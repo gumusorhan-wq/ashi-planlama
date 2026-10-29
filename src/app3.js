@@ -174,7 +174,7 @@
     const gc = a.gecici; if (!gc || !gc.ad) return {gorev: null, gecmis: []};
     const hedef = birimCoz(plan, gc.ad), baslik = C.TR(gc.neden);
     const gecmis = gc.bas ? C.aylariListele(gc.bas, gc.bit, bugunIso()) : [];
-    if (gc.bit && gc.bit < ayIlk()) return {gorev: null, gecmis};
+    if (gc.bit && gc.bit <= ayIlk() && !(gc.bas && gc.bas >= ayIlk())) return {gorev: null, gecmis, sonaErdi: true};   // görev ayın ilk günü bitiyorsa (ör. 01.10–01.11) kişi o ay kadrosuna döner
     return {gorev: {yer: gc.ad, hedef, kaynak: 'asos', yolluk: '', bas: gc.bas || '', bit: gc.bit || '', tarih: gc.bas ? `${trTarih(gc.bas)}${gc.bit ? ' – ' + trTarih(gc.bit) : ''}` : '', gerekce: GEREKCE_ESLE[baslik] || ''}, gecmis};
   }
   const bugunIso = () => new Date().toISOString().slice(0, 10);
@@ -227,8 +227,9 @@
       if (tur === 'A') {
         k.calisma = a.calisma; if (a.yillikKalan != null) k.yillikKalan = a.yillikKalan; if (a.memBas && !k.atamaBas) k.memBas = a.memBas;
         k.durumA = asosDurumA(a);
+        if (k.gorevSonaErdi && k.durumA === 'GEÇİCİ GÖREVDE') k.durumA = '';      // Personel Listesi Raporu'na göre görevi plan ayından önce bitiyor (ör. 01.10–01.11): kadrosuna döner
         if (/KADROSUNUN OLDUGU YERDE/.test(C.TR(a.calisma))) k.durumMetinA = ''; else k.durumMetinA = a.calisma;
-        if (a.gecici.ad && (!k.gorev || k.gorev.kaynak !== 'manuel') && !(k.gorev && k.gorev.bas)) k.gorev = {yer: a.gecici.ad, hedef: birimCoz(plan, a.gecici.ad), kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
+        if (a.gecici.ad && !k.gorevSonaErdi && (!k.gorev || k.gorev.kaynak !== 'manuel') && !(k.gorev && k.gorev.bas)) k.gorev = {yer: a.gecici.ad, hedef: birimCoz(plan, a.gecici.ad), kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
         else if (!a.gecici.ad && k.gorev && k.gorev.kaynak === 'asos' && !k.gorev.bas) k.gorev = null;
         if (k.durumA === 'GEÇİCİ GÖREVDE' && !k.gorev) k.gorev = {yer: '', hedef: null, kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
       } else {
@@ -236,6 +237,7 @@
         const h = asosAyHesabi(a); k.durumB = h.durumB; k.durumMetinB = h.durumMetin; k.sut = h.sut;
         k.izin = (k.izin || []).filter(i => !i.asos).concat(h.izin.map(i => ({...i, asos: true}))); if (h.izin.length) rapor.izinli++; if (h.durumB === 'NÖBET MUAFİYETİ' || h.sut) rapor.muafiyet++;
         const gg = geciciGorev(plan, a);
+        k.gorevSonaErdi = !!gg.sonaErdi; if (gg.sonaErdi && k.durumA === 'GEÇİCİ GÖREVDE') { k.durumA = ''; k.durumMetinA = ''; }
         if (!k.gorev || k.gorev.kaynak !== 'manuel') { const eski = k.gorev; k.gorev = gg.gorev && eski && eski.gerekce && !gg.gorev.gerekce ? {...gg.gorev, gerekce: eski.gerekce, yolluk: eski.yolluk || ''} : gg.gorev; }
         k.gecmisAsos = [...new Set([...(k.gecmisAsos || []), ...gg.gecmis])].sort();
         if (gelenKaynak) { k.durumB = 'GEÇİCİ GÖREVLİ'; }
@@ -386,7 +388,7 @@
 
   // ---------- aylık rotasyon: her istasyondan ayda (kota) kişi çıkar; sırayla, kişi isteği varsa öncelikli / birkaç ay üst üste ----------
   const ayAnahtari = () => `${S.y}-${C.pad(S.m)}`;
-  const gorevAktif = g => !!g && !!(g.hedef || g.yer) && (!g.bit || g.bit >= ayIlk()) && (!g.bas || g.bas <= gunSon());
+  const gorevAktif = g => !!g && !!(g.hedef || g.yer) && (!g.bit || g.bit > ayIlk() || (g.bas && g.bas >= ayIlk())) && (!g.bas || g.bas <= gunSon());
   const sonCikis = k => [...(k.gecmis || []), ...(k.gecmisAsos || [])].sort().pop() || '';
   const ISTEK = {'': 'Sırayla', git: 'Gitmek istiyor', devam: 'Devam etmek istiyor', gitmesin: 'Bu ay gitmesin'};
   function rotasyon(b, h) {
@@ -544,7 +546,7 @@
           const ofBirim = new Set((onceki.birimler || []).filter(b => b.ekipOf).map(b => b.ad));
           S.plan.kayitlar = JSON.parse(JSON.stringify(onceki.kayitlar)).map(k => {
             const y = {...k, izin: [], planlanan: null, kilit: false};
-            if (y.gorev && y.gorev.bit && y.gorev.bit < ayIlk()) {
+            if (y.gorev && y.gorev.bit && y.gorev.bit <= ayIlk()) {
               if (y.istek === 'devam' || ofBirim.has(y.birim)) { y.gorev = {...y.gorev, bas: ayIlk(), bit: gunSon(), tarih: `${trTarih(ayIlk())} – ${trTarih(gunSon())}`}; y.gecmis = [...new Set([...(y.gecmis || []), ayAnahtari()])].sort(); }
               else { y.gorev = null; if (y.durum === 'GEÇİCİ GÖREVDE') y.durum = ''; y.durumManuel = false; }
             }
