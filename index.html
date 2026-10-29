@@ -879,6 +879,7 @@ function mount(root, opts = {}) {
     return {yuvalar, adaylar, acikYuva, fazlaGrup, cikabilir};
   }
   function kartHtml(b, h, p, etiket, plFark, oran, dengeli, isciTam) {
+    const dis = x => (durumlar()[x.k.durum] || {}).disarida && !x.k._gelen, disarida = h.satir.filter(dis).length, nobetsiz = h.satir.filter(x => !dis(x) && x.nobetYok).length, nobetTutan = h.satir.length - disarida - nobetsiz;
     const E = eksikAnaliz(h, isciTam, doktorluIstasyon(b)), gelecek = h.ihtiyacTur === 'oner' ? h.ihtiyacKisi : 0;
     const yuvaSatir = E.yuvalar.map(y => {
       const dolu = y.gerek - y.acik;
@@ -900,7 +901,7 @@ function mount(root, opts = {}) {
         <div class="ap-bar ${dengeli ? 'ok' : p > h.ihtiyac ? 'fz' : 'bad'}"><i style="width:${oran}%"></i></div>
         <div class="r"><span title="Nöbet yazılan toplam / ayda dolması gereken yuva nöbeti">Yazılan / gereken nöbet</span><b>${fmt(p)} / ${h.ihtiyac}</b></div>
         <div class="r"><span title="Herkes hedef nöbetini tutarsa / herkese üst sınır yazılırsa">Kişilerin kapasitesi</span><b>${fmt(h.kapasite)} · azami ${fmt(h.azamiKap)}</b></div>
-        <div class="r"><span>Kişi</span><b>${h.satir.length}</b></div>
+        <div class="r"><span title="Hesaba giren kişi: istasyonda çalışan ve nöbet tutabilen. Dışarıda (geçici görevde) olanların hedefi 0 sayılır, kapasiteye ve ihtiyaca girmez.">Kişi (nöbet tutan)</span><b>${nobetTutan}${disarida ? ` <span class="ap-note">+ ${disarida} dışarıda</span>` : ''}${nobetsiz ? ` <span class="ap-note">+ ${nobetsiz} nöbet tutmaz</span>` : ''}</b></div>
         <div class="ap-yh">Yuvalar (hedef nöbetle dolu / gereken)</div>${yuvaSatir}
         ${gelen}${cikan}${net}${Math.abs(plFark) > 0.01 ? `<div class="ap-note" style="margin-top:6px" title="Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}: kilitli değer ya da yuva kısıtı">Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}</div>` : ''}</div>`;
   }
