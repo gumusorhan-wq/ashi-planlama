@@ -1719,7 +1719,7 @@ function mount(root, opts = {}) {
     const rapor = {tur, yeni: [], degisen: 0, nakil: [], eksik: [], dortB: 0, dortBTarihsiz: 0, toplam: satirlar.length, gorevli: 0, disKurum: 0, gelen: 0, izinli: 0, muafiyet: 0, plan};
     const tcMap = new Map(), adMap = new Map();
     plan.kayitlar.forEach(k => { if (k.tc) tcMap.set(k.tc, k); const a = adAnahtar(k.ad); if (!adMap.has(a)) adMap.set(a, k); });
-    const goruldu = new Set();
+    const goruldu = new Set(), izinGoruldu = new Set();
     satirlar.forEach(a => {
       let gelenKaynak = false;
       if (tur === 'B' && !a.kadroIl) {                       // kadrosu Manisa'da olmayan: dış kurum personeli; İASB birimlerinde çalışıyorsa "kurum dışı gelen"
@@ -1751,8 +1751,11 @@ function mount(root, opts = {}) {
         if (k.durumA === 'GEÇİCİ GÖREVDE' && !k.gorev) k.gorev = {yer: '', hedef: null, kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
       } else {
         k.atamaBas = a.atamaBas || ''; if (a.atamaBas) k.memBas = a.atamaBas; k.atamaNeden = a.atamaNeden;
-        const h = asosAyHesabi(a); k.durumB = h.durumB; k.durumMetinB = h.durumMetin; k.sut = h.sut;
-        k.izin = (k.izin || []).filter(i => !i.asos).concat(h.izin.map(i => ({...i, asos: true}))); if (h.izin.length) rapor.izinli++; if (h.durumB === 'NÖBET MUAFİYETİ' || h.sut) rapor.muafiyet++;
+        // Bir kişinin birden çok izin/muafiyet satırı olabilir: aynı dosyada ilk satırda ASOS verisi sıfırlanır, sonrakiler eklenir
+        const h = asosAyHesabi(a), ilkSatir = !izinGoruldu.has(k.id); izinGoruldu.add(k.id);
+        if (ilkSatir) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; k.sut = h.sut; k.izin = (k.izin || []).filter(i => !i.asos); }
+        else { if (h.durumB && !k.durumB) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; } k.sut = Math.max(k.sut || 0, h.sut); }
+        k.izin = (k.izin || []).concat(h.izin.map(i => ({...i, asos: true}))); if (h.izin.length) rapor.izinli++; if (h.durumB === 'NÖBET MUAFİYETİ' || h.sut) rapor.muafiyet++;
         const gg = geciciGorev(plan, a);
         k.gorevSonaErdi = !!gg.sonaErdi; if (gg.sonaErdi && k.durumA === 'GEÇİCİ GÖREVDE') { k.durumA = ''; k.durumMetinA = ''; }
         if (!k.gorev || k.gorev.kaynak !== 'manuel') { const eski = k.gorev; k.gorev = gg.gorev && eski && eski.gerekce && !gg.gorev.gerekce ? {...gg.gorev, gerekce: eski.gerekce, yolluk: eski.yolluk || ''} : gg.gorev; }
