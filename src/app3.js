@@ -76,6 +76,7 @@
     if (hi < 0) throw new Error('"TC Kimlik No" başlığı bulunamadı. ASOS\'tan indirilen "Personel Listesi Raporu" veya EKİP "Başhekimlik Komuta İstasyon Personel Listesi Raporu" dosyasını seçin.');
     const H = rows[hi].map(C.TR);
     if (H.includes('NOBET GOREVI')) return {tur: 'N', satirlar: asosParseN(rows, hi)};
+    if (H.includes('SIRA NO') && H.includes('ADI SOYADI') && H.some(h => /^\d+ [A-Z]+ 20\d\d/.test(h))) throw new Error('Bu dosya "Nöbet Listesi Döküm Cetveli": kişinin hangi günler kaç saat nöbet tuttuğunu içerir ama ekip şefi / YSP / sürücü görevini içermez. Sürücülüğü doğrulamak için ASOS\'tan "Nöbet İçi Hareket Raporu"nu (Nöbet Görevi sütunlu dosya) yükleyin.');
     if (H.includes('KADRO UNVANI') && H.includes('CALISMA DURUMU')) return {tur: 'A', satirlar: asosParseA(rows, hi)};
     if (H.includes('IZIN TIPI') || H.includes('MUAFIYET TIPI')) return {tur: 'B', satirlar: asosParseB(rows, hi)};
     throw new Error('Başlıklar tanınmadı (' + H.filter(Boolean).slice(0, 6).join(', ') + '…). ' + 'Tanınmayan ASOS rapor biçimi. Beklenen: EKİP Personel Listesi Raporu ya da Personel Listesi Raporu.');
@@ -89,6 +90,7 @@
     // süre: "24", "24 saat", "24:00", "12,5", "1 gün"
     const saatOku = v => {
       const t = C.TR(String(v ?? '')).trim(); if (!t) return 0; let m;
+      if (/^MESAI/.test(t)) return 8;
       if ((m = t.match(/^(\d+):(\d{2})/))) return +m[1] + +m[2] / 60;
       if ((m = t.match(/^(\d+(?:[.,]\d+)?)\s*(SAAT|SA|S)?$/))) return parseFloat(m[1].replace(',', '.'));
       if ((m = t.match(/^(\d+(?:[.,]\d+)?)\s*GUN/))) return parseFloat(m[1].replace(',', '.')) * 24;
@@ -107,6 +109,73 @@
       tani.ok++; out.push({tc, rol, saat, ay: bi >= 0 ? C.tarihIso(r[bi]).slice(0, 7) : ''});
     });
     out.tani = tani; return out;
+  }
+  function asosParseA(rows, hi) {
+    const ix = {}; rows[hi].forEach((h, i) => { ix[C.TR(h)] = i; });
+    const g = (r, a) => (ix[a] === undefined ? '' : r[ix[a]]), out = [];
+    rows.slice(hi + 1).forEach((r, n) => {
+      const tc = String(g(r, 'TC KIMLIK NO')).replace(/\D/g, ''); if (!tc) return;
+      out.push({tur: 'A', tc, ad: `${String(g(r, 'ADI')).trim()} ${String(g(r, 'SOYADI')).trim()}`.toLocaleUpperCase('tr-TR').replace(/\s+/g, ' ').trim(),
+        tel: String(g(r, 'CEP TELEFONU') || '').trim(), memBas: C.tarihIso(g(r, 'MEMURIYET BASLANGIC TARIHI')), calisma: String(g(r, 'CALISMA DURUMU') || '').trim(),
+        yillikKalan: g(r, 'YILLIK IZIN (KALAN)') === '' ? null : sayi(g(r, 'YILLIK IZIN (KALAN)')), kadroTur: String(g(r, 'KADRO TURU') || '').trim(), kadroBirim: String(g(r, 'KADRO BIRIMI') || '').trim(),
+        kadroBrans: String(g(r, 'KADRO BRANSI') || '').trim(), unvan: String(g(r, 'KADRO UNVANI') || '').trim(),
+        gecici: {ad: String(g(r, 'GECICI GOREV BIRIMI') || '').trim()}, sira: n});
+    });
+    return out;
+  }
+  function asosParseB(rows, hi) {
+    const sec = rows[Math.max(0, hi - 1)] || [], ix = {}; let cur = '';
+    rows[hi].forEach((h, i) => { if (hi > 0 && sec[i]) cur = C.TR(sec[i]).slice(0, 8); const k = cur + '|' + C.TR(h); if (ix[k] === undefined) ix[k] = i; });
+    const g = (r, s, a) => { const i = ix[s + '|' + a]; return i === undefined ? '' : r[i]; }, out = [];
+    rows.slice(hi + 1).forEach((r, n) => {
+      const tc = String(g(r, 'KIMLIK B', 'TC KIMLIK NO')).replace(/\D/g, ''); if (!tc) return;
+      const ds = v => C.tarihIso(v);
+      out.push({tur: 'B', tc, ad: `${String(g(r, 'KIMLIK B', 'ADI')).trim()} ${String(g(r, 'KIMLIK B', 'SOYADI')).trim()}`.toLocaleUpperCase('tr-TR').replace(/\s+/g, ' ').trim(),
+        unvan: String(g(r, 'OZLUK BI', 'UNVAN') || '').trim(), kadroBrans: String(g(r, 'OZLUK BI', 'BRANS') || '').trim(), kadroTur: String(g(r, 'OZLUK BI', 'ISTIHDAM SEKLI') || '').trim(),
+        izin: g(r, 'IZIN BIL', 'IZIN TIPI') ? {tip: String(g(r, 'IZIN BIL', 'IZIN TIPI')).trim(), bas: ds(g(r, 'IZIN BIL', 'BASLANGIC TARIHI')), bit: ds(g(r, 'IZIN BIL', 'BITIS TARIHI')), gun: sayi(g(r, 'IZIN BIL', 'ALINAN GUN'))} : null,
+        muaf: C.muafiyetCoz(g(r, 'MUAFIYET', 'MUAFIYET TIPI')), kadroIl: String(g(r, 'ASOS ATA', 'KADRO ILI') || '').trim(),
+        kadroBirim: String(g(r, 'ASOS ATA', 'ATAMA BIRIMI ADI') || '').trim(), kadroIstTip: String(g(r, 'ASOS ATA', 'ISTASYON TIPI') || '').trim(), atamaNeden: String(g(r, 'ASOS ATA', 'BASLAYIS NEDENI') || '').trim(), atamaBas: ds(g(r, 'ASOS ATA', 'BASLAYIS TARIHI')),
+        aktifBirim: String(g(r, 'AKTIF CA', 'AKTIF BIRIM ADI') || '').trim(), aktifTip: String(g(r, 'AKTIF CA', 'BIRIM TIPI') || '').trim(),
+        gecici: {ad: String(g(r, 'GECICI G', 'GECICI GOREV BIRIM ADI') || '').trim(), neden: String(g(r, 'GECICI G', 'BASLAYIS NEDENI') || '').trim(), tip: String(g(r, 'GECICI G', 'BIRIM TIPI') || '').trim(), bas: ds(g(r, 'GECICI G', 'BASLANGIC TARIHI')), bit: ds(g(r, 'GECICI G', 'BITIS TARIHI'))},
+        sira: n});
+    });
+    return out;
+  }
+  const trTarih = iso => iso ? iso.split('-').reverse().join('.') : '';
+  function asosSinif(a) {
+    if (/ISCI|SOFOR/.test(C.TR(a.kadroTur + ' ' + a.unvan)) || /SURUCU/.test(C.TR(a.kadroBrans))) return 'isci';
+    return C.sinifTespit(a.unvan) || 'memur';
+  }
+  function asosDurumA(a) {
+    const t = C.TR(a.calisma);
+    if (/GECICI GOREVLI CALISIYOR/.test(t)) return 'GEÇİCİ GÖREVDE';
+    if (/AILE HEK/.test(t)) return 'AİLE HEKİMLİĞİNDE';
+    if (/UZMANLIK/.test(t)) return 'UZMANLIK EĞİTİMİ';
+    return '';
+  }
+  const GEREKCE_ESLE = {'PERSONEL IHTIYACI': 'PERSONEL İHTİYACI', 'DIGER': 'DİĞER'};
+  // B raporundan plan ayına göre durum / izin / muafiyet / süt izni / geçici görev çıkarır
+  function asosAyHesabi(a) {
+    const bas = ayIlk(), son = gunSon(), sonuc = {durumB: '', izin: [], sut: 0, gorev: null, durumMetin: ''};
+    if (a.izin && a.izin.bit && a.izin.bit >= bas && (!a.izin.bas || a.izin.bas <= son)) {
+      const t = C.TR(a.izin.tip), uzun = a.izin.bit >= son && (!a.izin.bas || a.izin.bas <= bas);
+      const dm = /DOGUM ONCESI/.test(t) ? 'DOĞUM ÖNCESİ' : /DOGUM/.test(t) ? 'DOĞUM SONRASI' : /HEYET/.test(t) ? 'HEYET RAPORLU' : /RAPOR/.test(t) ? 'RAPORLU' : '';
+      if (dm && uzun) { sonuc.durumB = dm; sonuc.durumMetin = `${a.izin.tip} ${trTarih(a.izin.bas)}–${trTarih(a.izin.bit)}`; }
+      else sonuc.izin.push({tur: a.izin.tip.toLocaleUpperCase('tr-TR'), gun: a.izin.gun, bas: a.izin.bas, bit: a.izin.bit});
+    }
+    (a.muaf || []).forEach(m => {
+      if (!(m.bit >= bas && m.bas <= son)) return;
+      if (m.tur === 'nobet' && !sonuc.durumB) { sonuc.durumB = 'NÖBET MUAFİYETİ'; sonuc.durumMetin = `Nöbet muafiyeti ${trTarih(m.bas)}–${trTarih(m.bit)}`; }
+      if (m.tur === 'sut') sonuc.sut = Math.max(sonuc.sut, m.saat || 0);
+    });
+    return sonuc;
+  }
+  function geciciGorev(plan, a) {
+    const gc = a.gecici; if (!gc || !gc.ad) return {gorev: null, gecmis: []};
+    const hedef = birimCoz(plan, gc.ad), baslik = C.TR(gc.neden);
+    const gecmis = gc.bas ? C.aylariListele(gc.bas, gc.bit, bugunIso()) : [];
+    if (gc.bit && gc.bit < ayIlk()) return {gorev: null, gecmis};
+    return {gorev: {yer: gc.ad, hedef, kaynak: 'asos', yolluk: '', bas: gc.bas || '', bit: gc.bit || '', tarih: gc.bas ? `${trTarih(gc.bas)}${gc.bit ? ' – ' + trTarih(gc.bit) : ''}` : '', gerekce: GEREKCE_ESLE[baslik] || ''}, gecmis};
   }
   const bugunIso = () => new Date().toISOString().slice(0, 10);
   function asosOnizle(sonuc, taban) {
