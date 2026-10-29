@@ -156,10 +156,11 @@
     if (!b) return '<div class="ap-card ap-empty">Birim yok.</div>';
     S.ist = b.ad;
     const D = durumlar(), duz = !salt();
-    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)).sort(personelSirala);
+    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida));
     const istas = b.tur === 'istasyon', h = istas ? hesapla(b) : null;
     const disSay = S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef).length;
     const satirMap = new Map(); if (h) h.satir.forEach(s => satirMap.set(s.k.id, s));
+    kis.sort(nobetSirala(satirMap));
     const p = h ? planlananToplam(h) : 0;
     let son = '', rows = '';
     kis.forEach(k => {

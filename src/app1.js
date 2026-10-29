@@ -117,6 +117,10 @@ function mount(root, opts = {}) {
   const gorevGosterim = k => (k.durum === 'GEÇİCİ GÖREVLİ' && k._gelen ? (k.birim + ' kadrosundan') : gorevMetin(k));
   const durumGosterim = k => k.durumMetin || k.durum || '';
 
+  // İstasyon listesi sırası: ekip şefi (doktor, AABT) üstte, YSP (ATT) ortada, sürücü (işçi) en altta
+  const NB_SIRA = {dok: 0, ke: 1, ka: 1, ysp: 2, sy: 3, isci: 4};
+  const nbSira = (k, satirMap) => { const s = satirMap && satirMap.get(k.id); return s ? NB_SIRA[s.grup] : k.sinif === 'doktor' ? 0 : k.sinif === 'isci' ? 4 : (C.kadroTip(k) === 'AABT' ? 1 : 2); };
+  const nobetSirala = satirMap => (a, b) => (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
   function personelSirala(a, b) {
     const sg = {doktor: 0, memur: 1, isci: 2};
     return (sg[a.sinif] - sg[b.sinif]) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad, b.ad);

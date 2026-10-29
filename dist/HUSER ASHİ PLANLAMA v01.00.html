@@ -835,6 +835,10 @@ function mount(root, opts = {}) {
   const gorevGosterim = k => (k.durum === 'GEÇİCİ GÖREVLİ' && k._gelen ? (k.birim + ' kadrosundan') : gorevMetin(k));
   const durumGosterim = k => k.durumMetin || k.durum || '';
 
+  // İstasyon listesi sırası: ekip şefi (doktor, AABT) üstte, YSP (ATT) ortada, sürücü (işçi) en altta
+  const NB_SIRA = {dok: 0, ke: 1, ka: 1, ysp: 2, sy: 3, isci: 4};
+  const nbSira = (k, satirMap) => { const s = satirMap && satirMap.get(k.id); return s ? NB_SIRA[s.grup] : k.sinif === 'doktor' ? 0 : k.sinif === 'isci' ? 4 : (C.kadroTip(k) === 'AABT' ? 1 : 2); };
+  const nobetSirala = satirMap => (a, b) => (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
   function personelSirala(a, b) {
     const sg = {doktor: 0, memur: 1, isci: 2};
     return (sg[a.sinif] - sg[b.sinif]) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad, b.ad);
@@ -997,10 +1001,11 @@ function mount(root, opts = {}) {
     if (!b) return '<div class="ap-card ap-empty">Birim yok.</div>';
     S.ist = b.ad;
     const D = durumlar(), duz = !salt();
-    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)).sort(personelSirala);
+    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida));
     const istas = b.tur === 'istasyon', h = istas ? hesapla(b) : null;
     const disSay = S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef).length;
     const satirMap = new Map(); if (h) h.satir.forEach(s => satirMap.set(s.k.id, s));
+    kis.sort(nobetSirala(satirMap));
     const p = h ? planlananToplam(h) : 0;
     let son = '', rows = '';
     kis.forEach(k => {
@@ -1354,7 +1359,7 @@ function mount(root, opts = {}) {
       const k = s.k, azami = Math.floor(s.azami + 1e-9);
       return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), planlanan: sayi(k.planlanan), ust: k.sinif === 'isci' ? null : azami, gelen: !!k._gelen,
         izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
-    }).sort((a, c) => ({doktor: 0, memur: 1, isci: 2}[a.sinif] - {doktor: 0, memur: 1, isci: 2}[c.sinif]) || trCollator.compare(a.ad, c.ad));
+    }).sort((a, c) => (NB_SIRA[a.grup] - NB_SIRA[c.grup]) || trCollator.compare(a.ad, c.ad));
   }
   function n2Girdi(b) {
     const dp = n2Depo(b.ad), ks = n2Kisiler(b).map(k => ({...k, izin: [...(k.izin || []), ...(dp.izin[k.id] || [])], istek: dp.istek[k.id] || []}));
@@ -1387,7 +1392,7 @@ function mount(root, opts = {}) {
   function n2TeklifOzet(b) {
     const h = hesapla(b), o = n2OnayOku(b.ad), D = durumlar();
     const satir = h.satir.map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
-      return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => personelSirala(x.k, y.k));
+      return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => (NB_SIRA[x.s.grup] - NB_SIRA[y.s.grup]) || personelSirala(x.k, y.k));
     const toplam = satir.reduce((a, x) => a + x.tek, 0), mevcutT = satir.reduce((a, x) => a + (x.tutar ? x.mevcut : 0), 0);
     return {h, o, satir, toplam, mevcutT, fark: Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
   }
