@@ -433,11 +433,11 @@
     const devam = b.ekipOf ? disarida : disarida.filter(k => k.istek === 'devam');      // kapalı ekibin geçici görevdekileri olduğu yerde devam eder
     // Kota: elle girilmişse o; değilse 1, mesai dolmuyorsa (kapasite ihtiyacı aşıyorsa) fazlalık kadar kişi (en çok 3)
     const nobetciler = h.satir.filter(s => !s.nobetYok), ort = nobetciler.length ? nobetciler.reduce((a, s) => a + s.hedef, 0) / nobetciler.length : 7;
-    const kotaOto = h.durum === 'fazla' && ort > 0 ? Math.min(3, Math.max(1, Math.round(h.fazlaH / ort))) : 1;
+    const kotaOto = h.fazlaVar && ort > 0 ? Math.min(3, Math.max(1, Math.round(h.fazlaEf / ort))) : 1;
     const kota = b.ekipOf ? 1e6 : (b.cikisKota === undefined || b.cikisKota === null ? kotaOto : b.cikisKota);   // kapalı ekipte tüm uygun personel dağıtılabilir
     const idx = id => { const i = (b.rotasyon || []).indexOf(id); return i < 0 ? 1e6 : i; };
     const grupOf = id => (h.satir.find(s => s.k.id === id) || {}).grup;
-    const fz = new Set(C.GRUPLAR.filter(g => h.slot.hedef.fazla[g] > 0.001));            // mesaisini tamamlayamayan (fazla) gruplar
+    const fz = new Set(C.GRUPLAR.filter(g => (h.fazlaGrupEf || h.slot.hedef.fazla)[g] > 0.001));            // mesaisini tamamlayamayan (fazla) gruplar
     const uygunlar = kisiler.filter(k => {
       const dt = D[k.durum] || {};
       return !aileHek(k) && !gorevAktif(k.gorev) && !dt.nobetYok && !dt.mesaiYok && !dt.pasif && !dt.disarida && !C.gorevlendirmeEngeli(k, ayIlk()) && C.kisiMesai(k, S.y, S.m, ozel(), D) > 0;
@@ -459,7 +459,7 @@
   // Bir istasyonun hedef nöbetle açığı: cikar listesindeki kişiler dışarı çıkarsa / don listesindeki dışarıdaki kişiler dönerse
   function acikSimule(b, cikar = [], don = []) {
     const kis = kisCtx(S.plan, b.ad).map(x => cikar.includes(x.id) ? {...x, durum: 'GEÇİCİ GÖREVDE'} : don.includes(x.id) ? {...x, durum: ''} : x);
-    return hesaplaCtx(S.plan, S.y, S.m, b, kis).hedefAcik;
+    return hesaplaCtx(S.plan, S.y, S.m, b, kis).acikEf;
   }
   // Açığı olan istasyonun, başka istasyona görevlendirilmiş ve dönmesi o açığı azaltacak personelini geri çağırır (kişi "devam etsin" işaretliyse, sağlık mazereti/eğitim görevinde ise ya da o ay kadrosunda mesaisi yoksa dokunulmaz)
   function acikGeriCek(uygula) {
@@ -478,7 +478,7 @@
     const hedefler = ists.filter(x => x.h.ihtiyacTur === 'oner' && !x.b.ekipOf).map(x => ({ad: x.b.ad, acik: {...(x.h.acikM || x.h.acik)}, tam: x.h.tamHedef}));
     const kkm = S.plan.birimler.find(b => b.tur === 'kkm');
     const out = [];
-    ists.filter(x => x.r.oneri.length && (S.rotKaynak !== 'fazla' || x.h.durum === 'fazla' || x.b.ekipOf)).sort((a, b) => b.h.fazlaH - a.h.fazlaH).forEach(src => src.r.oneri.forEach(k => {
+    ists.filter(x => x.r.oneri.length && (S.rotKaynak !== 'fazla' || x.h.fazlaVar || x.b.ekipOf)).sort((a, b) => b.h.fazlaEf - a.h.fazlaEf).forEach(src => src.r.oneri.forEach(k => {
       const ilce = C.ilceAdi(src.b.ad), s = src.h.satir.find(x => x.k.id === k.id), hd = s ? s.hedef : 0, grup = s ? s.grup : 'ka';
       const yet = C.YETENEK[grup] || ['es', 'ysp', 'sur'], gerekli = t => Math.min(hd > 0 ? hd : t.tam, t.tam) - 1e-9;
       // Kişinin yeteneklerine uyan nöbet branşlarında (ekip şefi / YSP / sürücü) açığı olan istasyon: aynı ilçe, sonra yakından uzağa

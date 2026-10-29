@@ -205,8 +205,9 @@ const APCore = (() => {
     // Mod 'fazla' (fazla mesaili): kişilere azami nöbete kadar fazla nöbet yazılacağı kabul edilir; personel yalnızca fazla nöbetle de kapanmayan açık bir kişiyi dolduruyorsa önerilir.
     // Mod verilmezse (ya da 'mesai'): açık, herkes yalnız hedef nöbetini tuttuğunda hesaplanır.
     const hedefAcik = unmetH, fazlaMod = a.mod === 'fazla', acikEf = fazlaMod ? unmetA : unmetH, ihtiyacKisi = tam > 0 ? Math.floor(acikEf / tam + EPS) : 0;
+    const fazlaEf = fazlaMod ? r2(toplam(A.fazla)) : fazlaH;
     const ihtiyacTur = hedefAcik <= EPS ? 'yok' : (fazlaMod && unmetA <= EPS) ? 'icerde' : ihtiyacKisi >= 1 ? 'oner' : unmetA <= EPS ? 'icerde' : 'elle';
-    return {gun, ihtiyac, satir, gruplar, kapasite, azamiKap, fark: r2(fazlaH - unmetH), fazlaH, farkAzami: unmetA > EPS ? -unmetA : r2(azamiKap - ihtiyac), durum, tamHedef: tam, hedefAcik, acikEf: r2(acikEf), acikM: fazlaMod ? A.rem : H.rem, ihtiyacKisi, kalanAcik: r2(acikEf - ihtiyacKisi * tam), ihtiyacTur,
+    return {gun, ihtiyac, satir, gruplar, kapasite, azamiKap, fark: r2(fazlaH - unmetH), fazlaH, farkAzami: unmetA > EPS ? -unmetA : r2(azamiKap - ihtiyac), durum, tamHedef: tam, hedefAcik, acikEf: r2(acikEf), fazlaEf, fazlaGrupEf: fazlaMod ? A.fazla : H.fazla, fazlaVar: fazlaMod ? fazlaEf > EPS : durum === 'fazla', acikM: fazlaMod ? A.rem : H.rem, ihtiyacKisi, kalanAcik: r2(acikEf - ihtiyacKisi * tam), ihtiyacTur,
       slot: {dem, hedef: H, azami: A, supH, supA}, acik: H.rem};
   }
   // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).

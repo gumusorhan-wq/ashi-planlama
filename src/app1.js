@@ -48,7 +48,7 @@ function mount(root, opts = {}) {
   let kaydetZamani = null;
   const kaydet = () => { clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
   const ayarKaydet = () => { const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
-  const HESAP_SURUM = 7;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
+  const HESAP_SURUM = 8;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
   function toast(t) { const id = uid(); S.toastlar.push({id, t}); toastCiz(); setTimeout(() => { S.toastlar = S.toastlar.filter(x => x.id !== id); toastCiz(); }, 5000); }
   function toastCiz() { root.querySelectorAll('.ap-toast').forEach(e => e.remove()); S.toastlar.forEach((x, i) => { const e = document.createElement('div'); e.className = 'ap-toast'; e.style.bottom = (14 + i * 46) + 'px'; e.textContent = x.t; root.appendChild(e); }); }
   function logla(islem, detay) { if (!S.plan) return; (S.plan.log = S.plan.log || []).unshift({t: Date.now(), rol: S.rol, islem, detay: detay || ''}); if (S.plan.log.length > 1500) S.plan.log.length = 1500; }

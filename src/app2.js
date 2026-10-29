@@ -46,8 +46,9 @@
     // en dar branşlar önce (yuva sayısı az olan), aynı yuva kümesindeki doktor/AABT gibi seçenekler birlikte gösterilir
     adaylar.sort((a, c) => a.yuva.length - c.yuva.length);
     const acikYuva = yuvalar.filter(y => y.acik >= 0.5);
-    const fazlaGrup = Object.entries(h.slot.hedef.fazla).filter(([, v]) => v > 0.001).map(([g, v]) => ({g, v, ad: C.GRUP_AD[g]}));
-    const cikabilir = h.fazlaH > 0.001 && tam > 0 ? Math.floor(h.fazlaH / tam + 1e-9) : 0;
+    const fazlaGrup = Object.entries(h.fazlaGrupEf || h.slot.hedef.fazla).filter(([, v]) => v > 0.001).map(([g, v]) => ({g, v, ad: C.GRUP_AD[g]}));
+    const kisiBasi = fazlaMod ? Math.max(tam, ...(h.satir.filter(s => !s.nobetYok && s.azami > 0 && s.k.sinif !== 'isci').map(s => s.azami).slice(0, 1))) : tam;     // fazla mesaili modda kalan kişiler azami nöbete kadar tutabildiği için çıkan kişinin yerini daha az kişi doldurur
+    const cikabilir = h.fazlaEf > 0.001 && kisiBasi > 0 ? Math.floor(h.fazlaEf / kisiBasi + 1e-9) : 0;
     return {yuvalar, adaylar, acikYuva, fazlaGrup, cikabilir};
   }
   function kartHtml(b, h, p, etiket, plFark, oran, dengeli, isciTam) {
@@ -66,7 +67,7 @@
     else if (h.ihtiyacTur === 'elle') gelen = fazlaMod ? `<div class="ap-ek ap-ek-e"><b>Elle karar</b> <span>fazla nöbetle de ${fmt(-h.farkAzami)} açık; bir kişinin ayı dolmaz</span></div>` : `<div class="ap-ek ap-ek-c"><b>Açık kalıyor</b> <span>${fmt(h.hedefAcik)} nöbet; bir kişinin ayını doldurmaz</span></div>`;
     // dışarı çıkabilecek personel
     let cikan = '';
-    if (h.fazlaH > 0.001) cikan = `<div class="ap-ek ap-ek-c" title="Nöbet branşları dolduğu halde mesaisini tamamlayamayan nöbet fazlası. ${E.fazlaGrup.map(f => f.ad + ': ' + fmt(f.v) + ' nöbet').join('; ')}"><b>${E.cikabilir ? `${E.cikabilir} kişi dışarı çıkabilir` : 'Fazlalık var'}</b> <span>${fmt(h.fazlaH)} nöbetlik fazlalık${E.fazlaGrup.length ? ' · ' + esc(E.fazlaGrup.map(f => f.ad).join(', ')) : ''} — nöbet branşlarına sığmıyor</span></div>`;
+    if (h.fazlaEf > 0.001) cikan = `<div class="ap-ek ap-ek-c" title="${fazlaMod ? 'Memur/doktor en çok ' + fmt(S.ayar.azamiMemur) + ' nöbet tutarsa bile' : 'Mesai karşılığıyla'} nöbet branşlarına sığmayan nöbet fazlası. ${E.fazlaGrup.map(f => f.ad + ': ' + fmt(f.v) + ' nöbet').join('; ')}"><b>${E.cikabilir ? `${E.cikabilir} kişi dışarı çıkabilir` : 'Fazlalık var'}</b> <span>${fmt(h.fazlaEf)} nöbetlik fazlalık${E.fazlaGrup.length ? ' · ' + esc(E.fazlaGrup.map(f => f.ad).join(', ')) : ''} — nöbet branşlarına sığmıyor</span></div>`;
     const net = gelecek && E.cikabilir ? `<div class="ap-note" style="margin-top:4px">Net: gelen ${gelecek}, çıkabilir ${E.cikabilir} → ${E.cikabilir >= gelecek ? 'kendi fazlalığı yetiyor' : 'dışarıdan ' + (gelecek - E.cikabilir) + ' kişi gerekir'}</div>` : '';
     const durumRozet = !gelecek && !cikan && h.ihtiyacTur === 'yok' ? '<span class="ap-tag ap-t-ok">Dengede</span>' : '';
     return `<div class="ap-st" data-act="ist-ac" data-v="${esc(b.ad)}"><h3>${esc(b.ad)} ${durumRozet}</h3>
@@ -91,8 +92,8 @@
           <div class="ap-note" style="margin-top:6px">Personeli diğer istasyonlara görevlendirilebilir.</div></div>`;
       }
       ih += h.ihtiyac; kap += h.kapasite; pl += p; azk += h.azamiKap;
-      kat[b.ad] = h.ihtiyacTur !== 'yok' ? h.ihtiyacTur : (h.durum === 'fazla' ? 'fazla' : 'diger');
-      if (h.ihtiyacTur === 'oner') { acik++; kisiOner += h.ihtiyacKisi; } else if (h.ihtiyacTur === 'icerde') fm++; else if (h.ihtiyacTur === 'elle') elle++; if (h.durum === 'fazla') fazla++;
+      kat[b.ad] = h.ihtiyacTur !== 'yok' ? h.ihtiyacTur : (h.fazlaVar ? 'fazla' : 'diger');
+      if (h.ihtiyacTur === 'oner') { acik++; kisiOner += h.ihtiyacKisi; } else if (h.ihtiyacTur === 'icerde') fm++; else if (h.ihtiyacTur === 'elle') elle++; if (h.fazlaVar) fazla++;
       const beklenen = Math.min(h.ihtiyac, h.azamiKap), plFark = p - beklenen;
       const oran = Math.min(100, Math.round(p / h.ihtiyac * 100)), dengeli = Math.abs(p - h.ihtiyac) < 1e-9;
       const etiket = h.ihtiyacTur === 'oner' ? `<span class="ap-tag ap-t-ih" title="Hedef nöbetle ${fmt(h.hedefAcik)} nöbet açık: gelen ${h.ihtiyacKisi} kişi mesaisini bu istasyonda tamamlar${h.kalanAcik > 0 ? '; kalan ' + fmt(h.kalanAcik) + ' nöbet fazla nöbetle kapanır' : ''}">Personel öner: ${h.ihtiyacKisi} kişi</span>`
@@ -103,7 +104,7 @@
       return kartHtml(b, h, p, etiket, plFark, oran, dengeli, isciTam);
     });
     const f = S.panoFiltre || '', gosterilen = liste.filter((_, i) => !f || kat[ists[i].ad] === f), kartlar = gosterilen.join('');
-    const FILTRE_AD = {oner: 'Personel önerilen istasyonlar', icerde: 'Fazla nöbetle kendi içinde dönen istasyonlar', elle: 'Elle karar gerektiren istasyonlar', fazla: 'Mesai tamamlayamayan istasyonlar', of: 'Ekip OF (kapalı) istasyonlar'};
+    const FILTRE_AD = {oner: 'Personel önerilen istasyonlar', icerde: 'Fazla nöbetle kendi içinde dönen istasyonlar', elle: 'Elle karar gerektiren istasyonlar', fazla: S.ayar.panoMod === 'mesai' ? 'Mesai tamamlayamayan istasyonlar' : 'Fazlalığı olan istasyonlar', of: 'Ekip OF (kapalı) istasyonlar'};
     const tk = (v, sayi, renk, etiket, ek) => `<div class="ap-click ${f === v ? 'on' : ''}" data-act="pano-filtre" data-v="${v}" title="Tıklayınca bu istasyonlar gösterilir" tabindex="0"><b style="color:${renk}">${sayi}</b><span>${etiket}${ek || ''}</span></div>`;
     const aktif = S.plan.kayitlar.filter(k => !(durumlar()[k.durum] || {}).pasif && !aileHek(k)).length;
     const attK = S.plan.kayitlar.filter(k => k.sinif === 'memur' && !(durumlar()[k.durum] || {}).pasif), attDog = attK.filter(k => C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === 'dogrulanmadi').length, attSur = attK.filter(k => C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === 'surucu').length;
@@ -123,7 +124,7 @@
         <li><b>Plan farkı:</b> planlanan nöbet toplamı ile olması gereken (ihtiyaç ya da azami kapasite, hangisi küçükse) arasındaki fark. Normalde görünmez; elle girilip kilitlenen değerler varsa çıkar.</li></ul></details>
       <div class="ap-sum ap-sum1"><div class="ap-click ${f ? '' : 'on'}" data-act="pano-filtre" data-v="" title="Tüm istasyonları göster" tabindex="0"><b>${ists.length - of}</b><span>Açık istasyon</span></div>${of ? tk('of', of, 'inherit', 'Ekip OF (kapalı)') : ''}<div><b>${aktif}</b><span>Aktif kayıt</span></div>
       <div><b>${ih}</b><span>Toplam ihtiyaç (nöbet)</span></div><div><b>${fmt(S.ayar.panoMod === 'mesai' ? kap : azk)}</b><span>${S.ayar.panoMod === 'mesai' ? 'Kapasite (mesai karşılığı)' : `Kapasite (en çok ${fmt(S.ayar.azamiMemur)} nöbet)`}</span></div>
-      <div><b>${fmt(pl)}</b><span>Planlanan</span></div>${tk('oner', acik, 'var(--ap-bad)', 'Personel önerilen istasyon', ` (toplam ${kisiOner} kişi)`)}${S.ayar.panoMod === 'mesai' ? '' : tk('icerde', fm, 'var(--ap-warn)', 'Fazla nöbetle kendi içinde dönen')}${tk('elle', elle, '#9a3412', S.ayar.panoMod === 'mesai' ? 'Açık kalan (kişiye yetmeyen)' : 'Elle karar gerektiren')}${tk('fazla', fazla, 'var(--ap-warn)', 'Mesai tamamlayamayan')}</div>
+      <div><b>${fmt(pl)}</b><span>Planlanan</span></div>${tk('oner', acik, 'var(--ap-bad)', 'Personel önerilen istasyon', ` (toplam ${kisiOner} kişi)`)}${S.ayar.panoMod === 'mesai' ? '' : tk('icerde', fm, 'var(--ap-warn)', 'Fazla nöbetle kendi içinde dönen')}${tk('elle', elle, '#9a3412', S.ayar.panoMod === 'mesai' ? 'Açık kalan (kişiye yetmeyen)' : 'Elle karar gerektiren')}${tk('fazla', fazla, 'var(--ap-warn)', S.ayar.panoMod === 'mesai' ? 'Mesai tamamlayamayan' : 'Fazlalığı olan (fazla mesaili)')}</div>
       ${f ? `<div class="ap-row"><b>${FILTRE_AD[f]}: ${gosterilen.length}</b><button class="ap-btn sm" data-act="pano-filtre" data-v="">✕ Filtreyi kaldır</button><span class="ap-note">Kartlara tıklayarak istasyonu açabilirsiniz.</span></div>` : ''}
       <div class="ap-toolbar ap-noprint"><button class="ap-btn pri" data-act="oner-hepsi" title="Tüm istasyonlarda planlanan nöbetleri yeniden hesaplar">Planlananı yeniden hesapla</button>
       <button class="ap-btn" data-act="excel-toplu">Toplu Excel</button>
@@ -206,7 +207,7 @@
     const ists = birimler.filter(b => b.tur === 'istasyon' && !b.ekipOf).map(b => ({b, h: hesapla(b)}));
     const acik = ists.filter(x => x.h.ihtiyacTur === 'oner').sort((a, b) => b.h.acikEf - a.h.acikEf);
     const ic = ists.filter(x => x.h.ihtiyacTur === 'icerde' || x.h.ihtiyacTur === 'elle').sort((a, b) => b.h.hedefAcik - a.h.hedefAcik);
-    const fazla = ists.filter(x => x.h.durum === 'fazla').sort((a, b) => b.h.fazlaH - a.h.fazlaH);
+    const fazla = ists.filter(x => x.h.fazlaVar).sort((a, b) => b.h.fazlaEf - a.h.fazlaEf);
     const gk = S.plan.kayitlar.filter(k => k.gorev && (k.gorev.hedef || k.gorev.yer)).sort((a, b) => trCollator.compare(a.birim, b.birim) || trCollator.compare(a.ad, b.ad));
     const opts = k => `<option value="">— (kaldır)</option>${birimler.map(b => `<option ${b.ad === k.gorev.hedef ? 'selected' : ''}>${esc(b.ad)}</option>`).join('')}`;
     const rows = gk.map(k => {
@@ -219,7 +220,7 @@
       <td>${eng ? `<span class="ap-tag ap-t-ih" title="${esc(eng)}">Engel</span>` : ''}</td></tr>`;
     }).join('');
     // basit eşleştirme önerisi
-    const oner = []; let fz = fazla.map(x => ({ad: x.b.ad, k: x.h.fazlaH})), ac = acik.map(x => ({ad: x.b.ad, k: x.h.hedefAcik}));
+    const oner = []; let fz = fazla.map(x => ({ad: x.b.ad, k: x.h.fazlaEf})), ac = acik.map(x => ({ad: x.b.ad, k: x.h.hedefAcik}));
     for (const a of ac) for (const f of fz) { const m = Math.min(a.k, f.k); if (m >= 4) { oner.push(`${f.ad} → ${a.ad}: yaklaşık ${fmt(m)} nöbet (≈ ${Math.max(1, Math.round(m / 7.5))} kişi)`); a.k -= m; f.k -= m; } }
     // Dağıtım sonucu: önerilen rotasyon tüm istasyonlara uygulanınca hâlâ personel bekleyen istasyonlar. Fazla nöbetle kapanan istasyonlara personel gönderilmez; kalan açık fazla nöbetle kapanır.
     const rotOner = rotasyonOneriler(), gidenSay = {}; rotOner.forEach(o => { if (o.hedef) gidenSay[o.hedef] = (gidenSay[o.hedef] || 0) + 1; });
