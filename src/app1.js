@@ -58,7 +58,7 @@ function mount(root, opts = {}) {
 
   async function ayarYukle() {
     const a = (await depo.get('ayar')) || {};
-    S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 15, kapsam: [], ...a, ...(opts.ayarlar || {})};
+    S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, otoGeriCek: true, azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 15, kapsam: [], ...a, ...(opts.ayarlar || {})};
     Object.keys(C.DURUM_VARSAYILAN).forEach(k => { if (!S.ayar.durumlar[k]) S.ayar.durumlar[k] = C.DURUM_VARSAYILAN[k]; });
   }
   async function planYukle() {
@@ -80,8 +80,8 @@ function mount(root, opts = {}) {
     return out;
   }
   const birimKisileri = ad => kisCtx(S.plan, ad);
-  function hesaplaCtx(plan, y, m, birim) {
-    return C.istasyonHesap(kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, azamiMemur: birim.azamiMemur != null ? birim.azamiMemur : S.ayar.azamiMemur, isciEk: 0, surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik}, birim.ekipOf ? 0 : birim.yuva);
+  function hesaplaCtx(plan, y, m, birim, kisiler) {
+    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, azamiMemur: birim.azamiMemur != null ? birim.azamiMemur : S.ayar.azamiMemur, isciEk: 0, surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik}, birim.ekipOf ? 0 : birim.yuva);
   }
   const hesapla = birim => hesaplaCtx(S.plan, S.y, S.m, birim);
   const planlananToplam = (hesap) => hesap.satir.filter(s => !s.nobetYok).reduce((a, s) => a + sayi(s.k.planlanan), 0);
