@@ -50,11 +50,11 @@
     finally { S.arsivCalisiyor = false; if (S.arsivTekrar) { S.arsivTekrar = false; setTimeout(() => arsivArkaPlan(), 300); } }
   }
   // Yüklenen dosya günlüğü (Arşiv sayfasında gösterilir): hangi dosya, hangi tür, kaç satır, hangi aya uygulandı
-  const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', N: 'Nöbet Listesi / Hareket Raporu'};
+  const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', I: 'Personel İzin-Muafiyet Raporu', N: 'Nöbet Listesi / Hareket Raporu'};
   async function yuklemeKaydet(dosyalar) {
     const l = (await depo.get('yuklemeler')) || [], t = Date.now();
     dosyalar.forEach(d => {
-      const r = d.rapor, ozet = d.tur === 'N' ? `${r.kisi} kişi, ${r.eslesen} eşleşti · aylar: ${(r.aylar || []).join(', ')}` : `${r.yeni.length} yeni, ${r.degisen} güncel${r.nakil && r.nakil.length ? ', ' + r.nakil.length + ' birim değişikliği' : ''}`;
+      const r = d.rapor, ozet = d.tur === 'I' ? `${r.kisi} kişi, ${r.eslesen} eşleşti · ${r.izinli} izinli, ${r.muafiyet} muafiyet` : d.tur === 'N' ? `${r.kisi} kişi, ${r.eslesen} eşleşti · aylar: ${(r.aylar || []).join(', ')}` : `${r.yeni.length} yeni, ${r.degisen} güncel${r.nakil && r.nakil.length ? ', ' + r.nakil.length + ' birim değişikliği' : ''}`;
       l.unshift({t, ad: d.ad, tur: d.tur, satir: r.toplam, boyut: d.boyut || 0, ay: ayAnahtari(), rol: S.rol, ozet});
     });
     if (l.length > 500) l.length = 500;
