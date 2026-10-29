@@ -885,7 +885,7 @@ function mount(root, opts = {}) {
     const E = eksikAnaliz(h, isciTam, doktorluIstasyon(b)), gelecek = h.ihtiyacTur === 'oner' ? h.ihtiyacKisi : 0;
     const yuvaSatir = E.yuvalar.map(y => {
       const dolu = y.gerek - y.acik;
-      return `<div class="ap-yuva"><span>${y.ad}</span><span class="v">${fmt(dolu)}/${fmt(y.gerek)}</span>${y.acik >= 0.5 ? `<span class="ap-tag ap-t-ih" title="${y.ad} yuvasında hedef nöbetlerle ${fmt(y.acik)} nöbet açık kalıyor${y.azamiAcik < y.acik ? '; azami nöbetle ' + fmt(y.azamiAcik) + ' açık kalır' : ''}">−${fmt(y.acik)}</span>` : '<span class="ap-tag ap-t-ok">tam</span>'}</div>`;
+      return `<div class="ap-yuva"><span>${y.ad}${y.acik >= 0.5 ? ` <span class="ap-note" title="Herkese üst sınır (azami) kadar nöbet yazılırsa bu yuvada kalan açık">· azamiyle ${y.azamiAcik >= 0.5 ? '−' + fmt(y.azamiAcik) : 'dolar'}</span>` : ''}</span><span class="v">${fmt(dolu)}/${fmt(y.gerek)}</span>${y.acik >= 0.5 ? `<span class="ap-tag ap-t-ih" title="${y.ad} yuvasında hedef nöbetlerle ${fmt(y.acik)} nöbet açık kalıyor${y.azamiAcik < y.acik ? '; azami nöbetle ' + fmt(y.azamiAcik) + ' açık kalır' : ''}">−${fmt(y.acik)}</span>` : '<span class="ap-tag ap-t-ok">tam</span>'}</div>`;
     }).join('');
     // gelecek personel: hangi branşlardan ve kaç kişi
     let gelen = '';
@@ -904,7 +904,7 @@ function mount(root, opts = {}) {
         <div class="r"><span title="Nöbet yazılan toplam / ayda dolması gereken yuva nöbeti">Yazılan / gereken nöbet</span><b>${fmt(p)} / ${h.ihtiyac}</b></div>
         <div class="r"><span title="Herkes hedef nöbetini tutarsa / herkese üst sınır yazılırsa">Kişilerin kapasitesi</span><b>${fmt(h.kapasite)} · azami ${fmt(h.azamiKap)}</b></div>
         <div class="r"><span title="Hesaba giren kişi: istasyonda çalışan ve nöbet tutabilen. Dışarıda (geçici görevde) olanların hedefi 0 sayılır, kapasiteye ve ihtiyaca girmez.">Kişi (nöbet tutan)</span><b>${nobetTutan}${disarida ? ` <span class="ap-note">+ ${disarida} dışarıda</span>` : ''}${nobetsiz ? ` <span class="ap-note">+ ${nobetsiz} nöbet tutmaz</span>` : ''}</b></div>
-        <div class="ap-yh">Yuvalar (hedef nöbetle dolu / gereken)</div>${yuvaSatir}
+        <div class="ap-yh">Yuvalar (herkes yalnız hedef nöbetini tutarsa dolu / gereken)</div>${yuvaSatir}
         ${gelen}${cikan}${net}${Math.abs(plFark) > 0.01 ? `<div class="ap-note" style="margin-top:6px" title="Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}: kilitli değer ya da yuva kısıtı">Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}</div>` : ''}</div>`;
   }
 
