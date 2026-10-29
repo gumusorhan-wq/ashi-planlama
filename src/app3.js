@@ -652,7 +652,7 @@
   root.addEventListener('drop', e => { if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); if (S.rol === 'salt_okur' || (S.plan && S.plan.durum === 'kilitli')) { toast('Düzenleme yetkiniz yok / ay kilitli.'); return; } asosDosyalariIsle([...e.dataTransfer.files]); });
 
   // başlangıç
-  const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); })();
+  const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); setTimeout(() => arsivArkaPlan(), 1200); })();
   return {getState: () => S, hazir, yenile: render, unmount: () => { root.innerHTML = ''; }};
 }
 return {mount, VERSION};

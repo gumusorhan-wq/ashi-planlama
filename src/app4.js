@@ -18,7 +18,36 @@
       ist[b.ad] = {of: !!b.ekipOf, ihtiyac: h.ihtiyac, kapasite: h.kapasite, azami: h.azamiKap, planlanan: Math.round(planlanan * 100) / 100, kisi: aktif.length,
         fazlaMesai: Math.round(fazla.reduce((a, x) => a + x.fazla, 0) * 100) / 100, fazlaH: h.fazlaH, hedefAcik: h.hedefAcik, ihtiyacTur: h.ihtiyacTur, ihtiyacKisi: h.ihtiyacKisi, durum: h.durum, cikan, gelen, fazla};
     });
-    return {ay: `${y}-${C.pad(m)}`, zaman: Date.now(), ist};
+    return {ay: `${y}-${C.pad(m)}`, zaman: Date.now(), hesapImza: hesapImza(), ist};
+  }
+  // Hesap imzası: hesaplama sürümü + sonucu etkileyen ayarlar. Değişirse arşivdeki aylar yeni yönteme göre arka planda yeniden hesaplanır.
+  const hesapImza = () => JSON.stringify([HESAP_SURUM, S.ayar.isciDusulen, S.ayar.azamiMemur, S.ayar.surEsik, S.ayar.surDegilEsik, Object.entries(S.ayar.durumlar).map(([k, v]) => [k, !!v.nobetYok, !!v.mesaiYok, !!v.disarida, !!v.pasif])]);
+  // Arşivlenmiş bir ayın planını (kopya üzerinde) güncel yöntemle yeniden hesaplar; kayıtlı plana dokunulmaz
+  function planiYenidenHesapla(plan, y, m) {
+    const kopya = JSON.parse(JSON.stringify(plan)), yedek = {plan: S.plan, y: S.y, m: S.m, toplu: S.toplu};
+    try { S.plan = kopya; S.y = y; S.m = m; S.toplu = true; kopya.birimler.filter(b => b.tur === 'istasyon').forEach(b => oner(b.ad)); return ayMetrik(kopya, y, m); }
+    finally { S.plan = yedek.plan; S.y = yedek.y; S.m = yedek.m; S.toplu = yedek.toplu; }
+  }
+  // Arka plan: imzası eski olan arşiv aylarını sırayla (arayüzü kilitlemeden) yeniler
+  async function arsivArkaPlan() {
+    if (!S.ayar) return;
+    if (S.arsivCalisiyor) { S.arsivTekrar = true; return; }
+    S.arsivCalisiyor = true;
+    try {
+      const v = S.arsivVeri || await arsivYukle(), imza = hesapImza(); let n = 0, yok = 0;
+      for (const ay of Object.keys(v).sort()) {
+        const rec = v[ay]; if (rec.hesapImza === imza) continue;
+        const [y, m] = ay.split('-').map(Number);
+        const plan = (S.plan && `${S.y}-${C.pad(S.m)}` === ay) ? S.plan : await depo.get(anahtar(y, m));
+        if (!plan) { yok++; continue; }
+        await new Promise(r => setTimeout(r, 30));
+        const yeni = planiYenidenHesapla(plan, y, m); yeni.zaman = rec.zaman; yeni.yenilendi = Date.now();
+        await arsivYaz(yeni); n++;
+      }
+      if (n) { toast(`${n} arşiv ayı güncel hesaplama yöntemine göre yeniden hesaplandı.`); render(); }
+      S.arsivPlanYok = yok;
+    } catch (er) { console.error(er); }
+    finally { S.arsivCalisiyor = false; if (S.arsivTekrar) { S.arsivTekrar = false; setTimeout(() => arsivArkaPlan(), 300); } }
   }
   // Yüklenen dosya günlüğü (Arşiv sayfasında gösterilir): hangi dosya, hangi tür, kaç satır, hangi aya uygulandı
   const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', N: 'Nöbet Listesi / Hareket Raporu'};
@@ -58,8 +87,8 @@
       <label class="ap-note"><input type="checkbox" id="ap-arsiv-kilit" ${S.rol === 'yonetici' ? '' : 'disabled'}> Kaydederken ayı kilitle (yalnız yönetici)</label>
       <button class="ap-btn" data-act="arsiv-hepsi" ${duz && kayitliPlan.length + (var_ ? 0 : 1) > 0 ? '' : 'disabled'} title="Tarayıcıdaki arşivlenmemiş tüm aylık planları arşive ekler">Kayıtlı tüm planları arşivle (${kayitliPlan.length})</button></div>
       ${var_ ? `<div class="ap-note" style="margin-top:8px">${ayEtiket()} son arşivleme: ${new Date(var_.zaman).toLocaleString('tr-TR')}</div>` : ''}</div>
-      <div class="ap-card"><h2>Arşivlenen aylar (${aylar.length})</h2>${tabloHtml(['Ay', 'Arşivleme', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Personel önerilen ist.', ''],
-      aylar.map(a => { const r = S.arsivVeri[a], t = arsivToplam(r); return [ayAd(a), new Date(r.zaman).toLocaleDateString('tr-TR'), t.ihtiyac, t.planlanan, t.cikan, t.gelen, t.fazla, t.oner, S.rol === 'yonetici' ? `<button class="ap-btn sm dng" data-act="arsiv-sil" data-v="${a}">Sil</button>` : '']; }))}</div>` + yuklemeHtml;
+      <div class="ap-card"><h2>Arşivlenen aylar (${aylar.length})</h2>${tabloHtml(['Ay', 'Arşivleme', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Personel önerilen ist.', 'Hesap', ''],
+      aylar.map(a => { const r = S.arsivVeri[a], t = arsivToplam(r); return [ayAd(a), new Date(r.zaman).toLocaleDateString('tr-TR'), t.ihtiyac, t.planlanan, t.cikan, t.gelen, t.fazla, t.oner, r.hesapImza === hesapImza() ? (r.yenilendi ? `<span class="ap-note" title="Güncel yönteme göre yeniden hesaplandı">güncellendi ${new Date(r.yenilendi).toLocaleDateString('tr-TR')}</span>` : 'güncel') : '<span class="ap-note" style="color:var(--ap-warn)" title="Bu ayın planı bu tarayıcıda yoksa eski yöntemle kalır">eski hesap</span>', S.rol === 'yonetici' ? `<button class="ap-btn sm dng" data-act="arsiv-sil" data-v="${a}">Sil</button>` : '']; }))}</div>` + yuklemeHtml;
   }
 
   // ---- istatistik: seçilen aylar ----

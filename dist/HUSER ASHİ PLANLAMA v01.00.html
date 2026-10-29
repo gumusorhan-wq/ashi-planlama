@@ -757,7 +757,8 @@ function mount(root, opts = {}) {
   const salt = () => S.rol === 'salt_okur' || (S.plan && S.plan.durum === 'kilitli');
   let kaydetZamani = null;
   const kaydet = () => { clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
-  const ayarKaydet = () => depo.put('ayar', S.ayar);
+  const ayarKaydet = () => { const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
+  const HESAP_SURUM = 6;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
   function toast(t) { const id = uid(); S.toastlar.push({id, t}); toastCiz(); setTimeout(() => { S.toastlar = S.toastlar.filter(x => x.id !== id); toastCiz(); }, 5000); }
   function toastCiz() { root.querySelectorAll('.ap-toast').forEach(e => e.remove()); S.toastlar.forEach((x, i) => { const e = document.createElement('div'); e.className = 'ap-toast'; e.style.bottom = (14 + i * 46) + 'px'; e.textContent = x.t; root.appendChild(e); }); }
   function logla(islem, detay) { if (!S.plan) return; (S.plan.log = S.plan.log || []).unshift({t: Date.now(), rol: S.rol, islem, detay: detay || ''}); if (S.plan.log.length > 1500) S.plan.log.length = 1500; }
@@ -1182,7 +1183,36 @@ function mount(root, opts = {}) {
       ist[b.ad] = {of: !!b.ekipOf, ihtiyac: h.ihtiyac, kapasite: h.kapasite, azami: h.azamiKap, planlanan: Math.round(planlanan * 100) / 100, kisi: aktif.length,
         fazlaMesai: Math.round(fazla.reduce((a, x) => a + x.fazla, 0) * 100) / 100, fazlaH: h.fazlaH, hedefAcik: h.hedefAcik, ihtiyacTur: h.ihtiyacTur, ihtiyacKisi: h.ihtiyacKisi, durum: h.durum, cikan, gelen, fazla};
     });
-    return {ay: `${y}-${C.pad(m)}`, zaman: Date.now(), ist};
+    return {ay: `${y}-${C.pad(m)}`, zaman: Date.now(), hesapImza: hesapImza(), ist};
+  }
+  // Hesap imzası: hesaplama sürümü + sonucu etkileyen ayarlar. Değişirse arşivdeki aylar yeni yönteme göre arka planda yeniden hesaplanır.
+  const hesapImza = () => JSON.stringify([HESAP_SURUM, S.ayar.isciDusulen, S.ayar.azamiMemur, S.ayar.surEsik, S.ayar.surDegilEsik, Object.entries(S.ayar.durumlar).map(([k, v]) => [k, !!v.nobetYok, !!v.mesaiYok, !!v.disarida, !!v.pasif])]);
+  // Arşivlenmiş bir ayın planını (kopya üzerinde) güncel yöntemle yeniden hesaplar; kayıtlı plana dokunulmaz
+  function planiYenidenHesapla(plan, y, m) {
+    const kopya = JSON.parse(JSON.stringify(plan)), yedek = {plan: S.plan, y: S.y, m: S.m, toplu: S.toplu};
+    try { S.plan = kopya; S.y = y; S.m = m; S.toplu = true; kopya.birimler.filter(b => b.tur === 'istasyon').forEach(b => oner(b.ad)); return ayMetrik(kopya, y, m); }
+    finally { S.plan = yedek.plan; S.y = yedek.y; S.m = yedek.m; S.toplu = yedek.toplu; }
+  }
+  // Arka plan: imzası eski olan arşiv aylarını sırayla (arayüzü kilitlemeden) yeniler
+  async function arsivArkaPlan() {
+    if (!S.ayar) return;
+    if (S.arsivCalisiyor) { S.arsivTekrar = true; return; }
+    S.arsivCalisiyor = true;
+    try {
+      const v = S.arsivVeri || await arsivYukle(), imza = hesapImza(); let n = 0, yok = 0;
+      for (const ay of Object.keys(v).sort()) {
+        const rec = v[ay]; if (rec.hesapImza === imza) continue;
+        const [y, m] = ay.split('-').map(Number);
+        const plan = (S.plan && `${S.y}-${C.pad(S.m)}` === ay) ? S.plan : await depo.get(anahtar(y, m));
+        if (!plan) { yok++; continue; }
+        await new Promise(r => setTimeout(r, 30));
+        const yeni = planiYenidenHesapla(plan, y, m); yeni.zaman = rec.zaman; yeni.yenilendi = Date.now();
+        await arsivYaz(yeni); n++;
+      }
+      if (n) { toast(`${n} arşiv ayı güncel hesaplama yöntemine göre yeniden hesaplandı.`); render(); }
+      S.arsivPlanYok = yok;
+    } catch (er) { console.error(er); }
+    finally { S.arsivCalisiyor = false; if (S.arsivTekrar) { S.arsivTekrar = false; setTimeout(() => arsivArkaPlan(), 300); } }
   }
   // Yüklenen dosya günlüğü (Arşiv sayfasında gösterilir): hangi dosya, hangi tür, kaç satır, hangi aya uygulandı
   const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', N: 'Nöbet Listesi / Hareket Raporu'};
@@ -1222,8 +1252,8 @@ function mount(root, opts = {}) {
       <label class="ap-note"><input type="checkbox" id="ap-arsiv-kilit" ${S.rol === 'yonetici' ? '' : 'disabled'}> Kaydederken ayı kilitle (yalnız yönetici)</label>
       <button class="ap-btn" data-act="arsiv-hepsi" ${duz && kayitliPlan.length + (var_ ? 0 : 1) > 0 ? '' : 'disabled'} title="Tarayıcıdaki arşivlenmemiş tüm aylık planları arşive ekler">Kayıtlı tüm planları arşivle (${kayitliPlan.length})</button></div>
       ${var_ ? `<div class="ap-note" style="margin-top:8px">${ayEtiket()} son arşivleme: ${new Date(var_.zaman).toLocaleString('tr-TR')}</div>` : ''}</div>
-      <div class="ap-card"><h2>Arşivlenen aylar (${aylar.length})</h2>${tabloHtml(['Ay', 'Arşivleme', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Personel önerilen ist.', ''],
-      aylar.map(a => { const r = S.arsivVeri[a], t = arsivToplam(r); return [ayAd(a), new Date(r.zaman).toLocaleDateString('tr-TR'), t.ihtiyac, t.planlanan, t.cikan, t.gelen, t.fazla, t.oner, S.rol === 'yonetici' ? `<button class="ap-btn sm dng" data-act="arsiv-sil" data-v="${a}">Sil</button>` : '']; }))}</div>` + yuklemeHtml;
+      <div class="ap-card"><h2>Arşivlenen aylar (${aylar.length})</h2>${tabloHtml(['Ay', 'Arşivleme', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Personel önerilen ist.', 'Hesap', ''],
+      aylar.map(a => { const r = S.arsivVeri[a], t = arsivToplam(r); return [ayAd(a), new Date(r.zaman).toLocaleDateString('tr-TR'), t.ihtiyac, t.planlanan, t.cikan, t.gelen, t.fazla, t.oner, r.hesapImza === hesapImza() ? (r.yenilendi ? `<span class="ap-note" title="Güncel yönteme göre yeniden hesaplandı">güncellendi ${new Date(r.yenilendi).toLocaleDateString('tr-TR')}</span>` : 'güncel') : '<span class="ap-note" style="color:var(--ap-warn)" title="Bu ayın planı bu tarayıcıda yoksa eski yöntemle kalır">eski hesap</span>', S.rol === 'yonetici' ? `<button class="ap-btn sm dng" data-act="arsiv-sil" data-v="${a}">Sil</button>` : '']; }))}</div>` + yuklemeHtml;
   }
 
   // ---- istatistik: seçilen aylar ----
@@ -2144,7 +2174,7 @@ function mount(root, opts = {}) {
   root.addEventListener('drop', e => { if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); if (S.rol === 'salt_okur' || (S.plan && S.plan.durum === 'kilitli')) { toast('Düzenleme yetkiniz yok / ay kilitli.'); return; } asosDosyalariIsle([...e.dataTransfer.files]); });
 
   // başlangıç
-  const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); })();
+  const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); setTimeout(() => arsivArkaPlan(), 1200); })();
   return {getState: () => S, hazir, yenile: render, unmount: () => { root.innerHTML = ''; }};
 }
 return {mount, VERSION};
