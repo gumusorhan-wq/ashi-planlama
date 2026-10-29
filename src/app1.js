@@ -105,6 +105,8 @@ function mount(root, opts = {}) {
     });
     return n;
   }
+  // Aile hekimliğine geçen personel listede görünür ama hiçbir hesaba girmez; kendi isteği olmadan görevlendirilmez ya da geri çağrılmaz (durumu ancak elle değiştirilebilir)
+  const aileHek = k => !!k && k.durum === 'AİLE HEKİMLİĞİNDE';
   const izinTarihli = k => (k.izin || []).some(i => i.bas && i.bit);
   const izinMetin = k => (k.izin || []).filter(i => sayi(i.gun) > 0).map(i => `${fmt(sayi(i.gun))} ${i.tur || ''}`.trim()).join(', ');
   const izinGun = k => (k.izin || []).reduce((a, i) => a + sayi(i.gun), 0);

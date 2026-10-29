@@ -406,7 +406,7 @@
     const fz = new Set(C.GRUPLAR.filter(g => h.slot.hedef.fazla[g] > 0.001));            // mesaisini tamamlayamayan (fazla) gruplar
     const uygunlar = kisiler.filter(k => {
       const dt = D[k.durum] || {};
-      return !gorevAktif(k.gorev) && !dt.nobetYok && !dt.mesaiYok && !dt.pasif && !dt.disarida && !C.gorevlendirmeEngeli(k, ayIlk()) && C.kisiMesai(k, S.y, S.m, ozel(), D) > 0;
+      return !aileHek(k) && !gorevAktif(k.gorev) && !dt.nobetYok && !dt.mesaiYok && !dt.pasif && !dt.disarida && !C.gorevlendirmeEngeli(k, ayIlk()) && C.kisiMesai(k, S.y, S.m, ozel(), D) > 0;
     });
     // Fazlalık hangi gruptaysa (genelde ATT) çıkacak kişi o gruptandır; AABT ekip şefi nöbet branşını doldurduğu için fazlaya çıkmaz. Fazlalık yoksa önce ATT, sonra AABT, sonra doktor/işçi.
     const oncelik = k => { const g = grupOf(k.id); return fz.size ? (fz.has(g) ? 0 : 1) : (g === 'sy' || g === 'ysp' ? 0 : g === 'ka' || g === 'ke' ? 1 : 2); };
@@ -432,7 +432,7 @@
     const D = durumlar(), cikti = [], ist = n => (S.plan.birimler.find(x => x.ad === n) || {}).tur === 'istasyon';
     S.plan.birimler.filter(b => b.tur === 'istasyon' && !b.ekipOf).forEach(b => {
       let taban = acikSimule(b); if (taban < 0.5) return;
-      const don = [], aday = S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef && ist(k.gorev.hedef) && k.gorev.hedef !== b.ad && k.istek !== 'devam' && !/SAĞLIK MAZERETİ|EĞİTİM/.test(k.gorev.gerekce || '') && (D[k.durum] || {}).disarida && C.kisiMesai({...k, durum: ''}, S.y, S.m, ozel(), D) > 0);
+      const don = [], aday = S.plan.kayitlar.filter(k => k.birim === b.ad && !aileHek(k) && gorevAktif(k.gorev) && k.gorev.hedef && ist(k.gorev.hedef) && k.gorev.hedef !== b.ad && k.istek !== 'devam' && !/SAĞLIK MAZERETİ|EĞİTİM/.test(k.gorev.gerekce || '') && (D[k.durum] || {}).disarida && C.kisiMesai({...k, durum: ''}, S.y, S.m, ozel(), D) > 0);
       aday.forEach(k => { const yeni = acikSimule(b, [], [...don.map(x => x.id), k.id]); if (taban - yeni >= 0.5) { don.push(k); taban = yeni; cikti.push({k, b, hedef: k.gorev.hedef}); } });
     });
     if (uygula && cikti.length) { S.toplu = true; try { cikti.forEach(({k, b, hedef}) => mut(() => { k.gorev = null; if (k.durum === 'GEÇİCİ GÖREVDE') k.durum = ''; k.durumManuel = false; k.istek = ''; }, 'Açık nedeniyle otomatik geri çağrıldı', `${k.ad}: ${hedef} → ${b.ad}`)); } finally { S.toplu = false; } otoHesapla(); }
@@ -501,6 +501,7 @@
   const doktorluIstasyon = b => b && b.tur === 'istasyon' && (b.tip ? b.tip === 'A1' : S.plan.kayitlar.some(k => k.birim === b.ad && k.sinif === 'doktor'));
   const doktorHedefiUygun = ad => { const b = S.plan.birimler.find(x => x.ad === ad); return !!b && (b.tur === 'kkm' || doktorluIstasyon(b)); };
   function gorevEngeli(k, hedef) {
+    if (aileHek(k)) return 'Aile hekimliğine geçti: kendi isteği olmadan görevlendirilemez ya da geri çağrılamaz';
     const b = S.plan.birimler.find(x => x.ad === hedef);
     if (b && b.ekipOf && hedef !== k.birim) return 'Bu ekip kapalı (EKİP OF); görevlendirme yapılamaz';
     if (b && b.tur === 'istasyon' && hedef !== k.birim) { const e = C.gorevlendirmeEngeli(k, ayIlk()); if (e) return e; }
@@ -514,7 +515,7 @@
     return mut(() => { k.gorev = {...(k.gorev || {}), yer: (k.gorev && k.gorev.yer) || hedef, hedef, kaynak: 'manuel', yolluk: (k.gorev && k.gorev.yolluk) || '', tarih: (k.gorev && k.gorev.tarih) || '', gerekce: (k.gorev && k.gorev.gerekce) || '', ...(ek || {})}; k.durum = 'GEÇİCİ GÖREVDE'; k.durumManuel = true; k.gecmis = [...new Set([...(k.gecmis || []), ayAnahtari()])].sort(); }, 'Görevlendirme', `${k.ad}: ${k.birim} → ${hedef}`);
   }
   // Bir ekibin başka birimlere görevli personelini geri çağırır (ör. kapalı ekip yeniden açılırken). Kurum dışı yerlerdeki görevler (hastane, aile hekimliği vb.) değiştirilmez.
-  function geriCagirmaAdaylari(b) { return S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef); }
+  function geriCagirmaAdaylari(b) { return S.plan.kayitlar.filter(k => k.birim === b.ad && !aileHek(k) && gorevAktif(k.gorev) && k.gorev.hedef); }
   function geriCagir(b) {
     const liste = geriCagirmaAdaylari(b);
     mut(() => { liste.forEach(k => { k.gorev = null; if (k.durum === 'GEÇİCİ GÖREVDE') k.durum = ''; k.durumManuel = false; k.istek = ''; }); }, 'Personel geri çağrıldı', `${b.ad}: ${liste.length} kişi`);
@@ -595,6 +596,7 @@
         case 'geri-cagir': { const b = S.plan.birimler.find(x => x.ad === v); if (!b) break; const n = geriCagirmaAdaylari(b).length; if (n && confirm(`${b.ad} ekibine bağlı, başka birimlere görevli ${n} personel geri çağrılsın mı?`)) toast(`${geriCagir(b)} personel geri çağrıldı.`); break; }
         case 'gorev-bitir': {
           const k = kayit(t.dataset.id); if (!k || !k.gorev) break;
+          if (aileHek(k)) { toast('Aile hekimliğindeki personel kendi isteği olmadan geri çağrılamaz.'); break; }
           const disKurum = !k.gorev.hedef;
           if (disKurum && !confirm(`${k.ad} kurum dışı bir yerde görevli (${k.gorev.yer}). Görev yine de bitirilsin mi?`)) break;
           const hedef = k.gorev.hedef || k.gorev.yer;

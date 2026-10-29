@@ -51,7 +51,7 @@
     return {yuvalar, adaylar, acikYuva, fazlaGrup, cikabilir};
   }
   function kartHtml(b, h, p, etiket, plFark, oran, dengeli, isciTam) {
-    const dis = x => (durumlar()[x.k.durum] || {}).disarida && !x.k._gelen, disarida = h.satir.filter(dis).length, nobetsiz = h.satir.filter(x => !dis(x) && x.nobetYok).length, nobetTutan = h.satir.length - disarida - nobetsiz;
+    const aile = h.satir.filter(x => aileHek(x.k)).length, dis = x => !aileHek(x.k) && (durumlar()[x.k.durum] || {}).disarida && !x.k._gelen, disarida = h.satir.filter(dis).length, nobetsiz = h.satir.filter(x => !aileHek(x.k) && !dis(x) && x.nobetYok).length, nobetTutan = h.satir.length - aile - disarida - nobetsiz;
     const fazlaMod = S.ayar.panoMod !== 'mesai', E = eksikAnaliz(h, isciTam, doktorluIstasyon(b), fazlaMod), gelecek = h.ihtiyacTur === 'oner' ? h.ihtiyacKisi : 0;
     const yuvaSatir = E.yuvalar.map(y => {
       const dolu = y.gerek - y.acik;
@@ -73,7 +73,7 @@
         <div class="ap-bar ${dengeli ? 'ok' : p > h.ihtiyac ? 'fz' : 'bad'}"><i style="width:${oran}%"></i></div>
         <div class="r"><span title="Nöbet yazılan toplam / ayda dolması gereken nöbet">Yazılan / gereken nöbet</span><b>${fmt(p)} / ${h.ihtiyac}</b></div>
         <div class="r"><span title="${fazlaMod ? 'Memur/doktor en çok ' + fmt(S.ayar.azamiMemur) + ' nöbet tutarsa kişilerin toplam kapasitesi' : 'Herkes yalnız mesaisini tamamlayacak kadar nöbet tutarsa kişilerin toplam kapasitesi'}">${fazlaMod ? 'Kapasite (fazla mesaili)' : 'Kapasite (mesai karşılığı)'}</span><b>${fmt(fazlaMod ? h.azamiKap : h.kapasite)}</b></div>
-        <div class="r"><span title="Hesaba giren kişi: istasyonda çalışan ve nöbet tutabilen. Dışarıda (geçici görevde) olanların hedefi 0 sayılır, kapasiteye ve ihtiyaca girmez.">Kişi (nöbet tutan)</span><b>${nobetTutan}${disarida ? ` <span class="ap-note">+ ${disarida} dışarıda</span>` : ''}${nobetsiz ? ` <span class="ap-note">+ ${nobetsiz} nöbet tutmaz</span>` : ''}</b></div>
+        <div class="r"><span title="Hesaba giren kişi: istasyonda çalışan ve nöbet tutabilen. Dışarıda (geçici görevde) olanların hedefi 0 sayılır, kapasiteye ve ihtiyaca girmez.">Kişi (nöbet tutan)</span><b>${nobetTutan}${disarida ? ` <span class="ap-note">+ ${disarida} dışarıda</span>` : ''}${nobetsiz ? ` <span class="ap-note">+ ${nobetsiz} nöbet tutmaz</span>` : ''}${aile ? ` <span class="ap-note" title="Aile hekimliğine geçen personel listede görünür ama hiçbir hesaba girmez; kendi isteği olmadan geri çağrılmaz">+ ${aile} aile hekimliğinde</span>` : ''}</b></div>
         <div class="ap-yh">Nöbet branşları (${fazlaMod ? 'fazla mesaili' : 'mesai karşılığı'}: dolu / gereken)</div>${yuvaSatir}
         ${gelen}${cikan}${net}${Math.abs(plFark) > 0.01 ? `<div class="ap-note" style="margin-top:6px" title="Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}: kilitli değer ya da nöbet branşı kısıtı">Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}</div>` : ''}</div>`;
   }
@@ -105,7 +105,7 @@
     const f = S.panoFiltre || '', gosterilen = liste.filter((_, i) => !f || kat[ists[i].ad] === f), kartlar = gosterilen.join('');
     const FILTRE_AD = {oner: 'Personel önerilen istasyonlar', icerde: 'Fazla nöbetle kendi içinde dönen istasyonlar', elle: 'Elle karar gerektiren istasyonlar', fazla: 'Mesai tamamlayamayan istasyonlar', of: 'Ekip OF (kapalı) istasyonlar'};
     const tk = (v, sayi, renk, etiket, ek) => `<div class="ap-click ${f === v ? 'on' : ''}" data-act="pano-filtre" data-v="${v}" title="Tıklayınca bu istasyonlar gösterilir" tabindex="0"><b style="color:${renk}">${sayi}</b><span>${etiket}${ek || ''}</span></div>`;
-    const aktif = S.plan.kayitlar.filter(k => !(durumlar()[k.durum] || {}).pasif).length;
+    const aktif = S.plan.kayitlar.filter(k => !(durumlar()[k.durum] || {}).pasif && !aileHek(k)).length;
     const attK = S.plan.kayitlar.filter(k => k.sinif === 'memur' && !(durumlar()[k.durum] || {}).pasif), attDog = attK.filter(k => C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === 'dogrulanmadi').length, attSur = attK.filter(k => C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === 'surucu').length;
     const uyari = '';
     return `${uyari}<details class="ap-card"><summary><b>Bu değerler ne anlama geliyor?</b></summary>
@@ -285,7 +285,7 @@
   }
 
   function istatistik() {
-    const D = durumlar(), K = S.plan.kayitlar.filter(k => !(D[k.durum] || {}).pasif), say = {};
+    const D = durumlar(), K = S.plan.kayitlar.filter(k => !(D[k.durum] || {}).pasif && !aileHek(k)), say = {};
     const inc = (a, n = 1) => { say[a] = (say[a] || 0) + n; };
     K.forEach(k => {
       inc('toplam'); inc('sinif:' + k.sinif); if (k.durum) inc('durum:' + k.durum);
