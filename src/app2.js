@@ -150,6 +150,12 @@
       ${fazla ? `<div style="margin-top:4px">${fazla} <span class="ap-note">fazla = o gruptaki kişiler hedef nöbetlerini tamamlayamıyor; başka nöbet branşını dolduramaz</span></div>` : ''}
       <div class="ap-note" style="margin-top:4px">Yetenekler: doktor → ekip şefi · işçi → sürücü · AABT (sağlık teknikeri) → ekip şefi, YSP; sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa · ATT (sağlık memuru / teknisyeni) → YSP ve sürücü; ATT ekip şefi nöbet branşına girmez. Önce AABT nöbet branşları doldurur (ekip şefi öncelikli), fazlalık ATT'de görünür.</div></div>`;
   }
+  // Silinen kişiler: kayıt kalıcı silinmez, buradan geri getirilebilir
+  function silinenHtml(b, duz) {
+    const l = (S.plan.silinen || []).filter(x => x.birim === b.ad || x._silBirim === b.ad);
+    if (!l.length) return '';
+    return `<details class="ap-card" style="margin-top:12px"><summary><b>Silinen kişiler (${l.length})</b> <span class="ap-note">yanlışlıkla silineni geri getirebilirsiniz</span></summary>${l.map(k => `<div class="ap-row"><b>${esc(k.ad)}</b><span class="ap-note">${esc(k.unvan || '')} · ${new Date(k._silZaman).toLocaleString('tr-TR')}</span><button class="ap-btn sm pri" data-act="kisi-geri" data-id="${k.id}" ${duz ? '' : 'disabled'}>Geri getir</button></div>`).join('')}</details>`;
+  }
   function istHtml() {
     const birimler = S.plan.birimler;
     const b = birimler.find(x => x.ad === S.ist) || birimler[0];
@@ -200,7 +206,7 @@
       ${istas ? `<label class="ap-note" title="Kapalı ekip: ihtiyaç 0 sayılır; işareti kaldırınca ekip açılır ve personel geri çağrılabilir"><input type="checkbox" data-act="ekip-of" data-v="${esc(b.ad)}" ${b.ekipOf ? 'checked' : ''} ${duz ? '' : 'disabled'}> <b>Ekip OF (kapalı)</b></label>` : ''}
       <label class="ap-note"><input type="checkbox" data-act="tahmini" ${S.ayar.tahminiGoster ? 'checked' : ''}> Çıktıda tahmini nöbeti göster</label></div>
       ${durumBar}${lejant()}
-      <div class="ap-tw ap-tw-ist"><table class="ap-t ap-ist"><colgroup><col style="width:14.5%"><col style="width:8.5%"><col style="width:6%"><col style="width:10.5%"><col style="width:10.3%"><col style="width:4%"><col style="width:5.8%"><col style="width:3.6%"><col style="width:3.1%"><col style="width:3.3%"><col style="width:4.8%"><col style="width:3.1%"><col style="width:2.2%"><col style="width:9.2%"><col style="width:6%"><col style="width:5.1%"></colgroup><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>SINIF</th><th>NÖBET ROLÜ</th><th>G.GÖREV DURUMU</th><th>İZİN GÜN</th><th>İZİN TÜRÜ</th><th>MESAİ</th><th>HEDEF</th><th>AZAMİ</th><th>PLAN</th><th>FARK</th><th>🔒</th><th>GEÇİCİ GÖREV</th><th>YOLLUK</th><th>İŞLEM</th></tr></thead><tbody>${rows || '<tr><td colspan="16" class="ap-empty">Bu birimde kayıt yok</td></tr>'}</tbody></table></div>`;
+      <div class="ap-tw ap-tw-ist"><table class="ap-t ap-ist"><colgroup><col style="width:14.5%"><col style="width:8.5%"><col style="width:6%"><col style="width:10.5%"><col style="width:10.3%"><col style="width:4%"><col style="width:5.8%"><col style="width:3.6%"><col style="width:3.1%"><col style="width:3.3%"><col style="width:4.8%"><col style="width:3.1%"><col style="width:2.2%"><col style="width:9.2%"><col style="width:6%"><col style="width:5.1%"></colgroup><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>SINIF</th><th>NÖBET ROLÜ</th><th>G.GÖREV DURUMU</th><th>İZİN GÜN</th><th>İZİN TÜRÜ</th><th>MESAİ</th><th>HEDEF</th><th>AZAMİ</th><th>PLAN</th><th>FARK</th><th>🔒</th><th>GEÇİCİ GÖREV</th><th>YOLLUK</th><th>İŞLEM</th></tr></thead><tbody>${rows || '<tr><td colspan="16" class="ap-empty">Bu birimde kayıt yok</td></tr>'}</tbody></table></div>${silinenHtml(b, duz)}`;
   }
 
   function gorevHtml() {
