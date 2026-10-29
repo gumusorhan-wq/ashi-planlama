@@ -20,7 +20,7 @@
 .ap-btn[disabled]{opacity:.45;cursor:not-allowed}.ap-btn.sm{padding:3px 8px;font-size:12px}.ap-btn.dng{color:var(--ap-bad)}
 .ap-in,.ap-sel{font:inherit;padding:5px 8px;border:1px solid var(--ap-line);border-radius:6px;background:var(--ap-card);color:var(--ap-ink);max-width:100%}
 .ap-in.n{width:70px;text-align:right}.ap-in.w{width:100%}
-.ap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.ap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
 .ap-st{border:1px solid var(--ap-line);border-radius:10px;padding:11px;background:var(--ap-card);cursor:pointer}
 .ap-st:hover{border-color:var(--ap-pri)}
 .ap-st h3{margin:0 0 6px;font-size:13.5px}
@@ -79,3 +79,6 @@ table.ap-ist{table-layout:fixed;width:100%;min-width:1040px;font-size:12.5px}
 table.n2{border-collapse:collapse;font-size:12px}table.n2 th.n2d{min-width:26px;padding:2px;text-align:center;font-size:11px}table.n2 th.hs,table.n2l tr.hs td{background:rgba(120,120,120,.12)}
 td.n2c{min-width:26px;height:26px;text-align:center;border:1px solid var(--ap-line);cursor:pointer;user-select:none}td.n2c.iz{background:#fde68a;cursor:default}td.n2c.is{background:#fecaca;color:var(--ap-bad);font-weight:700}td.n2c.on{background:rgba(250,204,21,.18);cursor:default}td.n2c.nb{background:var(--ap-pri2);color:var(--ap-pri);font-weight:700;cursor:default}
 td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!important;color:var(--ap-bad)}select.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}table.n2l td{padding:2px 4px}
+.ap-yh{margin-top:8px;font-size:11.5px;color:var(--ap-mut);font-weight:600}
+.ap-yuva{display:flex;align-items:center;gap:6px;font-size:12.5px;padding:1px 0}.ap-yuva>span:first-child{flex:1;color:var(--ap-mut)}.ap-yuva .v{font-weight:700}
+.ap-ek{margin-top:8px;padding:6px 8px;border-radius:7px;background:var(--ap-badbg);font-size:12.5px;line-height:1.35}.ap-ek b{color:var(--ap-bad)}.ap-ek.ap-ek-c{background:var(--ap-warnbg)}.ap-ek.ap-ek-c b{color:var(--ap-warn)}.ap-ek.ap-ek-e{background:#ffedd5}.ap-ek.ap-ek-e b{color:#9a3412}

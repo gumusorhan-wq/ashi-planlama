@@ -29,8 +29,56 @@
       <p class="ap-note">Veriler yalnızca bu tarayıcıda (IndexedDB) tutulur. Yedek almak için Ayarlar'daki JSON yedeğini kullanın.</p></div>`;
   }
 
+  // ---- istasyon kartı: hangi yuva eksik, hangi branştan kaç kişi gerekli, kaç kişi dışarı çıkabilir ----
+  const YUVA_ADLARI = {es: 'Ekip şefi', ysp: 'YSP', sur: 'Sürücü'};
+  // Aday branşlar ve doldurabildikleri yuvalar (nöbet listesi doğrulamasına göre)
+  const ADAY_BRANS = [
+    {ad: 'Doktor', yuva: ['es']},
+    {ad: 'İşçi (sürücü)', yuva: ['sur'], isci: true},
+    {ad: 'ATT', yuva: ['ysp']},
+    {ad: 'ATT (sürücü teyitli)', yuva: ['ysp', 'sur']},
+    {ad: 'AABT', yuva: ['es', 'ysp']},
+    {ad: 'AABT (sürücü teyitli)', yuva: ['es', 'ysp', 'sur']}];
+  function eksikAnaliz(h, isciTam) {
+    const rem = h.slot.hedef.rem, tam = h.tamHedef, yuvalar = ['es', 'ysp', 'sur'].map(k => ({k, ad: YUVA_ADLARI[k], gerek: h.slot.dem[k], acik: Math.max(0, rem[k]), azamiAcik: Math.max(0, h.slot.azami.rem[k])}));
+    // her aday branş, doldurabildiği yuvalardaki açık kadar nöbet tutar; gelen kişi o ay tüm hedefini (tam ay) tutabiliyorsa önerilir
+    const adaylar = ADAY_BRANS.map(x => ({...x, kapasite: x.yuva.reduce((t, y) => t + Math.max(0, rem[y]), 0), tam: x.isci ? isciTam : tam})).map(x => ({...x, kisi: x.tam > 0 ? Math.floor(x.kapasite / x.tam + 1e-9) : 0})).filter(x => x.kisi >= 1);
+    // en dar branşlar önce (yuva sayısı az olan), aynı yuva kümesindeki doktor/AABT gibi seçenekler birlikte gösterilir
+    adaylar.sort((a, c) => a.yuva.length - c.yuva.length);
+    const acikYuva = yuvalar.filter(y => y.acik >= 0.5);
+    const fazlaGrup = Object.entries(h.slot.hedef.fazla).filter(([, v]) => v > 0.001).map(([g, v]) => ({g, v, ad: C.GRUP_AD[g]}));
+    const cikabilir = h.fazlaH > 0.001 && tam > 0 ? Math.floor(h.fazlaH / tam + 1e-9) : 0;
+    return {yuvalar, adaylar, acikYuva, fazlaGrup, cikabilir};
+  }
+  function kartHtml(b, h, p, etiket, plFark, oran, dengeli, isciTam) {
+    const E = eksikAnaliz(h, isciTam), gelecek = h.ihtiyacTur === 'oner' ? h.ihtiyacKisi : 0;
+    const yuvaSatir = E.yuvalar.map(y => {
+      const dolu = y.gerek - y.acik;
+      return `<div class="ap-yuva"><span>${y.ad}</span><span class="v">${fmt(dolu)}/${fmt(y.gerek)}</span>${y.acik >= 0.5 ? `<span class="ap-tag ap-t-ih" title="${y.ad} yuvasında hedef nöbetlerle ${fmt(y.acik)} nöbet açık kalıyor${y.azamiAcik < y.acik ? '; azami nöbetle ' + fmt(y.azamiAcik) + ' açık kalır' : ''}">−${fmt(y.acik)}</span>` : '<span class="ap-tag ap-t-ok">tam</span>'}</div>`;
+    }).join('');
+    // gelecek personel: hangi branşlardan ve kaç kişi
+    let gelen = '';
+    if (gelecek) {
+      const secenek = E.adaylar.map(x => `${esc(x.ad)}${x.kisi > 1 ? ' ×' + x.kisi : ''}`).join(' · ');
+      gelen = `<div class="ap-ek ap-ek-g" title="Gelen kişi o ay boyunca (tam ay) bu istasyonda mesaisini tamamlayacak şekilde önerilir. Açık yuvalara girebilen branşlar listelenir."><b>+${gelecek} kişi gelmeli</b> <span>(ay boyu ${fmt(h.tamHedef)} nöbet tutar)</span><div class="ap-note">Açık: ${E.acikYuva.map(y => `${y.ad} ${fmt(y.acik)}`).join(', ') || '—'}<br>Uygun branş: ${secenek || 'AABT (sürücü teyitli)'}</div></div>`;
+    } else if (h.ihtiyacTur === 'icerde') gelen = `<div class="ap-ek ap-ek-c" title="Açık bir kişinin tüm ay mesaisini doldurmaya yetmediği için personel önerilmez"><b>Personel gerekmez</b> <span>açık ${fmt(h.hedefAcik)} nöbet, fazla nöbetle kapanır</span></div>`;
+    else if (h.ihtiyacTur === 'elle') gelen = `<div class="ap-ek ap-ek-e"><b>Elle karar</b> <span>azamiyle de ${fmt(-h.farkAzami)} açık; bir kişinin ayı dolmaz</span></div>`;
+    // dışarı çıkabilecek personel
+    let cikan = '';
+    if (h.fazlaH > 0.001) cikan = `<div class="ap-ek ap-ek-c" title="Yuvalar dolduğu halde mesaisini tamamlayamayan nöbet fazlası. ${E.fazlaGrup.map(f => f.ad + ': ' + fmt(f.v) + ' nöbet').join('; ')}"><b>${E.cikabilir ? `${E.cikabilir} kişi dışarı çıkabilir` : 'Fazlalık var'}</b> <span>${fmt(h.fazlaH)} nöbet fazla${E.fazlaGrup.length ? ' · ' + esc(E.fazlaGrup.map(f => f.ad).join(', ')) : ''}</span></div>`;
+    const net = gelecek && E.cikabilir ? `<div class="ap-note" style="margin-top:4px">Net: gelen ${gelecek}, çıkabilir ${E.cikabilir} → ${E.cikabilir >= gelecek ? 'kendi fazlalığı yetiyor' : 'dışarıdan ' + (gelecek - E.cikabilir) + ' kişi gerekir'}</div>` : '';
+    const durumRozet = !gelecek && !cikan && h.ihtiyacTur === 'yok' ? '<span class="ap-tag ap-t-ok">Dengede</span>' : '';
+    return `<div class="ap-st" data-act="ist-ac" data-v="${esc(b.ad)}"><h3>${esc(b.ad)} ${durumRozet}</h3>
+        <div class="ap-bar ${dengeli ? 'ok' : p > h.ihtiyac ? 'fz' : 'bad'}"><i style="width:${oran}%"></i></div>
+        <div class="r"><span title="Nöbet yazılan toplam / ayda dolması gereken yuva nöbeti">Yazılan / gereken nöbet</span><b>${fmt(p)} / ${h.ihtiyac}</b></div>
+        <div class="r"><span title="Herkes hedef nöbetini tutarsa / herkese üst sınır yazılırsa">Kişilerin kapasitesi</span><b>${fmt(h.kapasite)} · azami ${fmt(h.azamiKap)}</b></div>
+        <div class="r"><span>Kişi</span><b>${h.satir.length}</b></div>
+        <div class="ap-yh">Yuvalar (hedef nöbetle dolu / gereken)</div>${yuvaSatir}
+        ${gelen}${cikan}${net}${Math.abs(plFark) > 0.01 ? `<div class="ap-note" style="margin-top:6px" title="Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}: kilitli değer ya da yuva kısıtı">Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}</div>` : ''}</div>`;
+  }
+
   function panoHtml() {
-    const ists = S.plan.birimler.filter(b => b.tur === 'istasyon');
+    const ists = S.plan.birimler.filter(b => b.tur === 'istasyon'), isciTam = C.hedefNobet(C.ayMesai(S.y, S.m, true, S.plan.ozel || {}), 'isci', false, {isciDusulen: S.ayar.isciDusulen}).birim;
     let ih = 0, kap = 0, pl = 0, acik = 0, fazla = 0, fm = 0, azk = 0, of = 0, kisiOner = 0, elle = 0;
     const kat = {};
     const liste = ists.map(b => {
@@ -51,12 +99,7 @@
         : h.ihtiyacTur === 'elle' ? `<span class="ap-tag" style="background:#ffedd5;color:#9a3412" title="Azami nöbetle de ${fmt(-h.farkAzami)} nöbet açık ama bir kişi gelirse mesaisini tamamlayamaz. Karar sizde: gerekirse elle görevlendirin.">Elle karar: ${fmt(-h.farkAzami)} açık</span>`
         : h.durum === 'fazla' ? `<span class="ap-tag ap-t-fz" title="Yuvalar doluyor ama bazı kişiler hedef nöbetlerini tamamlayamıyor (${fmt(h.fazlaH)} nöbet fazla)">Mesai tamamlayamama ${fmt(h.fazlaH)}</span>`
         : '<span class="ap-tag ap-t-ok">Dengede</span>';
-      return `<div class="ap-st" data-act="ist-ac" data-v="${esc(b.ad)}"><h3>${esc(b.ad)}</h3>
-        <div class="ap-bar ${dengeli ? 'ok' : p > h.ihtiyac ? 'fz' : 'bad'}"><i style="width:${oran}%"></i></div>
-        <div class="r"><span>Planlanan / İhtiyaç</span><b>${fmt(p)} / ${h.ihtiyac}</b></div>
-        <div class="r"><span>Kapasite (hedef / azami${b.azamiMemur != null ? ' ↑' : ''})</span><b>${fmt(h.kapasite)} / ${fmt(h.azamiKap)}</b></div>
-        <div class="r"><span>Kişi</span><b>${h.satir.length}</b></div>
-        <div style="margin-top:6px">${etiket}${Math.abs(plFark) > 0.01 ? ` <span class="ap-tag ap-t-ih" title="Planlanan toplam beklenenden ${fmt(Math.abs(plFark))} nöbet ${plFark < 0 ? 'eksik' : 'fazla'} (kilitli değerler veya dağıtım sınırı)">Plan farkı ${fmt(plFark)}</span>` : ''}</div></div>`;
+      return kartHtml(b, h, p, etiket, plFark, oran, dengeli, isciTam);
     });
     const f = S.panoFiltre || '', gosterilen = liste.filter((_, i) => !f || kat[ists[i].ad] === f), kartlar = gosterilen.join('');
     const FILTRE_AD = {oner: 'Personel önerilen istasyonlar', icerde: 'Fazla nöbetle kendi içinde dönen istasyonlar', elle: 'Elle karar gerektiren istasyonlar', fazla: 'Mesai tamamlayamayan istasyonlar', of: 'Ekip OF (kapalı) istasyonlar'};
@@ -66,6 +109,7 @@
     const uyari = attDog ? `<div class="ap-card" style="border-color:var(--ap-warn);background:var(--ap-warnbg)"><b>Sürücülük doğrulanmadı (AABT/ATT):</b> ${attK.length} memurdan <b>${attDog}</b> kişinin nöbet kaydı yok; bunlar şimdilik sürücü yuvasına konmuyor (AABT: ekip şefi+YSP, ATT: yalnız YSP) (sürücü olarak doğrulanan: ${attSur}). Sürücü yuvası hesapları nöbet listelerinden doğrulanınca netleşir. ${(S.plan.nobetAylari || []).length ? 'Yüklü nöbet ayları: ' + S.plan.nobetAylari.join(', ') + '. ' : ''}<button class="ap-btn sm" data-act="plan-asos" ${salt() ? 'disabled' : ''}>Nöbet listesi yükle</button> <a href="#" data-act="liste-surucu">Doğrulanmayanları listele</a></div>` : '';
     return `${uyari}<details class="ap-card"><summary><b>Bu değerler ne anlama geliyor?</b></summary>
       <ul class="ap-note" style="line-height:1.7">
+        <li><b>Kart okuma:</b> <i>Yazılan / gereken nöbet</i> ayda dolması gereken yuva nöbetine karşı yazılan nöbet toplamıdır. <i>Yuvalar</i> satırı hedef nöbetle (herkes mesaisi kadar tutarsa) her yuvanın ne kadar dolduğunu, <b>−N</b> ise orada kaç nöbet açık kaldığını gösterir. <b>+N kişi gelmeli</b>: açık, gelen kişinin o ay boyunca tüm hedef nöbetini tutmasına yetiyorsa çıkar; hangi yuva açık olduğuna göre uygun branşlar (Doktor, İşçi, ATT, AABT) yazılır. <b>N kişi dışarı çıkabilir</b>: yuvalara sığmayan fazla nöbetten hesaplanır. <i>Net</i> satırı ikisini karşılaştırır.</li>
         <li><b>İhtiyaç:</b> ay günü × 3 yuva (Kasım: 30 × 3 = 90 nöbet). Her gün ekip sorumlusu, yardımcı sağlık personeli ve sürücü gerekir.</li>
         <li><b>Kapasite (hedef):</b> istasyondaki kişilerin ayın mesaisini doldurmak için tutması gereken nöbetlerin toplamı (memur 7, işçi 8,5; izin ve muafiyet düşülür). Doktor yalnızca ekip şefi, işçi yalnızca sürücü yuvasını doldurabildiği için fazlası sayılmaz.</li>
         <li><b>Kapasite (azami):</b> memur ve doktora hedefin üstünde yazılabilecek en çok nöbetle (genel 8, istasyon bazında değiştirilebilir) hesaplanan toplam.</li>
@@ -126,7 +170,7 @@
         <td><select class="ap-sel" data-id="${k.id}" data-f="sinif" ${dis}>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === k.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
         <td>${k.sinif === 'memur' ? `${(() => { const sd = C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}); return `<select class="ap-sel" data-id="${k.id}" data-f="rolManuel" ${dis} title="Boş: nöbet listelerinden otomatik. AABT ve ATT sürücü yuvasına yalnız nöbet listesinde sürücü görünüyorsa girer; ATT ekip şefi yuvasına girmez."><option value="">Oto: ${esc(s ? ({dok: 'Doktor', isci: 'İşçi', ke: 'AABT: ekip şefi+YSP', ka: 'AABT: sürücü dahil', ysp: 'Yalnız YSP', sy: 'Sürücü+YSP'})[s.grup] : '')}</option>${(s && s.kadroTip === 'AABT' ? [['ysp', 'Ekip şefi+YSP (sürücü değil)'], ['sur', 'Sürücü dahil']] : [['ysp', 'Yalnız YSP'], ['sur', 'Sürücü+YSP']]).map(([r, t]) => `<option value="${r}" ${(k.rolManuel === r || (r === 'sur' && k.rolManuel === 'karma')) ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="ap-note">${sd.kaynak === 'manuel' ? 'elle seçildi' : sd.kaynak === 'kayit' ? `sürücü %${Math.round(100 * sd.pay)}` : '<span style="color:var(--ap-warn)">doğrulanmadı</span>'}</div>`; })()}` : `<span class="ap-note">${k.sinif === 'doktor' ? 'Ekip şefi' : 'Sürücü'}</span>`}</td>
         <td>${gelen ? '<b>GEÇİCİ GÖREVLİ</b>' : `<select class="ap-sel" data-id="${k.id}" data-f="durum" ${dis}><option value="">—</option>${Object.keys(D).map(a => `<option ${a === k.durum ? 'selected' : ''}>${a}</option>`).join('')}</select>`}${k.durumMetin && k.durumMetin !== k.durum ? `<div class="ap-note">${esc(k.durumMetin)}</div>` : ''}</td>
-        <td><input class="ap-in n" type="number" min="0" step="0.5" data-id="${k.id}" data-f="izinGun" value="${izinGun(k) || ''}" ${dis}></td>
+        <td><input class="ap-in n" type="number" min="0" step="0.5" data-id="${k.id}" data-f="izinGun" value="${izinGun(k) || ''}" ${dis}>${izinTarihli(k) && izinAyGun(k) !== izinGun(k) ? `<div class="ap-note" title="İznin başlangıç-bitiş tarihleri ASOS'tan geldi; mesaiyi yalnız plan ayına düşen günler etkiler">${ayEtiket()}'da ${izinAyGun(k)} gün · mesaiden ${fmt(C.kisiMesai({...k, izin: [], sut: 0, durum: ''}, S.y, S.m, ozel(), durumlar()) - C.kisiMesai({...k, sut: 0, durum: ''}, S.y, S.m, ozel(), durumlar()))} saat düşer</div>` : ''}</td>
         <td><select class="ap-sel" data-id="${k.id}" data-f="izinTur" ${dis}><option value="">—</option>${IZIN_TURLERI.map(a => `<option ${a === ((k.izin || [])[0] || {}).tur ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
         <td class="num">${s ? fmt(s.mesai) : ''}</td><td class="num">${s ? fmt(s.hedef) : ''}</td><td class="num">${s && !s.nobetYok ? fmt(s.azami) : ''}</td>
         <td>${istas && !(s && s.nobetYok) ? `<input class="ap-in n" type="number" min="0" step="0.5" data-id="${k.id}" data-f="planlanan" value="${k.planlanan ?? ''}" ${dis}>` : ''}</td>

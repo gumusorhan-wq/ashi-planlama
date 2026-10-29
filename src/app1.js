@@ -88,13 +88,23 @@ function mount(root, opts = {}) {
 
   // ---------- görünüm yardımcıları ----------
   function satirRenk(k) {
-    const D = durumlar(), dt = D[k.durum] || {}, izin = (k.izin || []).some(i => sayi(i.gun) > 0);
+    const D = durumlar(), dt = D[k.durum] || {}, izin = izinAyGun(k) > 0;
     if (k.gorev && k.gorev.hedef && dt.disarida) return D['GEÇİCİ GÖREVDE'].renk;
     if (k.durum === 'GEÇİCİ GÖREVLİ' && izin) return '#95B3D7';
     if (dt.renk) return dt.renk;
     if (izin) return '#FFFF00';
     return '';
   }
+  // Kişinin izninin plan ayına düşen takvim günü: tarihli (ASOS) izinlerde yalnız bu aya taşan günler, tarihsiz izinlerde girilen gün sayısı
+  function izinAyGun(k) {
+    const ay = `${S.y}-${C.pad(S.m)}`; let n = 0;
+    (k.izin || []).forEach(i => {
+      if (i.bas && i.bit) { for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(i.bit + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) n++; }
+      else n += sayi(i.gun);
+    });
+    return n;
+  }
+  const izinTarihli = k => (k.izin || []).some(i => i.bas && i.bit);
   const izinMetin = k => (k.izin || []).filter(i => sayi(i.gun) > 0).map(i => `${fmt(sayi(i.gun))} ${i.tur || ''}`.trim()).join(', ');
   const izinGun = k => (k.izin || []).reduce((a, i) => a + sayi(i.gun), 0);
   function gorevMetin(k) {
