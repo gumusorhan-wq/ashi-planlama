@@ -20,7 +20,19 @@
     });
     return {ay: `${y}-${C.pad(m)}`, zaman: Date.now(), ist};
   }
+  // Yüklenen dosya günlüğü (Arşiv sayfasında gösterilir): hangi dosya, hangi tür, kaç satır, hangi aya uygulandı
+  const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', N: 'Nöbet Listesi / Hareket Raporu'};
+  async function yuklemeKaydet(dosyalar) {
+    const l = (await depo.get('yuklemeler')) || [], t = Date.now();
+    dosyalar.forEach(d => {
+      const r = d.rapor, ozet = d.tur === 'N' ? `${r.kisi} kişi, ${r.eslesen} eşleşti · aylar: ${(r.aylar || []).join(', ')}` : `${r.yeni.length} yeni, ${r.degisen} güncel${r.nakil && r.nakil.length ? ', ' + r.nakil.length + ' birim değişikliği' : ''}`;
+      l.unshift({t, ad: d.ad, tur: d.tur, satir: r.toplam, boyut: d.boyut || 0, ay: ayAnahtari(), rol: S.rol, ozet});
+    });
+    if (l.length > 500) l.length = 500;
+    await depo.put('yuklemeler', l); S.yuklemeler = l;
+  }
   async function arsivYukle() {
+    S.yuklemeler = (await depo.get('yuklemeler')) || [];
     const anahtarlar = ((await depo.keys()) || []).filter(k => String(k).startsWith('arsiv:')).sort(), v = {};
     for (const k of anahtarlar) { const r = await depo.get(k); if (r && r.ay) v[r.ay] = r; }
     S.arsivVeri = v; if (!S.arsivSecili) S.arsivSecili = Object.keys(v);
@@ -38,6 +50,8 @@
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
     const aylar = Object.keys(S.arsivVeri).sort().reverse(), ay = ayAnahtari(), var_ = S.arsivVeri[ay], duz = S.rol !== 'salt_okur';
     const kayitliPlan = S.planAnahtarlari.map(k => k.slice(5)).filter(a => !S.arsivVeri[a]);
+    const yl = S.yuklemeler || [], kb = b => b ? (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB') : '';
+    const yuklemeHtml = `<div class="ap-card"><h2>Yüklenen dosyalar (${yl.length})</h2><p class="ap-note">ASOS'tan yüklenen her dosya, uygulandığı anda burada listelenir: ne zaman, hangi türde, kaç satır ve hangi plan ayına uygulandı. Dosyanın kendisi saklanmaz, yalnızca bu günlük tutulur.</p>${tabloHtml(['Tarih', 'Dosya', 'Tür', 'Satır', 'Boyut', 'Plan ayı', 'Sonuç'], yl.slice(0, 100).map(x => [new Date(x.t).toLocaleString('tr-TR'), esc(x.ad), DOSYA_TUR[x.tur] || x.tur, x.satir, kb(x.boyut), ayAd(x.ay), esc(x.ozet)]))}${yl.length > 100 ? '<div class="ap-note">Son 100 kayıt gösteriliyor.</div>' : ''}</div>`;
     return `<div class="ap-card"><h2>Aylık arşiv</h2>
       <p class="ap-note">Arşiv, her ayın istasyon bazlı özetini saklar: ihtiyaç, planlanan, kapasite, <b>çıkan ve gelen personel (branş ve istasyon)</b>, <b>fazla nöbet</b> alan kişiler. TC, telefon ve sağlık bilgisi arşive yazılmaz. Arşiv aynı tarayıcı veritabanında tutulur; yedeği Ayarlar'dan alınır.</p>
       <div class="ap-row"><button class="ap-btn pri" data-act="arsiv-yaz" ${duz ? '' : 'disabled'}>${ayEtiket()} ayını arşive kaydet${var_ ? ' (güncelle)' : ''}</button>
@@ -45,7 +59,7 @@
       <button class="ap-btn" data-act="arsiv-hepsi" ${duz && kayitliPlan.length + (var_ ? 0 : 1) > 0 ? '' : 'disabled'} title="Tarayıcıdaki arşivlenmemiş tüm aylık planları arşive ekler">Kayıtlı tüm planları arşivle (${kayitliPlan.length})</button></div>
       ${var_ ? `<div class="ap-note" style="margin-top:8px">${ayEtiket()} son arşivleme: ${new Date(var_.zaman).toLocaleString('tr-TR')}</div>` : ''}</div>
       <div class="ap-card"><h2>Arşivlenen aylar (${aylar.length})</h2>${tabloHtml(['Ay', 'Arşivleme', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Personel önerilen ist.', ''],
-      aylar.map(a => { const r = S.arsivVeri[a], t = arsivToplam(r); return [ayAd(a), new Date(r.zaman).toLocaleDateString('tr-TR'), t.ihtiyac, t.planlanan, t.cikan, t.gelen, t.fazla, t.oner, S.rol === 'yonetici' ? `<button class="ap-btn sm dng" data-act="arsiv-sil" data-v="${a}">Sil</button>` : '']; }))}</div>`;
+      aylar.map(a => { const r = S.arsivVeri[a], t = arsivToplam(r); return [ayAd(a), new Date(r.zaman).toLocaleDateString('tr-TR'), t.ihtiyac, t.planlanan, t.cikan, t.gelen, t.fazla, t.oner, S.rol === 'yonetici' ? `<button class="ap-btn sm dng" data-act="arsiv-sil" data-v="${a}">Sil</button>` : '']; }))}</div>` + yuklemeHtml;
   }
 
   // ---- istatistik: seçilen aylar ----

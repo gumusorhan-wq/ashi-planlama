@@ -259,7 +259,7 @@
         if (!/\.(xls|xlsx)$/i.test(f.name)) throw new Error('Yalnızca .xls / .xlsx dosyaları yüklenebilir.');
         const p = asosParse(await xlsOku(f));
         if (!p.satirlar.length) throw new Error('Dosyada personel satırı bulunamadı (başlıklar var, veri satırı yok).');
-        sonuc.push({ad: f.name, tur: p.tur, p});
+        sonuc.push({ad: f.name, tur: p.tur, p, boyut: f.size});
       } catch (er) { sonuc.push({ad: f.name, hata: er.message || String(er)}); }
     }
     const gecerli = sonuc.filter(x => x.p).sort((x, y) => x.tur.localeCompare(y.tur));
@@ -560,6 +560,7 @@
           const yeni = A.plan; if (pasif) yeni.kayitlar.forEach(k => { if (eksik.some(e => e.id === k.id)) k.durum = 'PASİF'; });
           S.plan = yeni; otoHesapla();
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | '));
+          await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           kaydet(); S.modal = null; S.asos = null; S.sayfa = 'pano'; if (!S.ist || !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || S.plan.birimler[0] || {}).ad || '';
           toast('Personel listeleri uygulandı.'); break;
         }
