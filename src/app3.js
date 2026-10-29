@@ -692,7 +692,7 @@
 
   // başlangıç
   const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); setTimeout(() => arsivArkaPlan(), 1200); })();
-  return {getState: () => S, hazir, yenile: render, unmount: () => { root.innerHTML = ''; }};
+  return {getState: () => S, hazir, yenile: render,  unmount: () => { root.innerHTML = ''; }};
 }
 return {mount, VERSION};
 })();

@@ -30,4 +30,9 @@ const on = N.oneriler(L, girdi, null, 10); assert.ok(on.oneriler.length > 0);
 { const ks = [...[1, 2, 3, 4, 5].map(i => ({id: i, grup: 'ka', planlanan: 7.5, ust: 8})), ...[6, 7, 8, 9].map(i => ({id: i, grup: 'ysp', planlanan: 6.5, ust: 8})), ...[10, 11, 12].map(i => ({id: i, grup: 'isci', planlanan: 8.5}))];
   const s = N.adetHazirla(ks, 30); const top = ks.filter(k => k.grup !== 'isci').reduce((a, k) => a + k.adet, 0);
   assert.strictEqual(top, s.gerek); assert.strictEqual(ks.filter(k => k.grup === 'isci').reduce((a, k) => a + k.yarim, 0), 50); /* tek kalan yarım vardiya düşülür */ assert.strictEqual(s.gunIsci, 25); assert.strictEqual(s.gerek, 65); }
+// tek işçi: yarım vardiyalar aynı gün iki farklı kişi gerektirir; tek işçinin yarımları 24 saatlik nöbete çevrilir, aynı gün çift görev oluşmaz
+{ const ks = []; for (let i = 1; i <= 7; i++) ks.push(kisi(i, 'ka', 7)); for (let i = 8; i <= 10; i++) ks.push(kisi(i, 'ysp', 7)); ks.push(kisi(11, 'sy', 6)); ks.push(kisi(12, 'isci', 0, 16));
+  const r3 = N.uret({y: 2026, m: 11, kisiler: ks}, {sureMs: 1500, deneme: 4, seed: 9}); assert.ok(!r3.say.cakisma, 'aynı gün çift görev olmamalı'); assert.ok(!r3.say.dinlenme && !r3.say.yetenek && !r3.say.izin, 'sert ihlal yok'); }
+// kapasite analizi: yalnız ekip şefi yapamayanlar varsa ekip şefi nöbet branşı boş kalır
+{ const ks = []; for (let i = 1; i <= 10; i++) ks.push(kisi(i, 'ysp', 9)); const k = N.kapasiteAnalizi({y: 2026, m: 11, kisiler: ks}); assert.ok(k.bos.es === 30 && k.bos.sur === 30, 'es ve sür boş kalmalı: ' + JSON.stringify(k.bos)); }
 console.log('nöbet çekirdek testleri geçti');

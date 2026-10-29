@@ -75,13 +75,26 @@
   }
   const tabloHtml = (bas, sat, ek) => `<div class="ap-tw"><table class="ap-t ${ek || ''}"><thead><tr>${bas.map((b, i) => `<th${sat.length && typeof sat[0][i] === 'number' ? ' class="num"' : ''}>${b}</th>`).join('')}</tr></thead><tbody>${sat.map(r => `<tr>${r.map((c, i) => `<td${typeof c === 'number' ? ' class="num"' : ''}>${typeof c === 'number' ? fmt(c) : c}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${bas.length}" class="ap-empty">Kayıt yok</td></tr>`}</tbody></table></div>`;
 
+  // Her ay yüklenecek dosyalar: en az sayıda ASOS dosyası (3 dosya) ve bu ay için durumu
+  function dosyaDurumHtml() {
+    const ay = ayAnahtari(), yl = (S.yuklemeler || []).filter(x => x.ay === ay), var_ = t => yl.some(x => x.tur === t);
+    const durum = ok => ok ? '<span class="ap-tag ap-t-ok">yüklendi</span>' : '<span class="ap-tag ap-t-ih">bekleniyor</span>';
+    const nobetAy = (S.plan && S.plan.nobetAylari) || [];
+    const sat = [
+      ['1', '<b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi</b>', 'Kim hangi istasyonda çalışıyor, çalışma durumu, yıllık izin bakiyesi. Doktorlar dahil tüm ekibi içerir: yalnız Personel Listesi Raporu ile ~58 kişi (çoğu doktor) eksik kalır.', var_('A')],
+      ['2', '<b>Personel Listesi Raporu</b>', 'İzin, rapor, muafiyet, süt izni, geçici görev yeri ve tarihleri, atama başlangıç tarihi (4/B 4 yıl kuralı). İzin-Muafiyet Raporu aynı bilgiyi içerir; ayrıca yüklemeye gerek yok.', var_('B') || var_('I')],
+      ['3', '<b>Nöbet Listesi Raporu</b> (ya da Nöbet İçi Hareket Raporu)', `Kişinin ekip şefi / YSP / sürücü olarak tuttuğu nöbetler: sürücülük doğrulaması ve gerçekleşen nöbetler. İkisi aynı bilgiyi verir, <b>birini yüklemeniz yeterli</b>. Son 6 ay birlikte değerlendirilir; yüklü nöbet ayları: ${nobetAy.length ? nobetAy.map(a => ayAd(a)).join(', ') : 'yok'}.`, var_('N') || nobetAy.length > 0]];
+    return `<div class="ap-card"><h2>Her ay yüklenecek dosyalar — ${ayEtiket()}</h2><p class="ap-note">Sistem yalnızca <b>3 ASOS dosyasıyla</b> çalışır. Her ay planlama öncesi bu üçünü yenilemeniz yeterlidir; arşiv ve istatistikler bunlardan ve planlamadan otomatik üretilir.</p>
+      ${tabloHtml(['#', 'Dosya', 'Ne için gerekli', 'Bu ay'], sat.map(r => [r[0], r[1], `<span class="ap-note">${r[2]}</span>`, durum(r[3])]))}
+      <details style="margin-top:8px"><summary class="ap-note">Yüklemeniz gerekmeyen dosyalar</summary><ul class="ap-note" style="line-height:1.7"><li><b>Personel İzin-Muafiyet Raporu:</b> Personel Listesi Raporu ile aynı izin/muafiyet bilgisini verir. Yalnızca bir kişinin aynı ay içinde birden çok izni olduğunda ek ayrıntı sağlar (isteğe bağlı).</li><li><b>Nöbet İçi Hareket Raporu:</b> Nöbet Listesi Raporu ile aynı bilgiyi içerir; ikisini birden yüklemek gerekmez.</li><li><b>Nöbet Listesi Döküm Cetveli:</b> Gün gün saat bilgisi verir ama ekip şefi / YSP / sürücü bilgisini içermez; şu an kullanılmıyor (ileride fazla mesai bakiyesi için değerlendirilebilir).</li></ul></details></div>`;
+  }
   function arsivHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
     const aylar = Object.keys(S.arsivVeri).sort().reverse(), ay = ayAnahtari(), var_ = S.arsivVeri[ay], duz = S.rol !== 'salt_okur';
     const kayitliPlan = S.planAnahtarlari.map(k => k.slice(5)).filter(a => !S.arsivVeri[a]);
     const yl = S.yuklemeler || [], kb = b => b ? (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB') : '';
     const yuklemeHtml = `<div class="ap-card"><h2>Yüklenen dosyalar (${yl.length})</h2><p class="ap-note">ASOS'tan yüklenen her dosya, uygulandığı anda burada listelenir: ne zaman, hangi türde, kaç satır ve hangi plan ayına uygulandı. Dosyanın kendisi saklanmaz, yalnızca bu günlük tutulur.</p><div class="ap-drop"><div class="ap-row" style="justify-content:center"><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''}>Excel dosyası yükle (.xls / .xlsx)</button></div><div class="ap-note" style="text-align:center;margin-top:6px">ya da dosyaları bu alana sürükleyip bırakın · EKİP listesi, Personel Listesi Raporu, Nöbet Listesi, Nöbet İçi Hareket Raporu (birlikte seçilebilir)</div></div>${tabloHtml(['Tarih', 'Dosya', 'Tür', 'Satır', 'Boyut', 'Plan ayı', 'Sonuç'], yl.slice(0, 100).map(x => [new Date(x.t).toLocaleString('tr-TR'), esc(x.ad), DOSYA_TUR[x.tur] || x.tur, x.satir, kb(x.boyut), ayAd(x.ay), esc(x.ozet)]))}${yl.length > 100 ? '<div class="ap-note">Son 100 kayıt gösteriliyor.</div>' : ''}</div>`;
-    return `<div class="ap-card"><h2>Aylık arşiv</h2>
+    return dosyaDurumHtml() + `<div class="ap-card"><h2>Aylık arşiv</h2>
       <p class="ap-note">Arşiv, her ayın istasyon bazlı özetini saklar: ihtiyaç, planlanan, kapasite, <b>çıkan ve gelen personel (branş ve istasyon)</b>, <b>fazla nöbet</b> alan kişiler. TC, telefon ve sağlık bilgisi arşive yazılmaz. Arşiv aynı tarayıcı veritabanında tutulur; yedeği Ayarlar'dan alınır.</p>
       <div class="ap-row"><button class="ap-btn pri" data-act="arsiv-yaz" ${duz ? '' : 'disabled'}>${ayEtiket()} ayını arşive kaydet${var_ ? ' (güncelle)' : ''}</button>
       <label class="ap-note"><input type="checkbox" id="ap-arsiv-kilit" ${S.rol === 'yonetici' ? '' : 'disabled'}> Kaydederken ayı kilitle (yalnız yönetici)</label>

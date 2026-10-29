@@ -190,16 +190,121 @@ const NobetCore = (() => {
     return {liste: enListe, iter};
   }
 
+  // ---- Yeni üretici: sayıları kesin koruyan kurucu + benzetilmiş tavlama ----
+  // 1) Nöbet adetleri (24 saatlik: es/ysp/sur; işçi 12 saatlik: surG/surA) akış ile nöbet branşlarına dağıtılır → her kişi tam adedini alır
+  // 2) Kişinin nöbetleri ay boyunca eşit aralıklı günlere yerleştirilir
+  // 3) Yalnızca iki yuvanın içeriğini takas eden hamlelerle (adetler değişmez) kural ihlalleri tavlama ile giderilir
+  function uret2(H, seed, sureMs) {
+    const {N, P, K} = H, R = rng(seed), m = P.length, t0 = Date.now();
+    // işçi yarım vardiyaları aynı gün iki farklı kişi tarafından tutulabilir; bir işçinin yarımları gün sayısını aşıyorsa (tek işçi gibi) fazlası 2 yarım = 1 tam (24 saat) nöbete çevrilir
+    const u24 = P.map(p => p.isci ? 0 : p.hedef24), uh = P.map(p => p.isci ? p.hedefYarim : 0);
+    let gunIsci = 0;
+    for (let tur = 0; tur < 6; tur++) {
+      gunIsci = Math.min(N, Math.floor(uh.reduce((x, v) => x + v, 0) / 2));
+      let degisti = false;
+      P.forEach((p, i) => { if (p.isci && uh[i] > gunIsci) { const fazla = uh[i] - gunIsci, ceviri = Math.ceil(fazla / 2); uh[i] -= ceviri * 2; if (uh[i] < 0) uh[i] = 0; u24[i] += ceviri; degisti = true; } });
+      if (!degisti) break;
+    }
+    const elig = (i, t) => { const p = P[i]; if (t === 'surG' || t === 'surA') return p.isci && uh[i] > 0; if (p.isci) return t === 'sur' && u24[i] > 0; return t === 'es' ? p.yet.includes('es') : t === 'ysp' ? p.yet.includes('ysp') : t === 'sur' ? p.yet.includes('sur') : false; };
+    const isciGun = new Set(); for (let j = 0; j < gunIsci; j++) isciGun.add(1 + Math.floor((j + 0.5) * N / gunIsci));
+    const slotD = [], slotT = [], gunSlot = Array.from({length: N + 1}, () => []);
+    const ekle = (d, t) => { gunSlot[d].push(slotD.length); slotD.push(d); slotT.push(t); };
+    for (let d = 1; d <= N; d++) { ekle(d, 'es'); ekle(d, 'ysp'); if (isciGun.has(d)) { ekle(d, 'surG'); ekle(d, 'surA'); } else ekle(d, 'sur'); }
+    const S = slotD.length, cont = new Int16Array(S).fill(-1), place = P.map(() => []);
+    const sinif = t => (t === 'surG' || t === 'surA') ? 1 : 0;
+    const tipSlot = {}; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { tipSlot[t] = []; }); for (let s = 0; s < S; s++) tipSlot[slotT[s]].push(s);
+    // 1) adetleri nöbet branşlarına dağıt (maksimum akış; her kişi için 24 saatlik ve yarım birimleri ayrı düğüm)
+    const tipler = ['es', 'ysp', 'sur', 'surG', 'surA'], need = tipler.map(t => tipSlot[t].length);
+    const V = 2 + 2 * m + 5, SRC = 0, SNK = 1, cap = Array.from({length: V}, () => new Array(V).fill(0));
+    P.forEach((p, i) => {
+      cap[SRC][2 + i] = u24[i]; cap[SRC][2 + m + i] = uh[i];
+      tipler.forEach((t, k) => { if (!elig(i, t)) return; const dugum = sinif(t) ? 2 + m + i : 2 + i; cap[dugum][2 + 2 * m + k] = 99; });
+    });
+    tipler.forEach((t, k) => { cap[2 + 2 * m + k][SNK] = need[k]; });
+    for (;;) { const par = new Array(V).fill(-1); par[SRC] = SRC; const q = [SRC]; while (q.length && par[SNK] < 0) { const u = q.shift(); for (let v = 0; v < V; v++) if (par[v] < 0 && cap[u][v] > 0) { par[v] = u; q.push(v); } } if (par[SNK] < 0) break; let f = 1e9; for (let v = SNK; v !== SRC; v = par[v]) f = Math.min(f, cap[par[v]][v]); for (let v = SNK; v !== SRC; v = par[v]) { cap[par[v]][v] -= f; cap[v][par[v]] += f; } }
+    const tahsis = P.map((p, i) => tipler.map((t, k) => cap[2 + 2 * m + k][sinif(t) ? 2 + m + i : 2 + i]));
+    // 2) her nöbet branşı için kişilerin birimlerini eşit aralıklı hedef zamanlarla sıralayıp slotlara yerleştir
+    tipler.forEach((t, k) => {
+      const items = []; P.forEach((p, i) => { const u = tahsis[i][k]; if (!u) return; const off = R(); for (let j = 0; j < u; j++) items.push({i, z: (j + off) / u + R() * 0.02}); });
+      items.sort((x, y) => x.z - y.z); const sl = tipSlot[t], Rn = items.length;
+      items.forEach((it, r) => { let c = Math.min(sl.length - 1, Math.floor((r + 0.5) * sl.length / Rn)); const c0 = c; while (c < sl.length && cont[sl[c]] >= 0) c++; if (c >= sl.length) { c = c0; while (c >= 0 && cont[sl[c]] >= 0) c--; } if (c < 0) return; cont[sl[c]] = it.i; place[it.i].push(sl[c]); });
+    });
+    const hasDay = P.map(() => new Uint8Array(N + 2)); place.forEach((pl, i) => pl.forEach(s => { hasDay[i][slotD[s]]++; }));
+    // maliyet
+    const pcost = i => {
+      const p = P[i], pl = place[i]; if (!pl.length) return 0;
+      let c = 0; const g24 = [], all = [], A = new Set(), G = new Set(), s24 = new Set();
+      for (const s of pl) { const d = slotD[s], t = slotT[s]; all.push(d);
+        if (p.izin.has(d)) c += 900; else if (p.istek.has(d)) c += 80;
+        if (p.once.has(d) && !p.izin.has(d)) c += 300;
+        if (t === 'surA') A.add(d); else if (t === 'surG') G.add(d); else { g24.push(d); if (t === 'sur') s24.add(d); } }
+      const gv = new Set(); for (const d of all) { if (gv.has(d)) c += 800; gv.add(d); }          // aynı gün birden fazla nöbet
+      g24.sort((a, b) => a - b); for (let k = 1; k < g24.length; k++) if (g24[k] - g24[k - 1] - 1 < K.minAra) c += 700;
+      if (K.surGunAsiri) s24.forEach(d => { if (s24.has(d + 2) && s24.has(d + 4)) c += 300; });
+      if (p.isci) { if (K.isciGece) A.forEach(d => { if (A.has(d + 1) && A.has(d + 2)) c += 300; }); G.forEach(d => { if (A.has(d - 1)) c += 700; }); }
+      const tum = [...new Set(all)].sort((a, b) => a - b);
+      for (let k = 1; k < tum.length; k++) { const bos = tum[k] - tum[k - 1] - 1; if (bos > K.maxAra) { let iz = false; for (let d = tum[k - 1] + 1; d < tum[k]; d++) if (p.izin.has(d)) { iz = true; break; } if (!iz) c += 60 * (bos - K.maxAra); } }
+      return c;
+    };
+    const pc = P.map((_, i) => pcost(i)); let toplam = pc.reduce((x, v) => x + v, 0), en = toplam, enCont = Int16Array.from(cont);
+    // 3) tavlama: iki slotun içeriğini takas et
+    const dolu = []; for (let s = 0; s < S; s++) if (cont[s] >= 0) dolu.push(s);
+    const sure = Math.max(50, sureMs - (Date.now() - t0)), T0 = 160, T1 = 6; let it = 0;
+    while (toplam > 0) {
+      const el = Date.now() - t0; if (el >= sureMs) break;
+      const frac = (el) / sureMs, T = T0 * Math.pow(T1 / T0, frac);
+      for (let rep = 0; rep < 200; rep++) {
+        it++;
+        // a: ihlalli kişinin bir nöbeti (çoğunlukla) ya da rastgele dolu slot
+        let a; if (R() < 0.75) { const bad = []; for (let i = 0; i < m; i++) if (pc[i] > 0) bad.push(i); if (bad.length) { const pl = place[bad[Math.floor(R() * bad.length)]]; a = pl[Math.floor(R() * pl.length)]; } }
+        if (a === undefined) { if (!dolu.length) break; a = dolu[Math.floor(R() * dolu.length)]; }
+        const da = slotD[a]; let b;
+        if (R() < 0.6) { const dd = Math.min(N, Math.max(1, da + Math.floor(R() * 13) - 6)); const gs = gunSlot[dd]; b = gs[Math.floor(R() * gs.length)]; } else b = Math.floor(R() * S);
+        if (b === a) continue;
+        const ca = cont[a], cb = cont[b], db = slotD[b]; if (ca === cb) continue;
+        if (sinif(slotT[a]) !== sinif(slotT[b])) continue;         // 24 saatlik ve yarım nöbetler birbirine karışmaz (adetler korunur)
+        if (ca >= 0 && !elig(ca, slotT[b])) continue; if (cb >= 0 && !elig(cb, slotT[a])) continue;
+        if (ca >= 0 && db !== da && hasDay[ca][db]) continue; if (cb >= 0 && db !== da && hasDay[cb][da]) continue;
+        const eski = (ca >= 0 ? pc[ca] : 0) + (cb >= 0 ? pc[cb] : 0);
+        // uygula
+        cont[a] = cb; cont[b] = ca;
+        if (ca >= 0) { place[ca][place[ca].indexOf(a)] = b; hasDay[ca][da]--; hasDay[ca][db]++; }
+        if (cb >= 0) { place[cb][place[cb].indexOf(b)] = a; hasDay[cb][db]--; hasDay[cb][da]++; }
+        const na = ca >= 0 ? pcost(ca) : 0, nb = cb >= 0 ? pcost(cb) : 0, delta = na + nb - eski;
+        if (delta <= 0 || R() < Math.exp(-delta / T)) {
+          if (ca >= 0) pc[ca] = na; if (cb >= 0) pc[cb] = nb; toplam += delta;
+          if (toplam < en) { en = toplam; enCont = Int16Array.from(cont); if (en === 0) break; }
+        } else {
+          cont[a] = ca; cont[b] = cb;
+          if (ca >= 0) { place[ca][place[ca].indexOf(b)] = a; hasDay[ca][db]--; hasDay[ca][da]++; }
+          if (cb >= 0) { place[cb][place[cb].indexOf(a)] = b; hasDay[cb][da]--; hasDay[cb][db]++; }
+        }
+      }
+    }
+    const liste = bos(N); for (let s = 0; s < S; s++) { const c = enCont[s]; if (c >= 0) liste[slotD[s]][slotT[s]] = P[c].id; }
+    return {liste, iter: it, ceza: en};
+  }
+
+  // Kapasite analizi: kişilerin nöbet branşı yetenekleri ve adetleri ile en fazla kaç yuva doldurulabilir; nöbet branşı bazında kaçının boş kalacağı
+  function kapasiteAnalizi(girdi, kural) {
+    const H = hazirla(girdi, kural), P = H.P, N = H.N, m = P.length;
+    const u24 = P.map(p => p.isci ? 0 : p.hedef24), uh = P.map(p => p.isci ? p.hedefYarim : 0); let g = 0;
+    for (let t = 0; t < 6; t++) { g = Math.min(N, Math.floor(uh.reduce((a, b) => a + b, 0) / 2)); let ch = false; P.forEach((p, i) => { if (p.isci && uh[i] > g) { const c = Math.ceil((uh[i] - g) / 2); uh[i] = Math.max(0, uh[i] - 2 * c); u24[i] += c; ch = true; } }); if (!ch) break; }
+    const need = {es: N, ysp: N, sur: N - g, surG: g, surA: g}, tipler = Object.keys(need), V = 2 + 2 * m + 5, cap = Array.from({length: V}, () => new Array(V).fill(0));
+    P.forEach((p, i) => { cap[0][2 + i] = u24[i]; cap[0][2 + m + i] = uh[i]; tipler.forEach((t, k) => { const half = t === 'surG' || t === 'surA'; const ok = half ? (p.isci && uh[i] > 0) : p.isci ? (t === 'sur' && u24[i] > 0) : p.yet.includes(t); if (ok) cap[half ? 2 + m + i : 2 + i][2 + 2 * m + k] = 99; }); });
+    tipler.forEach((t, k) => { cap[2 + 2 * m + k][1] = need[t]; });
+    for (;;) { const par = new Array(V).fill(-1); par[0] = 0; const q = [0]; while (q.length && par[1] < 0) { const u = q.shift(); for (let w = 0; w < V; w++) if (par[w] < 0 && cap[u][w] > 0) { par[w] = u; q.push(w); } } if (par[1] < 0) break; let f = 1e9; for (let w = 1; w !== 0; w = par[w]) f = Math.min(f, cap[par[w]][w]); for (let w = 1; w !== 0; w = par[w]) { cap[par[w]][w] -= f; cap[w][par[w]] += f; } }
+    const bos = {}; let toplam = 0; tipler.forEach((t, k) => { const b = cap[2 + 2 * m + k][1]; if (b > 0) { bos[t === 'surG' || t === 'surA' ? 'sur' : t] = (bos[t === 'surG' || t === 'surA' ? 'sur' : t] || 0) + b; toplam += b; } });
+    return {toplam, bos};
+  }
+
   // Otomatik nöbet listesi. girdi: {y, m, kisiler:[...]}. seçenekler: {kural, sureMs, deneme, seed}
   function uret(girdi, sec) {
-    const o = {sureMs: 1200, deneme: 6, seed: 1, ...(sec || {})}, H = hazirla(girdi, o.kural), t0 = Date.now();
-    let eniyi = null, ceza = Infinity, denendi = 0;
-    for (let i = 0; i < o.deneme && Date.now() - t0 < o.sureMs * 1.6; i++) {
-      denendi++;
-      const L = kur(H, o.seed + i * 101), ilk = denetle(L, H), kalanMs = Math.max(150, o.sureMs / o.deneme);
-      const r = ilk.toplam > 0 ? iyilestir(L, H, o.seed + i, kalanMs) : {liste: L}, c = denetle(r.liste, H).toplam;
-      if (c < ceza) { ceza = c; eniyi = r.liste; }
-      if (ceza === 0) break;
+    const o = {sureMs: 1200, deneme: 4, seed: 1, ...(sec || {})}, H = hazirla(girdi, o.kural), t0 = Date.now();
+    let eniyi = null, ceza = Infinity, denendi = 0; const pay = Math.max(200, Math.floor(o.sureMs / o.deneme));
+    for (let i = 0; i < o.deneme && Date.now() - t0 < o.sureMs; i++) {
+      denendi++; const r = uret2(H, o.seed + i * 977, Math.min(pay, o.sureMs - (Date.now() - t0))), c = denetle(r.liste, H).toplam;
+      if (c < ceza) { ceza = c; eniyi = r.liste; } if (ceza === 0) break;
     }
     const son = denetle(eniyi, H);
     return {liste: eniyi, ihlal: son.ihlal, ceza: son.toplam, say: son.say, deneme: denendi, sureMs: Date.now() - t0};
@@ -247,6 +352,6 @@ const NobetCore = (() => {
     while (fark < 0) { const aday = diger.filter(k => k.adet > 0).sort((a, b) => (a.kesir) - (b.kesir) || b.adet - a.adet)[0]; if (!aday) break; aday.adet--; aday.kesir += 1; fark++; }
     return {gerek, gunIsci, kalanFark: fark};
   }
-  return {adetHazirla, hazirla, denetle, uret, oneriler, bos, YETENEK, KURAL, YUVA_AD, KOD, gunSayisi, iso};
+  return {adetHazirla, kapasiteAnalizi, hazirla, denetle, uret, oneriler, bos, YETENEK, KURAL, YUVA_AD, KOD, gunSayisi, iso};
 })();
 if (typeof module !== 'undefined') module.exports = NobetCore;

@@ -344,6 +344,17 @@
     root.className = 'ap-root' + (koyu ? ' ap-dark' : ''); document.body.style.background = koyu ? '#0f1720' : '#f4f6f9';
     if (S.rol === 'istasyon') S.modul = 2;
     root.innerHTML = ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + `<div class="ap-main">${sayfaHtml()}</div>` + (S.modal ? S.modal() : '');
+    // Sayı sütunları: tüm hücreleri sayı olan sütunun başlığı ve hücreleri sağa yaslanır (başlık ile sayı aynı hizada)
+    root.querySelectorAll('table').forEach(t => {
+      const ths = [...t.querySelectorAll('thead th')]; if (!ths.length) return;
+      const rows = [...t.querySelectorAll('tbody tr')].filter(r => r.children.length === ths.length);
+      ths.forEach((th, i) => {
+        const hucre = rows.map(r => r.children[i]), dolu = hucre.map(c => (c.querySelector('input,select') ? (c.querySelector('input,select').value || '') : (c.textContent || '')).trim()).filter(v => v !== '');
+        if (!dolu.length || th.classList.contains('num') && hucre.every(c => c.classList.contains('num'))) return;
+        const sayisal = dolu.every(v => /^[−+-]?\d{1,7}([.,]\d+)?$/.test(v)) && !(hucre.some(c => c.querySelector('select')));
+        if (sayisal || hucre.every(c => c.classList.contains('num') || !(c.textContent || '').trim())) { th.classList.add('num'); hucre.forEach(c => c.classList.add('num')); }
+      });
+    });
     toastCiz();
     const tw2 = root.querySelector('.ap-tw'); if (tw2) { tw2.scrollLeft = sl; tw2.scrollTop = st; }
     window.scrollTo(0, sy);
