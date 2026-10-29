@@ -187,7 +187,7 @@ const APCore = (() => {
     // (nöbet kayıtlarında ekip şefi olarak görev almışsa ekip şefi + YSP; yalnızca YSP olarak çalışıyorsa YSP).
     const esik = {sur: (a.surEsik == null ? 70 : a.surEsik) / 100, degil: (a.surDegilEsik == null ? 15 : a.surDegilEsik) / 100};
     satir.forEach(s => { s.kadroTip = kadroTip(s.k); s.rol = rolBelirle(s.k, esik); s.grup = grupBelirle(s.k, esik, a); });
-    const gruplar = {dok: [], isci: [], ka: [], ysp: [], sy: []};
+    const gruplar = {dok: [], isci: [], ke: [], ka: [], ysp: [], sy: []};
     satir.forEach(s => { if (!s.nobetYok) gruplar[s.grup].push(s); });
     const D3 = ihtiyac / 3, dem = {es: D3, ysp: D3, sur: D3}, r2 = v => Math.round(v * 100) / 100, EPS = 1e-9;
     const topla = (f) => { const o = {}; GRUPLAR.forEach(g => { o[g] = gruplar[g].reduce((x, s) => x + s[f], 0); }); return o; };
@@ -207,9 +207,9 @@ const APCore = (() => {
   }
   // Grup yetenekleri ve yuva akışı. Yuvalar: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
   // ATT hiçbir koşulda ekip şefi yuvasına girmez; ekip şefi nöbetlerini doktor ve AABT tutar.
-  const GRUPLAR = ['dok', 'isci', 'ka', 'ysp', 'sy'];
-  const YETENEK = {dok: ['es'], isci: ['sur'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
-  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ka: 'AABT (her yuva)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
+  const GRUPLAR = ['dok', 'isci', 'ke', 'ka', 'ysp', 'sy'];
+  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
+  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (sürücü dahil)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
   // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) yuvaları doldurur; ATT geri kalan yuvaları doldurur.
   // Böylece AABT'nin hedef nöbetleri tam kullanılır, fazlalık ATT'de görünür (bir ATT bir ay dışarı çıkabilir).
   function akis(sup, dem) {
@@ -246,7 +246,7 @@ const APCore = (() => {
   function grupBelirle(k, esik, ayar) {
     if (k.sinif === 'doktor') return 'dok';
     if (k.sinif === 'isci') return 'isci';
-    if (kadroTip(k) === 'AABT') return 'ka';
+    if (kadroTip(k) === 'AABT') return surucuDurumu(k, esik).tip === 'surucu' ? 'ka' : 'ke';    // AABT de her yuvaya girmez: sürücü yuvası yalnızca nöbet listelerinde sürücü olarak nöbet tuttuğu doğrulananlara açılır
     return surucuDurumu(k, esik).tip === 'surucu' ? 'sy' : 'ysp';    // ATT: yalnızca nöbet listelerinde sürücü olarak nöbet tuttuğu doğrulanırsa sürücü + YSP; aksi halde yalnız YSP (ekip şefi olamaz)
   }
   // Nöbet rolü sınıflama: nöbet kayıtlarındaki ekip şefi / YSP / sürücü saatlerinden

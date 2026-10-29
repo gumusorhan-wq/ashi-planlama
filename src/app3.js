@@ -391,7 +391,7 @@
       return !gorevAktif(k.gorev) && !dt.nobetYok && !dt.mesaiYok && !dt.pasif && !dt.disarida && !C.gorevlendirmeEngeli(k, ayIlk()) && C.kisiMesai(k, S.y, S.m, ozel(), D) > 0;
     });
     // Fazlalık hangi gruptaysa (genelde ATT) çıkacak kişi o gruptandır; AABT ekip şefi yuvasını doldurduğu için fazlaya çıkmaz. Fazlalık yoksa önce ATT, sonra AABT, sonra doktor/işçi.
-    const oncelik = k => { const g = grupOf(k.id); return fz.size ? (fz.has(g) ? 0 : 1) : (g === 'sy' || g === 'ysp' ? 0 : g === 'ka' ? 1 : 2); };
+    const oncelik = k => { const g = grupOf(k.id); return fz.size ? (fz.has(g) ? 0 : 1) : (g === 'sy' || g === 'ysp' ? 0 : g === 'ka' || g === 'ke' ? 1 : 2); };
     const havuz = fz.size && uygunlar.some(k => oncelik(k) === 0) ? uygunlar.filter(k => oncelik(k) === 0) : uygunlar;
     const adaylar = havuz.sort((x, y) => (oncelik(x) - oncelik(y)) || ((y.istek === 'git') - (x.istek === 'git')) || ((x.istek === 'gitmesin') - (y.istek === 'gitmesin')) || sonCikis(x).localeCompare(sonCikis(y)) || (idx(x.id) - idx(y.id)) || (y.memBas || '').localeCompare(x.memBas || '') || trCollator.compare(x.ad, y.ad));   // eşitlikte kıdemli (eski başlayış) en son
     const gerek = Math.max(0, kota - devam.length);

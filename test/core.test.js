@@ -23,7 +23,7 @@ assert.strictEqual(C.dagit(31, [7.5, 7.5, 7.5, 7.5]).reduce((a, b) => a + b, 0),
 // istasyon: doktorlu + işçili; işçi hedefi kadar, kalan memur (Excel YUNUSEMRE 2 örüntüsü)
 const kisiler = [];
 for (let i = 0; i < 4; i++) kisiler.push({id: 'd' + i, sinif: 'doktor', durum: '', izin: []});
-for (let i = 0; i < 8; i++) kisiler.push({id: 'm' + i, sinif: 'memur', durum: '', izin: [], unvan: 'Sağlık Teknikeri'});
+for (let i = 0; i < 8; i++) kisiler.push({id: 'm' + i, sinif: 'memur', durum: '', izin: [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}});
 for (let i = 0; i < 3; i++) kisiler.push({id: 'i' + i, sinif: 'isci', durum: '', izin: []});
 const h = C.istasyonHesap(kisiler, 2026, 8, {}, D, {azamiMemur: 8}, 3), o = C.oneri(h);
 const topl = (p) => kisiler.filter(x => x.id[0] === p).reduce((a, x) => a + o.get(x.id), 0);
@@ -51,7 +51,7 @@ assert.ok(C.mesafeKm('SALİHLİ', 'AHMETLİ') < C.mesafeKm('SALİHLİ', 'SOMA'))
 assert.ok(C.mesafeKm('SOMA', 'SARIGÖL') > 100);
 // azami nöbet: Kasım — hedef 7, azami 8
 const D2 = C.DURUM_VARSAYILAN, AY = {isciDusulen: 11, azamiMemur: 8, isciEk: 0};
-const mk = (n, id, sinif, unvan) => Array.from({length: n}, (_, i) => ({id: id + i, sinif, durum: '', izin: [], unvan: unvan || (sinif === 'memur' ? 'Sağlık Teknikeri' : '')}));
+const mk = (n, id, sinif, unvan) => Array.from({length: n}, (_, i) => ({id: id + i, sinif, durum: '', izin: [], unvan: unvan || (sinif === 'memur' ? 'Sağlık Teknikeri' : ''), rolSay: /Tekniker/.test(unvan || (sinif === 'memur' ? 'Tekniker' : '')) ? {es: 30, ysp: 40, sur: 30} : undefined}));
 let h2 = C.istasyonHesap(mk(12, 'm', 'memur'), 2026, 11, {}, D2, AY, 3);          // ihtiyaç 90; hedef 12×7=84; azami 12×8=96
 assert.strictEqual(h2.kapasite, 84); assert.strictEqual(h2.azamiKap, 96); assert.strictEqual(h2.durum, 'fazlaMesai');
 let o2 = C.oneri(h2), top = [...o2.values()].reduce((a, b) => a + b, 0);
@@ -114,4 +114,10 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Memuru', rolSay: {sur: 0, ysp: 100, es: 0}}, esk), 'ysp');
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Memuru', rolManuel: 'sur'}, esk), 'sy');
   assert.deepStrictEqual(C.rolToplam({'2026-08': {sur: 10, ysp: 5}, '2026-09': {sur: 5, es: 2}}), {es: 2, ysp: 5, sur: 15}); }
+// AABT de sürücü yuvasına nöbet listesine göre girer: kayıt yoksa / sürücü değilse yalnız ekip şefi + YSP
+{ const esk = {sur: .7, degil: .15};
+  assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri'}, esk), 'ke');
+  assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri', rolSay: {es: 50, ysp: 50, sur: 0}}, esk), 'ke');
+  assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri', rolSay: {es: 40, ysp: 30, sur: 30}}, esk), 'ka');
+  assert.deepStrictEqual(C.YETENEK.ke, ['es', 'ysp']); }
 console.log('çekirdek testleri geçti');
