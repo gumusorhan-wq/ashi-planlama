@@ -10,11 +10,11 @@
       ${S.plan ? `<span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>` : ''}
       <span class="ap-sp"></span>
       <label class="ap-note" title="Tema"><select class="ap-sel" data-act="tema"><option value="acik" ${S.ayar.tema !== 'koyu' && S.ayar.tema !== 'sistem' ? 'selected' : ''}>Açık</option><option value="koyu" ${S.ayar.tema === 'koyu' ? 'selected' : ''}>Koyu</option><option value="sistem" ${S.ayar.tema === 'sistem' ? 'selected' : ''}>Sistem</option></select></label>
-      ${S.plan && (S.rol === 'yonetici' || S.rol === 'planlayici') ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}
+      ${S.plan && (S.rol === 'yonetici' || S.rol === 'planlayici') ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir (istasyonlara gönder)'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}
       ${opts.kullanici ? '' : `<label class="ap-note" title="Rol (demo)"><select class="ap-sel" data-act="rol">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`}</div>`;
   }
-  const SAYFALAR = [['pano', 'Pano'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['personel', 'Personel'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['log', 'Değişiklik günlüğü'], ['ayar', 'Ayarlar']];
-  const navHtml = () => S.modul === 2 ? `<div class="ap-nav">${N2_SEKME.filter(([k]) => k === 'plan' || n2Acik()).map(([k, t]) => `<button class="${(n2Acik() ? S.n2.sekme : 'plan') === k ? 'on' : ''}" data-act="n2-sekme" data-v="${k}">${t}</button>`).join('')}</div>` : `<div class="ap-nav">${SAYFALAR.map(([k, t]) => `<button class="${S.sayfa === k ? 'on' : ''}" data-act="sayfa" data-v="${k}">${t}</button>`).join('')}</div>`;
+  const SAYFALAR = [['pano', 'Pano'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['talep', 'İstasyon talepleri'], ['personel', 'Personel'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['log', 'Değişiklik günlüğü'], ['ayar', 'Ayarlar']];
+  const navHtml = () => S.modul === 2 ? `<div class="ap-nav">${N2_SEKME.filter(([k]) => k === 'plan' || n2Acik()).map(([k, t]) => `<button class="${(n2Acik() ? S.n2.sekme : 'plan') === k ? 'on' : ''}" data-act="n2-sekme" data-v="${k}">${t}</button>`).join('')}</div>` : `<div class="ap-nav">${SAYFALAR.map(([k, t]) => `<button class="${S.sayfa === k ? 'on' : ''}" data-act="sayfa" data-v="${k}">${t}${k === 'talep' && talepSay() ? ` <span class="ap-tag ap-t-ih">${talepSay()}</span>` : ''}</button>`).join('')}</div>`;
 
   function bosHtml() {
     const onceki = S.m === 1 ? C.iso(S.y - 1, 12, 1).slice(0, 7) : C.iso(S.y, S.m - 1, 1).slice(0, 7);
@@ -329,7 +329,7 @@
   function sayfaHtml() {
     if (S.modul === 2) return n2Html();
     if (!S.plan) return bosHtml();
-    return ({pano: panoHtml, ist: istHtml, gorev: gorevHtml, personel: personelHtml, ozel: ozelHtml, stat: statHtml, log: logHtml, ayar: ayarHtml, arsiv: arsivHtml, arstat: arstatHtml}[S.sayfa] || panoHtml)();
+    return ({pano: panoHtml, ist: istHtml, gorev: gorevHtml, personel: personelHtml, ozel: ozelHtml, stat: statHtml, talep: talepHtml, log: logHtml, ayar: ayarHtml, arsiv: arsivHtml, arstat: arstatHtml}[S.sayfa] || panoHtml)();
   }
   function render() {
     const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0;

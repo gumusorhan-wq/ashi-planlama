@@ -40,15 +40,30 @@
   function n2Html() {
     if (!S.plan) return `<div class="ap-card ap-empty"><h2>Modül 2 — İstasyon nöbet listesi</h2><p>Bu ay için plan yok. Önce Modül 1'den personel listelerini yükleyin.</p></div>`;
     const b = n2Birim(); if (!b) return '<div class="ap-card ap-empty">Açık istasyon yok.</div>';
-    const s = n2Acik() ? S.n2.sekme : 'plan';
+    let s = n2Acik() ? S.n2.sekme : 'plan';
+    if (S.rol === 'istasyon' && ['liste', 'denetim', 'paket'].includes(s) && n2OnayOku(b.ad).durum !== 'onaylandi') return n2UstHtml(b) + `<div class="ap-card ap-empty"><h2>Planlama onayı bekleniyor</h2><p>Nöbet listesi araçları, planlama birimi sizin nöbet planınızı <b>onayladıktan</b> sonra açılır. Durum: <b>${ONAY_AD[n2OnayOku(b.ad).durum]}</b>.</p><button class="ap-btn" data-act="n2-sekme" data-v="plan">Planlama sekmesine dön</button></div>`;
     return n2UstHtml(b) + ({plan: n2PlanHtml, istek: n2IstekHtml, liste: n2ListeHtml, denetim: n2DenetimHtml, paket: n2PaketHtml}[s] || n2PlanHtml)(b);
   }
   // ---- Planlama: Modül 1'de hazırlanan, bu istasyonun kendi planlaması (istasyon sorumlusu için yalnız onaydan sonra; sağlık nedenleri görünmez) ----
   const NB_AD = {dok: 'Ekip şefi', isci: 'Sürücü', ke: 'Ekip şefi · YSP', ka: 'Ekip şefi · YSP · Sürücü', ysp: 'YSP', sy: 'YSP · Sürücü'};
+  // İstasyon onay akışı: plan "Kesinleştir" ile istasyonlara gönderilir → istasyon sorumlusu nöbetleri düzenleyip planlamaya geri gönderir → planlama onaylarsa kesin plana işlenir
+  const ONAY_AD = {acik: 'Düzenleniyor', gonderildi: 'Planlama onayı bekleniyor', onaylandi: 'Onaylandı', reddedildi: 'Planlama düzeltme istedi'};
+  const n2OnayOku = ad => ((S.plan && S.plan.onay) || {})[ad] || {durum: 'acik', teklif: {}};
+  const n2OnayYaz = ad => { const o = (S.plan.onay = S.plan.onay || {}); return o[ad] = o[ad] || {durum: 'acik', teklif: {}}; };
+  const n2Duzenlenir = ad => ['acik', 'reddedildi'].includes(n2OnayOku(ad).durum);
+  const talepSay = () => (S.plan && S.plan.onay ? Object.values(S.plan.onay).filter(o => o.durum === 'gonderildi').length : 0);
+  // Bir istasyonun teklif değerleri ve uyarıları
+  function n2TeklifOzet(b) {
+    const h = hesapla(b), o = n2OnayOku(b.ad), D = durumlar();
+    const satir = h.satir.map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
+      return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => personelSirala(x.k, y.k));
+    const toplam = satir.reduce((a, x) => a + x.tek, 0), mevcutT = satir.reduce((a, x) => a + (x.tutar ? x.mevcut : 0), 0);
+    return {h, o, satir, toplam, mevcutT, fark: Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
+  }
   function n2PlanHtml(b) {
     const ist = S.rol === 'istasyon';
-    if (ist && !n2Onayli()) return `<div class="ap-card ap-empty"><h2>Planlama henüz onaylanmadı</h2><p>${ayEtiket()} planlaması planlama birimi tarafından <b>kesinleştirilince</b> burada görünecek; ardından istek takvimi ve nöbet listesi araçları açılır.</p></div>`;
-    const h = hesapla(b), D = durumlar(), plan = planlananToplam(h);
+    if (ist && !n2Onayli()) return `<div class="ap-card ap-empty"><h2>Planlama henüz onaylanmadı</h2><p>${ayEtiket()} planlaması planlama birimi tarafından <b>kesinleştirilip istasyonlara gönderilince</b> burada görünecek; nöbet sayılarını düzenleyip planlamaya geri gönderirsiniz.</p></div>`;
+    const T = n2TeklifOzet(b), h = T.h, o = T.o, D = durumlar(), duz = ist && n2Duzenlenir(b.ad) && n2Duz();
     const durumMetin = s => { const k = s.k;
       if (k._gelen) return `Geçici görevli (${esc(k.birim)} kadrosundan)`;
       if (aileHek(k)) return 'Aile hekimliğinde';
@@ -56,12 +71,43 @@
       if (izinAyGun(k) > 0 && !s.nobetYok) return `İzinli (${fmt(izinAyGun(k))} gün)`;
       if (s.nobetYok) return 'Nöbet tutmaz';
       return 'Nöbet tutar'; };
-    const sat = h.satir.slice().sort((x, y) => personelSirala(x.k, y.k)).map(s => `<tr><td>${esc(s.k.ad)}</td><td>${esc(bransAd(s.k))}</td><td>${durumMetin(s)}</td><td>${s.nobetYok || (D[s.k.durum] || {}).disarida ? '' : esc(NB_AD[s.grup] || '')}</td><td class="num">${s.nobetYok || (D[s.k.durum] || {}).disarida || s.k.planlanan == null ? '' : '<b>' + fmt(sayi(s.k.planlanan)) + '</b>'}</td></tr>`).join('');
-    return `${!ist ? `<div class="ap-card" style="border-color:var(--ap-warn);background:var(--ap-warnbg)"><span class="ap-note">Planlama birimi görünümü. İstasyon sorumlusu bu bölümü yalnızca plan <b>Kesinleştirildiğinde</b> görür (şu an: <b>${S.plan.durum === 'taslak' ? 'Taslak' : S.plan.durum === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</b>). Sağlık nedenleri (rapor, doğum, muafiyet) istasyon sorumlusuna gösterilmez.</span></div>` : ''}
-      <div class="ap-card"><h2>${esc(b.ad)} — ${ayEtiket()} planlaması</h2>
-      <div class="ap-sum ap-sum1" style="margin-bottom:10px"><div><b>${fmt(plan)} / ${h.ihtiyac}</b><span>Yazılan / gereken nöbet</span></div><div><b>${h.satir.filter(s => !s.nobetYok && !(D[s.k.durum] || {}).disarida).length}</b><span>Nöbet tutan kişi</span></div>${[['es', 'Ekip şefi'], ['ysp', 'YSP'], ['sur', 'Sürücü']].map(([k, ad]) => `<div><b>${fmt(h.slot.dem[k] - Math.max(0, h.acikM[k]))}/${fmt(h.slot.dem[k])}</b><span>${ad}</span></div>`).join('')}</div>
-      <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Kadro</th><th>Durum</th><th>Nöbet branşı</th><th>Planlanan nöbet</th></tr></thead><tbody>${sat || '<tr><td colspan="5" class="ap-empty">Kişi yok</td></tr>'}</tbody></table></div>
-      <p class="ap-note" style="margin-top:8px">Planlanan nöbet, kişinin bu ay tutması planlanan 24 saatlik nöbet sayısıdır (12 saatlik nöbetler 0,5 sayılır). Nöbet listesini bu sayılara göre İstek takvimi ve Nöbet listesi sekmelerinden hazırlarsınız.</p>${S.rol !== 'istasyon' ? '' : '<div class="ap-row"><button class="ap-btn pri" data-act="n2-sekme" data-v="istek">İstek takvimine geç →</button></div>'}</div>`;
+    const sat = T.satir.map(x => `<tr><td>${esc(x.k.ad)}</td><td>${esc(bransAd(x.k))}</td><td>${durumMetin(x.s)}</td><td>${x.tutar ? esc(NB_AD[x.s.grup] || '') : ''}</td><td class="num">${x.tutar ? fmt(x.mevcut) : ''}</td>
+      <td class="num">${!x.tutar ? '' : duz ? `<input class="ap-in n ${x.asim ? 'n2e' : ''}" type="number" min="0" step="0.5" data-n2="teklif" data-id="${x.k.id}" value="${x.tek}" title="${x.asim ? 'Üst sınır ' + fmt(x.ust) + ' nöbet' : ''}">` : `<b class="${x.degisti ? 'n2d' : ''}">${fmt(x.tek)}</b>`}</td><td class="num">${x.tutar && x.degisti ? `<span class="${x.tek > x.mevcut ? 'n2art' : 'n2eks'}">${x.tek > x.mevcut ? '+' : ''}${fmt(x.tek - x.mevcut)}</span>` : ''}</td></tr>`).join('');
+    const durumRozet = `<span class="ap-badge ${o.durum === 'onaylandi' ? 'ap-b-kesin' : o.durum === 'reddedildi' ? 'ap-b-taslak' : ''}">${ONAY_AD[o.durum]}</span>`;
+    const uyari = [T.fark ? `Toplam ${fmt(T.toplam)}, gereken ${h.ihtiyac} (${T.fark > 0 ? '+' : ''}${fmt(T.fark)})` : '', T.asimSay ? `${T.asimSay} kişide üst sınır aşıldı` : ''].filter(Boolean);
+    return `${!ist ? `<div class="ap-card" style="border-color:var(--ap-warn);background:var(--ap-warnbg)"><span class="ap-note">Planlama birimi görünümü. İstasyon sorumlusu bu bölümü yalnızca plan <b>Kesinleştirildiğinde</b> görür (şu an: <b>${S.plan.durum === 'taslak' ? 'Taslak' : S.plan.durum === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</b>), nöbet sayılarını düzenleyip size geri gönderir; onayınızı <b>İstasyon talepleri</b> sayfasından verirsiniz. Sağlık nedenleri (rapor, doğum, muafiyet) istasyon sorumlusuna gösterilmez.</span></div>` : ''}
+      ${o.durum === 'reddedildi' && o.ret ? `<div class="ap-card" style="border-color:var(--ap-bad)"><b>Planlama düzeltme istedi:</b> ${esc(o.ret)}</div>` : ''}
+      <div class="ap-card"><h2>${esc(b.ad)} — ${ayEtiket()} planlaması ${durumRozet}</h2>
+      <div class="ap-sum ap-sum1" style="margin-bottom:10px"><div><b>${fmt(T.toplam)} / ${h.ihtiyac}</b><span>${T.degisenSay ? 'Sizin planınız / gereken nöbet' : 'Yazılan / gereken nöbet'}</span></div><div><b>${T.satir.filter(x => x.tutar).length}</b><span>Nöbet tutan kişi</span></div>${[['es', 'Ekip şefi'], ['ysp', 'YSP'], ['sur', 'Sürücü']].map(([k, ad]) => `<div><b>${fmt(h.slot.dem[k] - Math.max(0, h.acikM[k]))}/${fmt(h.slot.dem[k])}</b><span>${ad} (planlamadaki)</span></div>`).join('')}</div>
+      ${uyari.length ? `<div class="ap-ek ap-ek-c" style="margin-bottom:8px"><b>Dikkat:</b> ${uyari.join(' · ')}</div>` : ''}
+      <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Kadro</th><th>Durum</th><th>Nöbet branşı</th><th>Planlamanın yazdığı</th><th>${duz ? 'Sizin planınız' : 'Planlanan (son)'}</th><th>Fark</th></tr></thead><tbody>${sat || '<tr><td colspan="7" class="ap-empty">Kişi yok</td></tr>'}</tbody></table></div>
+      <p class="ap-note" style="margin-top:8px">Kime kaç nöbet yazılacağını ${duz ? '<b>"Sizin planınız"</b> sütunundan değiştirebilirsiniz' : 'bu sütunda görürsünüz'} (24 saatlik nöbet; 12 saatlik nöbetler 0,5). Toplam, istasyonun gereken nöbetine (${h.ihtiyac}) eşit olmalı; memur ve doktor için üst sınır ${fmt(S.ayar.azamiMemur)} nöbettir.</p>
+      ${ist ? `<div class="ap-row">${duz ? `<button class="ap-btn pri" data-act="n2-gonder">Planlamaya gönder</button>${T.degisenSay ? `<button class="ap-btn" data-act="n2-teklif-sifirla">Değişiklikleri geri al</button>` : ''}` : o.durum === 'gonderildi' ? '<span class="ap-note">Planınız planlama birimine gönderildi; onay bekleniyor.</span>' : o.durum === 'onaylandi' ? '<button class="ap-btn pri" data-act="n2-sekme" data-v="istek">İstek takvimine geç →</button>' : ''}</div>` : ''}</div>`;
+  }
+  // Modül 1: istasyonlardan gelen talepler
+  function talepHtml() {
+    if (!S.plan) return bosHtml();
+    const ists = S.plan.birimler.filter(b => b.tur === 'istasyon' && !b.ekipOf), onay = S.plan.onay || {}, duz = !salt();
+    const durumlu = ists.filter(b => onay[b.ad] && onay[b.ad].durum !== 'acik' || (onay[b.ad] && Object.keys(onay[b.ad].teklif || {}).length));
+    const gel = ists.filter(b => (onay[b.ad] || {}).durum === 'gonderildi');
+    const kart = b => { const T = n2TeklifOzet(b), o = T.o, degisen = T.satir.filter(x => x.degisti);
+      return `<div class="ap-card"><h2>${esc(b.ad)} <span class="ap-badge ${o.durum === 'onaylandi' ? 'ap-b-kesin' : o.durum === 'reddedildi' ? 'ap-b-taslak' : ''}">${ONAY_AD[o.durum]}</span> ${o.gonderZaman ? `<span class="ap-note">${new Date(o.gonderZaman).toLocaleString('tr-TR')}</span>` : ''}</h2>
+        <div class="ap-note">Toplam <b>${fmt(T.toplam)}</b> / gereken ${T.h.ihtiyac}${T.fark ? ` (<span style="color:var(--ap-bad)">${T.fark > 0 ? '+' : ''}${fmt(T.fark)}</span>)` : ''}${T.asimSay ? ` · <span style="color:var(--ap-bad)">${T.asimSay} kişide üst sınır aşıldı</span>` : ''} · ${degisen.length} kişide değişiklik</div>
+        ${degisen.length ? tabloHtml(['Kişi', 'Kadro', 'Planlamanın yazdığı', 'İstasyonun önerdiği', 'Fark'], degisen.map(x => [esc(x.k.ad), esc(bransAd(x.k)), x.mevcut, x.tek, `<span class="${x.tek > x.mevcut ? 'n2art' : 'n2eks'}">${x.tek > x.mevcut ? '+' : ''}${fmt(x.tek - x.mevcut)}</span>`])) : '<p class="ap-note">Planlamadaki sayılar aynen bırakılmış.</p>'}
+        ${o.durum === 'gonderildi' ? `<div class="ap-row" style="margin-top:8px"><button class="ap-btn pri" data-act="talep-onayla" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'}>Onayla (kesin plana işle)</button><input class="ap-in" id="ap-talep-not-${esc(b.ad)}" placeholder="Reddederseniz istasyona not yazın" style="min-width:260px"><button class="ap-btn dng" data-act="talep-reddet" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'}>Düzeltme iste</button></div>` : ''}</div>`; };
+    return `<div class="ap-card"><h2>İstasyon talepleri — ${ayEtiket()}</h2>
+      <p class="ap-note">Plan <b>Kesinleştirilince</b> istasyonlara gönderilir; istasyon sorumluları kime kaç nöbet yazılacağını değiştirip size geri gönderir. Onayladığınız liste, o istasyonun kesin planının yerine geçer (nöbet sayıları kilitlenir). Plan durumu: <b>${S.plan.durum === 'taslak' ? 'Taslak (istasyonlara gönderilmedi)' : S.plan.durum === 'kesin' ? 'Kesinleşti (istasyonlarda)' : 'Kilitli'}</b>. Onay bekleyen: <b>${gel.length}</b> · onaylanan: <b>${ists.filter(b => (onay[b.ad] || {}).durum === 'onaylandi').length}</b> / ${ists.length}.</p>
+      ${gel.length > 1 ? `<div class="ap-row"><button class="ap-btn pri" data-act="talep-hepsi" ${duz ? '' : 'disabled'}>Gönderilen ${gel.length} istasyonu onayla</button></div>` : ''}</div>
+      ${durumlu.map(kart).join('') || '<div class="ap-card ap-empty">Henüz istasyondan gelen bir talep yok.</div>'}`;
+  }
+  // Onay: istasyonun önerdiği nöbet sayıları kesin plana işlenir ve kilitlenir
+  function talepOnayla(b) {
+    const o = n2OnayYaz(b.ad), T = n2TeklifOzet(b); let n = 0;
+    S.toplu = true;
+    try { T.satir.forEach(x => { if (!x.tutar) return; const k = S.plan.kayitlar.find(y => y.id === x.k.id); if (!k) return; k.planlanan = x.tek; k.kilit = true; n++; }); }
+    finally { S.toplu = false; }
+    o.durum = 'onaylandi'; o.onayZaman = Date.now(); o.ret = '';
+    logla('İstasyon planı onaylandı', `${b.ad}: ${n} kişi, ${T.degisenSay} değişiklik`); otoHesapla(); kaydet();
   }
 
   // ---- istek takvimi: kişi × gün matrisi ----
@@ -151,11 +197,22 @@
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && a !== 'modul') return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('talep-') && a !== 'modul') return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
       case 'n2-sekme': S.n2.sekme = v; break;
+      case 'n2-gonder': {
+        const T = n2TeklifOzet(b); if (!n2Duzenlenir(b.ad)) break;
+        const sorun = [T.fark ? `toplam nöbet gerekenden ${T.fark > 0 ? 'fazla' : 'eksik'} (${fmt(T.toplam)} / ${T.h.ihtiyac})` : '', T.asimSay ? `${T.asimSay} kişide üst sınır aşıldı` : ''].filter(Boolean);
+        if (sorun.length && !confirm('Uyarılar var: ' + sorun.join('; ') + '.\n\nYine de planlamaya gönderilsin mi?')) break;
+        mut2(() => { const o = n2OnayYaz(b.ad); T.satir.forEach(x => { if (x.tutar) o.teklif[x.k.id] = x.tek; }); o.durum = 'gonderildi'; o.gonderZaman = Date.now(); o.ret = ''; }, 'İstasyon planı planlamaya gönderildi', `${b.ad}: ${T.degisenSay} değişiklik`);
+        toast('Planınız planlama birimine gönderildi.'); break;
+      }
+      case 'n2-teklif-sifirla': if (n2Duzenlenir(b.ad) && confirm('Yaptığınız değişiklikler geri alınsın mı?')) mut2(() => { n2OnayYaz(b.ad).teklif = {}; }, 'İstasyon teklifi sıfırlandı', b.ad); break;
+      case 'talep-onayla': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if (confirm(`${bb.ad} istasyonunun planı kesin plana işlensin mi?`)) { talepOnayla(bb); toast(`${bb.ad} planı onaylandı.`); } break; }
+      case 'talep-reddet': { const bb = S.plan.birimler.find(x => x.ad === v), not = (root.querySelector('[id="ap-talep-not-' + v + '"]') || {}).value || ''; if (!bb || salt()) break; if (!not.trim()) { toast('Düzeltme isterken istasyona kısa bir not yazın.'); break; } mut(() => { const o = n2OnayYaz(bb.ad); o.durum = 'reddedildi'; o.ret = not.trim(); }, 'İstasyon planı için düzeltme istendi', `${bb.ad}: ${not.trim()}`); toast('Düzeltme istendi.'); break; }
+      case 'talep-hepsi': { const gel = S.plan.birimler.filter(x => x.tur === 'istasyon' && (S.plan.onay || {})[x.ad] && S.plan.onay[x.ad].durum === 'gonderildi'); if (salt() || !gel.length) break; if (confirm(`Gönderilen ${gel.length} istasyonun planı kesin plana işlensin mi?`)) { gel.forEach(talepOnayla); toast(`${gel.length} istasyon planı onaylandı.`); } break; }
       case 'n2-gorunum': S.n2.gorunum = v; break;
       case 'n2-istek': { const dp = n2Depo(b.ad), id = t.dataset.id, g = C.iso(S.y, S.m, +v); mut2(() => { const l = dp.istek[id] = dp.istek[id] || []; const i = l.indexOf(g); if (i >= 0) l.splice(i, 1); else l.push(g); if (!l.length) delete dp.istek[id]; }); break; }
       case 'n2-istek-temizle': if (confirm('Bu istasyonun tüm istek günleri silinsin mi?')) mut2(() => { n2Depo(b.ad).istek = {}; }, 'Modül 2: istekler temizlendi', b.ad); break;
@@ -205,6 +262,7 @@
     if (a === 'arsiv-ay') return false;
     if (!n) return false;
     const b = S.plan && n2Birim();
+    if (n === 'teklif') { const b2 = S.plan && n2Birim(); if (!b2 || !n2Duzenlenir(b2.ad)) return false; const id = t.dataset.id, v = t.value === '' ? null : Math.max(0, Math.round(sayi(t.value) * 2) / 2); mut2(() => { const o = n2OnayYaz(b2.ad); if (v == null) delete o.teklif[id]; else o.teklif[id] = v; }); return true; }
     if (n === 'ist') { S.n2.ist = t.value; S.n2.oneri = null; return true; }
     if (n === 'kural') { const dp = n2Depo(b.ad), k = t.dataset.k; mut2(() => { dp.kural = {...dp.kural, [k]: t.type === 'checkbox' ? t.checked : Math.max(0, Math.round(sayi(t.value))) }; }, 'Modül 2: kural', `${k}`); return true; }
     if (n === 'hucre') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { dp.liste = dp.liste || NC.bos(NC.gunSayisi(S.y, S.m)); dp.liste[g][tip] = t.value === '' ? null : t.value; }, 'Modül 2: elle değişiklik', `${g}. gün ${tip}`); return true; }
