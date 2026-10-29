@@ -90,21 +90,32 @@
     const ists = S.plan.birimler.filter(b => b.tur === 'istasyon' && !b.ekipOf), onay = S.plan.onay || {}, duz = !salt();
     const durumlu = ists.filter(b => onay[b.ad] && onay[b.ad].durum !== 'acik' || (onay[b.ad] && Object.keys(onay[b.ad].teklif || {}).length));
     const gel = ists.filter(b => (onay[b.ad] || {}).durum === 'gonderildi');
-    const kart = b => { const T = n2TeklifOzet(b), o = T.o, degisen = T.satir.filter(x => x.degisti);
+    const kart = b => { const T = n2TeklifOzet(b), o = T.o, degisen = o.durum === 'onaylandi' && o.onceki ? T.satir.filter(x => x.tutar && o.onceki[x.k.id] && Math.abs(sayi(o.onceki[x.k.id].planlanan) - x.tek) > 1e-9).map(x => ({...x, mevcut: sayi(o.onceki[x.k.id].planlanan), degisti: true})) : T.satir.filter(x => x.degisti);
       return `<div class="ap-card"><h2>${esc(b.ad)} <span class="ap-badge ${o.durum === 'onaylandi' ? 'ap-b-kesin' : o.durum === 'reddedildi' ? 'ap-b-taslak' : ''}">${ONAY_AD[o.durum]}</span> ${o.gonderZaman ? `<span class="ap-note">${new Date(o.gonderZaman).toLocaleString('tr-TR')}</span>` : ''}</h2>
         <div class="ap-note">Toplam <b>${fmt(T.toplam)}</b> / gereken ${T.h.ihtiyac}${T.fark ? ` (<span style="color:var(--ap-bad)">${T.fark > 0 ? '+' : ''}${fmt(T.fark)}</span>)` : ''}${T.asimSay ? ` · <span style="color:var(--ap-bad)">${T.asimSay} kişide üst sınır aşıldı</span>` : ''} · ${degisen.length} kişide değişiklik</div>
         ${degisen.length ? tabloHtml(['Kişi', 'Kadro', 'Planlamanın yazdığı', 'İstasyonun önerdiği', 'Fark'], degisen.map(x => [esc(x.k.ad), esc(bransAd(x.k)), x.mevcut, x.tek, `<span class="${x.tek > x.mevcut ? 'n2art' : 'n2eks'}">${x.tek > x.mevcut ? '+' : ''}${fmt(x.tek - x.mevcut)}</span>`])) : '<p class="ap-note">Planlamadaki sayılar aynen bırakılmış.</p>'}
+        ${o.durum === 'onaylandi' ? `<div class="ap-row" style="margin-top:8px"><span class="ap-note">Onaylandı${o.onayZaman ? ' · ' + new Date(o.onayZaman).toLocaleString('tr-TR') : ''}: nöbet sayıları kesin plana işlendi.</span><button class="ap-btn dng" data-act="talep-geri-al" data-v="${esc(b.ad)}" ${duz && o.onceki ? '' : 'disabled'} title="${o.onceki ? 'Onaydan önceki nöbet sayıları geri yüklenir; istasyon tekrar onay bekler' : 'Bu onay eski sürümde yapıldığı için geri alınamaz'}">Onayı geri al</button></div>` : ''}
         ${o.durum === 'gonderildi' ? `<div class="ap-row" style="margin-top:8px"><button class="ap-btn pri" data-act="talep-onayla" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'}>Onayla (kesin plana işle)</button><input class="ap-in" id="ap-talep-not-${esc(b.ad)}" placeholder="Reddederseniz istasyona not yazın" style="min-width:260px"><button class="ap-btn dng" data-act="talep-reddet" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'}>Düzeltme iste</button></div>` : ''}</div>`; };
     return `<div class="ap-card"><h2>İstasyon talepleri — ${ayEtiket()}</h2>
       <p class="ap-note">Plan <b>Kesinleştirilince</b> istasyonlara gönderilir; istasyon sorumluları kime kaç nöbet yazılacağını değiştirip size geri gönderir. Onayladığınız liste, o istasyonun kesin planının yerine geçer (nöbet sayıları kilitlenir). Plan durumu: <b>${S.plan.durum === 'taslak' ? 'Taslak (istasyonlara gönderilmedi)' : S.plan.durum === 'kesin' ? 'Kesinleşti (istasyonlarda)' : 'Kilitli'}</b>. Onay bekleyen: <b>${gel.length}</b> · onaylanan: <b>${ists.filter(b => (onay[b.ad] || {}).durum === 'onaylandi').length}</b> / ${ists.length}.</p>
       ${gel.length > 1 ? `<div class="ap-row"><button class="ap-btn pri" data-act="talep-hepsi" ${duz ? '' : 'disabled'}>Gönderilen ${gel.length} istasyonu onayla</button></div>` : ''}</div>
       ${durumlu.map(kart).join('') || '<div class="ap-card ap-empty">Henüz istasyondan gelen bir talep yok.</div>'}`;
   }
+  // Onayı geri alma: kişilerin onay öncesi nöbet sayıları ve kilit durumları geri yüklenir; istasyon yeniden "onay bekliyor" durumuna döner
+  function talepGeriAl(b) {
+    const o = n2OnayYaz(b.ad), onceki = o.onceki || {}; let n = 0;
+    S.toplu = true;
+    try { Object.entries(onceki).forEach(([id, v]) => { const k = S.plan.kayitlar.find(y => y.id === id); if (!k) return; k.planlanan = v.planlanan; k.kilit = !!v.kilit; n++; }); }
+    finally { S.toplu = false; }
+    o.durum = 'gonderildi'; o.onayZaman = null; o.onceki = null;
+    logla('İstasyon planı onayı geri alındı', `${b.ad}: ${n} kişi eski değerine döndü`); otoHesapla(); kaydet();
+    return n;
+  }
   // Onay: istasyonun önerdiği nöbet sayıları kesin plana işlenir ve kilitlenir
   function talepOnayla(b) {
-    const o = n2OnayYaz(b.ad), T = n2TeklifOzet(b); let n = 0;
+    const o = n2OnayYaz(b.ad), T = n2TeklifOzet(b); let n = 0; o.onceki = {};      // geri alabilmek için onay öncesi değerler saklanır
     S.toplu = true;
-    try { T.satir.forEach(x => { if (!x.tutar) return; const k = S.plan.kayitlar.find(y => y.id === x.k.id); if (!k) return; k.planlanan = x.tek; k.kilit = true; n++; }); }
+    try { T.satir.forEach(x => { if (!x.tutar) return; const k = S.plan.kayitlar.find(y => y.id === x.k.id); if (!k) return; o.onceki[k.id] = {planlanan: k.planlanan, kilit: !!k.kilit}; k.planlanan = x.tek; k.kilit = true; n++; }); }
     finally { S.toplu = false; }
     o.durum = 'onaylandi'; o.onayZaman = Date.now(); o.ret = '';
     logla('İstasyon planı onaylandı', `${b.ad}: ${n} kişi, ${T.degisenSay} değişiklik`); otoHesapla(); kaydet();
@@ -212,6 +223,7 @@
       case 'n2-teklif-sifirla': if (n2Duzenlenir(b.ad) && confirm('Yaptığınız değişiklikler geri alınsın mı?')) mut2(() => { n2OnayYaz(b.ad).teklif = {}; }, 'İstasyon teklifi sıfırlandı', b.ad); break;
       case 'talep-onayla': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if (confirm(`${bb.ad} istasyonunun planı kesin plana işlensin mi?`)) { talepOnayla(bb); toast(`${bb.ad} planı onaylandı.`); } break; }
       case 'talep-reddet': { const bb = S.plan.birimler.find(x => x.ad === v), not = (root.querySelector('[id="ap-talep-not-' + v + '"]') || {}).value || ''; if (!bb || salt()) break; if (!not.trim()) { toast('Düzeltme isterken istasyona kısa bir not yazın.'); break; } mut(() => { const o = n2OnayYaz(bb.ad); o.durum = 'reddedildi'; o.ret = not.trim(); }, 'İstasyon planı için düzeltme istendi', `${bb.ad}: ${not.trim()}`); toast('Düzeltme istendi.'); break; }
+      case 'talep-geri-al': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if (confirm(`${bb.ad} istasyonunun onayı geri alınsın mı? Nöbet sayıları onaydan önceki değerlerine döner ve istasyon yeniden onay bekler.`)) { const n = talepGeriAl(bb); toast(`${bb.ad} onayı geri alındı (${n} kişi).`); } break; }
       case 'talep-hepsi': { const gel = S.plan.birimler.filter(x => x.tur === 'istasyon' && (S.plan.onay || {})[x.ad] && S.plan.onay[x.ad].durum === 'gonderildi'); if (salt() || !gel.length) break; if (confirm(`Gönderilen ${gel.length} istasyonun planı kesin plana işlensin mi?`)) { gel.forEach(talepOnayla); toast(`${gel.length} istasyon planı onaylandı.`); } break; }
       case 'n2-gorunum': S.n2.gorunum = v; break;
       case 'n2-istek': { const dp = n2Depo(b.ad), id = t.dataset.id, g = C.iso(S.y, S.m, +v); mut2(() => { const l = dp.istek[id] = dp.istek[id] || []; const i = l.indexOf(g); if (i >= 0) l.splice(i, 1); else l.push(g); if (!l.length) delete dp.istek[id]; }); break; }
