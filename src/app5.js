@@ -139,11 +139,14 @@
     return `<div class="ap-card"><h2>İstek takvimi — nöbet istenmeyen günler</h2>
       <p class="ap-note">Bir hücreye tıklayarak o kişinin <b>nöbet istemediği günü</b> işaretleyin (✕), tekrar tıklayınca kalkar. <b>İ</b>: izinli gün (ASOS'tan gelen izinler ve aşağıdan eklenenler); <b>·</b>: yıllık izin öncesi ${G.kural.izinOnce} günlük otomatik boşluk. Otomatik liste önce bu günleri ve izinleri gözetir; mümkün olmazsa istek günü sona kalır ve denetimde uyarı verir.</p>
       <div class="ap-row" style="margin:8px 0 10px"><button class="ap-btn" data-act="n2-istek-temizle" ${duz ? '' : 'disabled'}>Tüm istekleri temizle</button><button class="ap-btn pri" data-act="n2-sekme" data-v="liste">Nöbet listesine geç →</button></div>
-      <div class="ap-tw"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}</tr></thead><tbody>${sat}</tbody></table></div>
-</div>
-      <div class="ap-card"><h2>İzin aralığı ekle</h2><p class="ap-note">Yıllık izin başlamadan önceki ${G.kural.izinOnce} gün nöbet yazılmaz, izin süresince de yazılmaz. ASOS'tan tarihli gelen izinler otomatik tanınır.</p>
-      <div class="ap-row"><select class="ap-sel" id="ap-n2-izkisi">${kisiSec}</select><label class="ap-note">Başlangıç <input type="date" class="ap-in" id="ap-n2-izbas"></label><label class="ap-note">Bitiş <input type="date" class="ap-in" id="ap-n2-izbit"></label><button class="ap-btn pri" data-act="n2-izin-ekle" ${duz ? '' : 'disabled'}>Ekle</button></div>
-      ${izinler.length ? `<div style="margin-top:8px">${izinler.map(({k, z, i}) => `<div class="ap-row"><b>${esc(k.ad)}</b> ${z.bas.split('-').reverse().join('.')} – ${z.bit.split('-').reverse().join('.')} <button class="ap-btn sm dng" data-act="n2-izin-sil" data-id="${k.id}" data-v="${i}" ${duz ? '' : 'disabled'}>Sil</button></div>`).join('')}</div>` : ''}</div>`;
+      <div style="margin:4px 0 12px"><b>İzin aralığı ekle</b> <span class="ap-note">Yıllık izin başlamadan önceki ${G.kural.izinOnce} gün nöbet yazılmaz, izin süresince de yazılmaz. ASOS'tan tarihli gelen izinler otomatik tanınır.</span>
+      
+      <div class="ap-row" style="margin-top:6px"><select class="ap-sel" id="ap-n2-izkisi">${kisiSec}</select><label class="ap-note">Başlangıç <input type="date" class="ap-in" id="ap-n2-izbas"></label><label class="ap-note">Bitiş <input type="date" class="ap-in" id="ap-n2-izbit"></label><button class="ap-btn pri" data-act="n2-izin-ekle" ${duz ? '' : 'disabled'}>Ekle</button></div></div>
+      ${izinler.length ? `<div style="margin-top:8px">${izinler.map(({k, z, i}) => `<div class="ap-row"><b>${esc(k.ad)}</b> ${z.bas.split('-').reverse().join('.')} – ${z.bit.split('-').reverse().join('.')} <button class="ap-btn sm dng" data-act="n2-izin-sil" data-id="${k.id}" data-v="${i}" ${duz ? '' : 'disabled'}>Sil</button></div>`).join('')}</div>` : ''}</div>
+
+
+      <div class="ap-card"><div class="ap-tw"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}</tr></thead><tbody>${sat}</tbody></table></div>
+</div>`;
   }
 
   // ---- nöbet listesi ----
