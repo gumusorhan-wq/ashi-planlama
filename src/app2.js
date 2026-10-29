@@ -55,7 +55,7 @@
     const E = eksikAnaliz(h, isciTam, doktorluIstasyon(b)), gelecek = h.ihtiyacTur === 'oner' ? h.ihtiyacKisi : 0;
     const yuvaSatir = E.yuvalar.map(y => {
       const dolu = y.gerek - y.acik;
-      return `<div class="ap-yuva"><span>${y.ad}${y.acik >= 0.5 ? ` <span class="ap-note" title="Herkese üst sınır (azami) kadar nöbet yazılırsa bu yuvada kalan açık">· azamiyle ${y.azamiAcik >= 0.5 ? '−' + fmt(y.azamiAcik) : 'dolar'}</span>` : ''}</span><span class="v">${fmt(dolu)}/${fmt(y.gerek)}</span>${y.acik >= 0.5 ? `<span class="ap-tag ap-t-ih" title="${y.ad} yuvasında hedef nöbetlerle ${fmt(y.acik)} nöbet açık kalıyor${y.azamiAcik < y.acik ? '; azami nöbetle ' + fmt(y.azamiAcik) + ' açık kalır' : ''}">−${fmt(y.acik)}</span>` : '<span class="ap-tag ap-t-ok">tam</span>'}</div>`;
+      return `<div class="ap-yuva"><span>${y.ad}${y.acik >= 0.5 ? ` <span class="ap-note" title="Kişilere hedeflerinin üstünde fazla nöbet (üst sınıra kadar) yazılırsa bu yuvada kalan açık">· fazla nöbetle ${y.azamiAcik >= 0.5 ? '−' + fmt(y.azamiAcik) : 'dolar'}</span>` : ''}</span><span class="v">${fmt(dolu)}/${fmt(y.gerek)}</span>${y.acik >= 0.5 ? `<span class="ap-tag ap-t-ih" title="${y.ad} yuvasında hedef nöbetlerle ${fmt(y.acik)} nöbet açık kalıyor${y.azamiAcik < y.acik ? '; azami nöbetle ' + fmt(y.azamiAcik) + ' açık kalır' : ''}">−${fmt(y.acik)}</span>` : '<span class="ap-tag ap-t-ok">tam</span>'}</div>`;
     }).join('');
     // gelecek personel: hangi branşlardan ve kaç kişi
     let gelen = '';
@@ -218,7 +218,12 @@
     // basit eşleştirme önerisi
     const oner = []; let fz = fazla.map(x => ({ad: x.b.ad, k: x.h.fazlaH})), ac = acik.map(x => ({ad: x.b.ad, k: x.h.hedefAcik}));
     for (const a of ac) for (const f of fz) { const m = Math.min(a.k, f.k); if (m >= 4) { oner.push(`${f.ad} → ${a.ad}: yaklaşık ${fmt(m)} nöbet (≈ ${Math.max(1, Math.round(m / 7.5))} kişi)`); a.k -= m; f.k -= m; } }
+    // Dağıtım sonucu: önerilen rotasyon tüm istasyonlara uygulanınca hâlâ personel bekleyen istasyonlar. Fazla nöbetle kapanan istasyonlara personel gönderilmez; kalan açık fazla nöbetle kapanır.
+    const rotOner = rotasyonOneriler(), gidenSay = {}; rotOner.forEach(o => { if (o.hedef) gidenSay[o.hedef] = (gidenSay[o.hedef] || 0) + 1; });
+    const karsilanamayan = acik.filter(x => x.h.ihtiyacTur === 'oner' && x.h.ihtiyacKisi > (gidenSay[x.b.ad] || 0)), fazlaIleDolan = [...ic].filter(x => x.h.ihtiyacTur === 'icerde');
+    const dagitimOzet = `<div class="ap-ek ap-ek-c" style="margin:8px 0"><b>Dağıtım sonucu:</b> ${rotOner.filter(o => o.hedef).length} kişi gerçekten ihtiyacı olan istasyonlara yönlendirildi. ${karsilanamayan.length ? `<b>${karsilanamayan.length} istasyonun ihtiyacı karşılanamadı</b> (${karsilanamayan.slice(0, 8).map(x => `${esc(x.b.ad)} −${x.h.ihtiyacKisi - (gidenSay[x.b.ad] || 0)} kişi`).join(', ')}${karsilanamayan.length > 8 ? ' …' : ''}); kalan açık o istasyonlarda fazla nöbetle kapanır.` : 'Personel bekleyen istasyon kalmadı.'} ${fazlaIleDolan.length ? `Fazla nöbetle kapanan ${fazlaIleDolan.length} istasyona (açığı bir kişiye yetmiyor) personel gönderilmez.` : ''}</div>`;
     const degerlendirme = `<div class="ap-card"><h2>Personel ihtiyacı değerlendirmesi — ${ayEtiket()}</h2>
+      ${dagitimOzet}
       <p class="ap-note">Ölçüt: kişiler hedef nöbetlerini tamamen tutsa da istasyon açık kalıyorsa ve bu açık, gelen bir kişinin mesaisini orada tamamlamasına yetiyorsa personel önerilir. Açık bir kişiye yetmiyorsa istasyon fazla nöbetle kendi içinde döner ve personel önerilmez. İsterseniz aşağıdaki "Görevlendirmeler" bölümünden elle görevlendirme yapabilirsiniz.</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>İSTASYON</th><th>HEDEFLE AÇIK</th><th>KAÇ KİŞİ MESAİSİNİ TAMAMLAR</th><th>AZAMİYLE DURUM</th><th>DEĞERLENDİRME</th></tr></thead><tbody>
       ${[...acik, ...ic].map(x => `<tr><td><b>${esc(x.b.ad)}</b></td><td class="num">${fmt(x.h.hedefAcik)}</td><td class="num">${x.h.ihtiyacKisi}</td><td>${x.h.farkAzami >= 0 ? 'Doluyor (' + fmt(x.h.azamiKap) + ' / ' + x.h.ihtiyac + ')' : fmt(-x.h.farkAzami) + ' nöbet açık kalıyor'}</td>
