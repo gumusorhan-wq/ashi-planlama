@@ -85,7 +85,7 @@
   // Nöbet İçi Hareket Raporu / Nöbet Listesi Raporu (Nöbet Sayım uygulamasındaki dosya): kişinin ekip şefi / YSP / sürücü olarak tuttuğu nöbet saatleri
   function asosParseN(rows, hi) {
     const H = rows[hi].map(C.TR), ix = re => H.findIndex(h => re.test(h));
-    const ti = ix(/^(TCKN|TC KIMLIK NO)$/), gi = ix(/^NOBET GOREVI$/), si = ix(/^NOBET SURESI/), eti = ix(/^EKIP TURU$/), epi = ix(/^EKIP TIPI$/), bi = ix(/BASLANGIC TARIHI|NOBET TARIHI|^TARIH$/);
+    const adI = ix(/^AD$/), soyI = ix(/^SOYAD$/), ebI = ix(/^EKIBIN ISTASYON BILGISI$/), enI = ix(/^EKIP ADI$/), nlbI = ix(/^NOBET LISTESI BRANSI$/), ti = ix(/^(TCKN|TC KIMLIK NO)$/), gi = ix(/^NOBET GOREVI$/), si = ix(/^NOBET SURESI/), eti = ix(/^EKIP TURU$/), epi = ix(/^EKIP TIPI$/), bi = ix(/BASLANGIC TARIHI|NOBET TARIHI|^TARIH$/);
     const out = [], tani = {satir: 0, tcYok: 0, istasyonDisi: 0, ambulansDisi: 0, rolYok: {}, sureYok: {}, ok: 0, baslik: rows[hi].filter(Boolean).join(' | '), gorevler: {}};
     const ornek = (o, v) => { v = String(v ?? '').trim() || '(boş)'; o[v] = (o[v] || 0) + 1; };
     // süre: "24", "24 saat", "24:00", "12,5", "1 gün"
@@ -107,7 +107,7 @@
       if (!rol) { ornek(tani.rolYok, r[gi]); return; }
       let saat = si >= 0 ? saatOku(r[si]) : 0;
       if (!(saat > 0)) { if (si >= 0) ornek(tani.sureYok, r[si]); saat = 1; }       // süre okunamazsa her kayıt eşit ağırlıkta sayılır (yalnız oran önemli)
-      tani.ok++; out.push({tc, rol, saat, bas: bi >= 0 ? String(r[bi]) : '', ay: bi >= 0 ? C.tarihIso(r[bi]).slice(0, 7) : ''});
+      tani.ok++; out.push({tc, rol, saat, ad: ((adI >= 0 ? r[adI] : '') + ' ' + (soyI >= 0 ? r[soyI] : '')).trim().toLocaleUpperCase('tr-TR'), brans: nlbI >= 0 ? String(r[nlbI] || '') : '', birimMetin: String(ebI >= 0 && r[ebI] ? r[ebI] : (enI >= 0 ? r[enI] : '') || ''), mesai: si >= 0 && /^MESAI/.test(C.TR(r[si])), bas: bi >= 0 ? String(r[bi]) : '', ay: bi >= 0 ? C.tarihIso(r[bi]).slice(0, 7) : ''});
     });
     out.tani = tani; return out;
   }
@@ -194,6 +194,25 @@
     return {gorev: {yer: gc.ad, hedef, kaynak: 'asos', yolluk: '', bas: gc.bas || '', bit: gc.bit || '', tarih: gc.bas ? `${trTarih(gc.bas)}${gc.bit ? ' – ' + trTarih(gc.bit) : ''}` : '', gerekce: GEREKCE_ESLE[baslik] || ''}, gecmis};
   }
   const bugunIso = () => new Date().toISOString().slice(0, 10);
+  // Gerçekleşen nöbetler (Nöbet Listesi Raporundan): ay → istasyon bazında nöbet sayısı, kişi bazında nöbet ve fazla nöbet, kadrosu dışındaki istasyonlarda tutulan nöbetler
+  function birimBul(plan, metin) { const a = C.istAnahtar(metin || ''); if (!a) return ''; const b = plan.birimler.find(x => x.tur === 'istasyon' && C.istAnahtar(x.ad) === a); return b ? b.ad : ''; }
+  function gercekHazirla(plan, satirlar) {
+    const tcMap = new Map(plan.kayitlar.filter(k => k.tc).map(k => [k.tc, k])), ay = {};
+    satirlar.forEach(r => { if (!r.ay || r.mesai) return; const m = (ay[r.ay] = ay[r.ay] || new Map()), e = m.get(r.tc) || {ad: r.ad, brans: r.brans, birimler: {}}; const ist = birimBul(plan, r.birimMetin) || (C.TR(r.birimMetin).includes('KOMUTA') ? 'KOMUTA KONTROL MERKEZİ' : String(r.birimMetin || '').trim() || '—'); e.birimler[ist] = (e.birimler[ist] || 0) + r.saat; m.set(r.tc, e); });
+    const out = {};
+    Object.entries(ay).forEach(([a, m]) => {
+      const [yy, mm] = a.split('-').map(Number), ist = {}, kisi = [], dis = [];
+      const hedefStd = sinif => { try { const isci = sinif === 'isci', ms = C.ayMesai(yy, mm, isci, {}); return C.hedefNobet(ms, sinif === 'doktor' ? 'doktor' : isci ? 'isci' : 'memur', false, {isciDusulen: S.ayar.isciDusulen}).birim; } catch (er) { return 0; } };
+      m.forEach((e, tc) => {
+        const k = tcMap.get(tc), toplam = Object.values(e.birimler).reduce((x, v) => x + v, 0) / 24, brans = k ? bransAd(k) : (e.brans || ''), kadro = k ? k.birim : '', hedef = hedefStd(k ? k.sinif : /SURUCU|ISCI/.test(C.TR(e.brans)) ? 'isci' : 'memur');
+        Object.entries(e.birimler).forEach(([b, saat]) => { const o = (ist[b] = ist[b] || {nobet: 0, kisi: 0}); o.nobet += saat / 24; o.kisi++; if (kadro && b !== kadro && b !== 'KOMUTA KONTROL MERKEZİ') dis.push({ad: k ? k.ad : e.ad, brans, kadro, istasyon: b, nobet: Math.round(saat / 24 * 100) / 100}); });
+        kisi.push({ad: k ? k.ad : e.ad, brans, kadro, nobet: Math.round(toplam * 100) / 100, hedef, fazla: Math.round(Math.max(0, toplam - hedef) * 100) / 100});
+      });
+      Object.values(ist).forEach(o => { o.nobet = Math.round(o.nobet * 100) / 100; });
+      out[a] = {ay: a, zaman: Date.now(), ist, kisi, dis};
+    });
+    return out;
+  }
   function asosOnizle(sonuc, taban) {
     let {tur, satirlar} = sonuc;
     if (tur === 'N') { const g = new Set(), tani = satirlar.tani; satirlar = satirlar.filter(r => { const k = `${r.tc}|${r.bas}|${r.rol}`; if (!r.bas) return true; if (g.has(k)) return false; g.add(k); return true; }); satirlar.tani = tani; }   // Nöbet Listesi ve Hareket Raporu birlikte yüklenirse aynı nöbet iki kez sayılmaz
@@ -213,6 +232,7 @@
         if (k.sinif === 'memur') { rp.att++; const d = C.surucuDurumu(k, esk).tip; if (d === 'surucu') rp.surucu++; else if (d === 'degil') rp.degil++; else rp.dogrulanmadi++; }
       });
       plan.nobetAylari = [...new Set([...(plan.nobetAylari || []), ...aylar])].sort();
+      rp.gercek = gercekHazirla(plan, satirlar);
       return rp;
     }
     if (tur === 'I') {
@@ -623,6 +643,8 @@
           S.plan = yeni; otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | '));
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
+          for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
+          S.arsivVeri = null;
           kaydet(); S.modal = null; S.asos = null; S.sayfa = 'pano'; if (!S.ist || !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || S.plan.birimler[0] || {}).ad || '';
           toast('Personel listeleri uygulandı.'); break;
         }

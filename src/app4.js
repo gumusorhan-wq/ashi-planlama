@@ -64,7 +64,10 @@
     S.yuklemeler = (await depo.get('yuklemeler')) || [];
     const anahtarlar = ((await depo.keys()) || []).filter(k => String(k).startsWith('arsiv:')).sort(), v = {};
     for (const k of anahtarlar) { const r = await depo.get(k); if (r && r.ay) v[r.ay] = r; }
-    S.arsivVeri = v; if (!S.arsivSecili) S.arsivSecili = Object.keys(v);
+    const gk = ((await depo.keys()) || []).filter(k => String(k).startsWith('gercek:')).sort(), g = {};
+    for (const k of gk) { const r = await depo.get(k); if (r && r.ay) g[r.ay] = r; }
+    S.gercekVeri = g; S.arsivVeri = v; S.arsivSecili = S.arsivSecili || []; S.arsivBilinen = S.arsivBilinen || new Set();
+    [...new Set([...Object.keys(v), ...Object.keys(g)])].sort().forEach(a => { if (!S.arsivBilinen.has(a)) { S.arsivBilinen.add(a); S.arsivSecili.push(a); } });      // yeni gelen aylar otomatik seçilir
     return v;
   }
   async function arsivYaz(rec) { await depo.put(arsivAnahtar(rec.ay), rec); (S.arsivVeri = S.arsivVeri || {})[rec.ay] = rec; if (S.arsivSecili && !S.arsivSecili.includes(rec.ay)) S.arsivSecili.push(rec.ay); }
@@ -130,16 +133,40 @@
     const matSat = Object.keys(mat).sort(trCollator.compare).map(ad => [esc(ad), ...BRANSLAR.map(b => mat[ad][b] || 0), BRANSLAR.reduce((x, b) => x + (mat[ad][b] || 0), 0)]);
     return {ayN, seyir, ist, cikSat, gelSat, fazSat, matSat, adlar: [...adlar].sort(trCollator.compare)};
   }
+  // Gerçekleşen nöbetler (Nöbet Listesi Raporundan): planlananla karşılaştırma, fazla nöbet, kadrosu dışında tutulan nöbet
+  function gercekIstatistik() {
+    const g = S.gercekVeri || {}, f = S.arsivIst, sec = (S.arsivSecili || []).filter(a => g[a]).sort(), ister = ad => !f || ad === f;
+    const ist = new Map(), faz = new Map(), dis = new Map(), mat = {};
+    sec.forEach(a => {
+      const rec = g[a], pl = S.arsivVeri && S.arsivVeri[a];
+      Object.entries(rec.ist).forEach(([ad, o]) => { if (!ister(ad)) return; const e = ist.get(ad) || {ad, plan: 0, planVar: 0, gercek: 0, kisi: 0, ay: 0}; e.gercek += o.nobet; e.kisi += o.kisi; e.ay++; if (pl && pl.ist[ad]) { e.plan += pl.ist[ad].planlanan; e.planVar++; } ist.set(ad, e); });
+      rec.kisi.forEach(k => { if (k.fazla <= 0.01 || !ister(k.kadro)) return; const key = k.ad + '|' + k.kadro, e = faz.get(key) || {ad: k.ad, brans: k.brans, ist: k.kadro, aylar: [], toplam: 0}; e.aylar.push(a); e.toplam += k.fazla; faz.set(key, e); });
+      rec.dis.forEach(x => { if (!ister(x.istasyon)) return; const key = x.ad + '|' + x.istasyon, e = dis.get(key) || {ad: x.ad, brans: x.brans, kadro: x.kadro, ist: x.istasyon, aylar: [], nobet: 0}; e.aylar.push(a); e.nobet += x.nobet; dis.set(key, e); (mat[x.istasyon] = mat[x.istasyon] || {})[x.brans] = (mat[x.istasyon][x.brans] || 0) + 1; });
+    });
+    const kisa = a => a.slice(2).replace('-', '/'), r2 = v => Math.round(v * 100) / 100;
+    return {sec,
+      ist: [...ist.values()].sort((a, b) => trCollator.compare(a.ad, b.ad)).map(e => [esc(e.ad), e.ay, e.planVar ? r2(e.plan) : '—', r2(e.gercek), e.planVar ? r2(e.gercek - e.plan) : '—', e.kisi]),
+      faz: [...faz.values()].sort((a, b) => b.toplam - a.toplam || trCollator.compare(a.ad, b.ad)).map(e => [esc(e.ad), esc(e.brans), esc(e.ist), e.aylar.length, r2(e.toplam), e.aylar.map(kisa).join(', ')]),
+      dis: [...dis.values()].sort((a, b) => trCollator.compare(a.ist, b.ist) || trCollator.compare(a.ad, b.ad)).map(e => [esc(e.ad), esc(e.brans), esc(e.kadro), esc(e.ist), r2(e.nobet), e.aylar.map(kisa).join(', ')]),
+      mat: Object.keys(mat).sort(trCollator.compare).map(ad => [esc(ad), ...BRANSLAR.map(b => mat[ad][b] || 0), BRANSLAR.reduce((x, b) => x + (mat[ad][b] || 0), 0)])};
+  }
+  function gercekKartlar() {
+    const G = gercekIstatistik(); if (!G.sec.length) return '';
+    return `<div class="ap-card"><h2>Gerçekleşen nöbet — planlananla karşılaştırma</h2><p class="ap-note">Nöbet Listesi Raporundan: istasyonda fiilen tutulan nöbet (24 saatlik; idari/mesai kayıtları hariç). Fark = gerçekleşen − planlanan (planı arşivlenmiş aylar için). Seçilen aylar: ${G.sec.map(ayAd).join(', ')}.</p>${tabloHtml(['İstasyon', 'Ay', 'Planlanan', 'Gerçekleşen nöbet', 'Fark', 'Nöbet tutan kişi-ay'], G.ist)}</div>
+      <div class="ap-card"><h2>Gerçekleşen fazla nöbet</h2><p class="ap-note">Kişinin o ay tuttuğu nöbet, standart aylık hedefinin (izin ve muafiyet düşülmeden) üstündeyse fazla sayılır. Kadro istasyonu başlığı altında toplanır.</p>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], G.faz)}</div>
+      <div class="ap-card"><h2>Kadrosu dışındaki istasyonlarda tutulan nöbetler</h2><p class="ap-note">Hangi istasyona hangi branştan kişi gelip nöbet tuttu (kişi-ay).</p>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], G.mat)}<h2 style="margin-top:14px">Liste</h2>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Nöbet tuttuğu istasyon', 'Nöbet', 'Aylar'], G.dis)}</div>`;
+  }
   function arstatHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
-    const aylar = Object.keys(S.arsivVeri).sort();
-    if (!aylar.length) return '<div class="ap-card ap-empty"><h2>Arşivde ay yok</h2><p>Önce "Arşiv" sayfasından aylık planı arşive kaydedin.</p></div>';
+    const aylar = [...new Set([...Object.keys(S.arsivVeri), ...Object.keys(S.gercekVeri || {})])].sort();
+    if (!aylar.length) return '<div class="ap-card ap-empty"><h2>Arşivde ay yok</h2><p>Önce "Arşiv" sayfasından aylık planı arşive kaydedin ya da Nöbet Listesi Raporu yükleyin.</p></div>';
     const st = arsivIstatistik();
     return `<div class="ap-card"><h2>İstatistik — dönem ve istasyon seçimi</h2>
       <div class="ap-row">${aylar.map(a => `<label class="ap-note"><input type="checkbox" data-act="arsiv-ay" data-v="${a}" ${(S.arsivSecili || []).includes(a) ? 'checked' : ''}> ${ayAd(a)}</label>`).join(' ')}
       <button class="ap-btn sm" data-act="arsiv-ay-hepsi">Tümü</button><button class="ap-btn sm" data-act="arsiv-ay-hic">Hiçbiri</button></div>
       <div class="ap-row" style="margin-top:8px"><label class="ap-note">İstasyon <select class="ap-sel" data-act="arsiv-ist"><option value="">Tüm istasyonlar</option>${st.adlar.map(a => `<option ${a === S.arsivIst ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></label>
-      <button class="ap-btn" data-act="arsiv-excel">Excel'e aktar</button><span class="ap-note">${st.ayN} ay seçili</span></div></div>
+      <button class="ap-btn" data-act="arsiv-excel">Excel'e aktar</button><span class="ap-note">${(S.arsivSecili || []).filter(a => aylar.includes(a)).length} ay seçili</span></div></div>
+      ${gercekKartlar()}
       <div class="ap-card"><h2>Aylara göre seyir (toplam)</h2>${tabloHtml(['Ay', 'İhtiyaç', 'Planlanan', 'Kapasite', 'Çıkan kişi', 'Gelen kişi', 'Fazla nöbet', 'Personel önerilen ist.'], st.seyir)}</div>
       <div class="ap-card"><h2>İstasyon özeti (seçilen aylar toplamı)</h2><p class="ap-note">Çıkan/gelen: kişi-ay (bir kişi 3 ay çıktıysa 3). Fazla nöbet: kişilerin hedeflerinin üstünde yazılan nöbetlerin toplamı.</p>${tabloHtml(['İstasyon', 'Açık ay', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Fazla nöbetli kişi-ay', 'Personel önerilen ay', 'Ekip OF ay'], st.ist)}</div>
       <div class="ap-card"><h2>Çıkan personel — kaç ay çıktı</h2>${tabloHtml(['Ad soyad', 'Branş', 'Çıktığı istasyon', 'Gittiği yer', 'Ay sayısı', 'Aylar'], st.cikSat)}</div>
@@ -156,5 +183,6 @@
     ekle('Gelen branş', ['İstasyon', ...BRANSLAR, 'Toplam'], st.matSat);
     ekle('Gelen personel', ['Ad soyad', 'Branş', 'Geldiği istasyon', 'İstasyon', 'Ay sayısı', 'Aylar'], st.gelSat);
     ekle('Fazla nöbet', ['Ad soyad', 'Branş', 'İstasyon', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], st.fazSat);
+    const G = gercekIstatistik(); if (G.sec.length) { ekle('Gerçekleşen nöbet', ['İstasyon', 'Ay', 'Planlanan', 'Gerçekleşen nöbet', 'Fark', 'Nöbet tutan kişi-ay'], G.ist); ekle('Gerçekleşen fazla', ['Ad soyad', 'Branş', 'Kadro istasyonu', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], G.faz); ekle('Dışarıdan nöbet', ['Ad soyad', 'Branş', 'Kadro istasyonu', 'Nöbet tuttuğu istasyon', 'Nöbet', 'Aylar'], G.dis); }
     xlsxIndir(wb, `ASHI-Arsiv-Istatistik-${(S.arsivSecili || []).slice().sort()[0] || ''}_${(S.arsivSecili || []).slice().sort().pop() || ''}.xlsx`);
   }
