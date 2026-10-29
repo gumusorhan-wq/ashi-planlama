@@ -277,23 +277,44 @@
 
   // ---------- çıktılar ----------
   const hex = c => (c || '#FFFFFF').replace('#', '').toUpperCase();
+  // Çıktı biçimi: planlama biriminin kullandığı Excel düzenine uyar (kısa unvan, izin gün + tür, görev yeri metni)
+  function unvanKisa(k) {
+    const u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
+    if (k.sinif === 'isci') return 'SÜREKLİ İŞÇİ';
+    if (k.sinif === 'doktor') return /DHY|DIS HEK|ACIL TIP HEK/.test(u) && /DHY/.test(u) ? 'DHY DOKTOR' : 'DOKTOR';
+    return (k.dortB ? '4/B ' : '') + (/\bSRC\b/.test(u) ? 'SRC ' : '') + C.kadroTip(k);
+  }
+  const izinTur = k => [...new Set((k.izin || []).filter(i => sayi(i.gun) > 0).map(i => i.tur || 'İZİN'))].join(', ');
+  function cikDurum(k) {
+    if (/^DOĞUM/.test(k.durum || '')) { const m = /(\d{2}\.\d{2}\.\d{4})/.exec(k.durumMetin || ''); return k.durum + (m ? ' ' + m[1] : ''); }
+    if (/RAPORLU/.test(k.durum || '')) return k.durum;
+    if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (durumlar()[k.durum] || {}).disarida) return 'GEÇİCİ GÖREVDE';
+    return durumGosterim(k).toLocaleUpperCase('tr-TR');
+  }
+  function cikGorev(k) {
+    const g = k.gorev; if (!g) return k.durumMetin && !C.durumAnahtar(k.durumMetin) ? k.durumMetin : '';
+    const istasyon = g.hedef && S.plan.birimler.some(b => b.ad === g.hedef && b.tur === 'istasyon');
+    if (istasyon) return `${g.hedef} NOLU ASHİ ${AYLAR[S.m].toLocaleUpperCase('tr-TR')}`;
+    const ozelGerekce = g.gerekce && !/PERSONEL İHTİYACI|MESAİ TAMAMLAYAMAMA/.test(g.gerekce) ? g.gerekce + ' ' : '';
+    return (ozelGerekce + (g.hedef || g.yer) + (ozelGerekce && g.bit && g.bit > gunSon() ? ' ' + trTarih(g.bit) : '')).trim();
+  }
   function birimSatirlari(b) {
     const D = durumlar(), kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)).sort(personelSirala);
     const h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
     return kis.map(k => {
       const gelen = k.birim !== b.ad;
       return {k, gelen, renk: gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), sinif: k.sinif,
-        hucre: [k.ad, k.unvan, gelen ? 'GEÇİCİ GÖREVLİ' : durumGosterim(k), izinGun(k) ? fmt(izinGun(k)) : '', gelen ? k.birim + ' kadrosundan' : gorevMetin(k), (k.gorev && k.gorev.yolluk) || ''],
+        hucre: [k.ad, unvanKisa(k), gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), izinGun(k) ? fmt(izinGun(k)) : '', izinTur(k), gelen ? `${k.birim} NOLU ASHİ ${AYLAR[S.m].toLocaleUpperCase('tr-TR')}` : cikGorev(k), (k.gorev && k.gorev.yolluk) || ''],
         tahmini: (sm.get(k.id) && !sm.get(k.id).nobetYok && k.planlanan != null) ? k.planlanan : ''};
     });
   }
   function excelBirimSheet(b) {
     const satirlar = birimSatirlari(b), tah = S.ayar.tahminiGoster;
-    const bas = ['AD SOYAD', 'ÜNVAN', 'G.GÖREV DURUMU', 'İZİN GÜN', 'GEÇİCİ GÖREV TARİHLERİ', 'YOLLUK DURUMU'].concat(tah ? ['TAHMİNİ NÖBET'] : []);
+    const bas = ['AD SOYAD', 'ÜNVAN', 'G.GÖREV DURUMU', '', 'İZİNLER', 'GEÇİCİ GÖREV TARİHLERİ', 'YOLLUK DURUMU'].concat(tah ? ['TAHMİNİ NÖBET'] : []);
     const aoa = [[b.ad + (b.tur === 'istasyon' ? ' NOLU ASHİ' : '') + (b.ekipOf ? ' — EKİP OF' : '')], bas];
     satirlar.forEach(s => aoa.push(s.hucre.concat(tah ? [s.tahmini] : [])));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch: 32}, {wch: 20}, {wch: 30}, {wch: 10}, {wch: 42}, {wch: 16}, {wch: 14}];
+    ws['!cols'] = [{wch: 32}, {wch: 16}, {wch: 30}, {wch: 6}, {wch: 14}, {wch: 42}, {wch: 16}, {wch: 14}];
     ws['!merges'] = [{s: {r: 0, c: 0}, e: {r: 0, c: bas.length - 1}}];
     const sinir = {top: {style: 'thin'}, bottom: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'}};
     for (let c = 0; c < bas.length; c++) { const h = XLSX.utils.encode_cell({r: 1, c}); if (ws[h]) ws[h].s = {font: {bold: true}, border: sinir, fill: {patternType: 'solid', fgColor: {rgb: 'DCE6F1'}}}; }
@@ -324,7 +345,7 @@
 
   function pngCiz(b) {
     const satirlar = birimSatirlari(b), tah = S.ayar.tahminiGoster;
-    const kol = [['AD SOYAD', 290], ['UNVAN', 140], ['G.GÖREV DURUMU', 270], ['İZİN', 70], ['GEÇİCİ GÖREV TARİHLERİ', 330], ['YOLLUK DURUMU', 160]].concat(tah ? [['TAHMİNİ NÖBET', 130]] : []);
+    const kol = [['AD SOYAD', 290], ['UNVAN', 140], ['G.GÖREV DURUMU', 300], ['', 50], ['İZİNLER', 130], ['GEÇİCİ GÖREV TARİHLERİ', 330], ['YOLLUK DURUMU', 160]].concat(tah ? [['TAHMİNİ NÖBET', 150]] : []);
     const W = kol.reduce((a, c) => a + c[1], 0), RH = 32, TH = 56, HH = 52;
     const sepSay = satirlar.filter((s, i) => i > 0 && s.sinif !== satirlar[i - 1].sinif && !s.gelen && !satirlar[i - 1].gelen).length;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = TH + HH + satirlar.length * RH + sepSay * 8 + 4;
