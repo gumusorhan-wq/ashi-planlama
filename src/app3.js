@@ -663,7 +663,7 @@
       const a = t.dataset.act;
       if (a === 'ist-sec') { S.ist = t.value; }
       else if (a === 'rol') { S.rol = t.value; }
-      else if (a === 'plan-durum') { if (t.value === 'kilitli' && S.rol !== 'yonetici') { toast('Ayı yalnızca yönetici kilitler.'); } else mut(() => { S.plan.durum = t.value; }, 'Plan durumu', t.value); }
+      else if (a === 'plan-durum') { if (S.rol !== 'yonetici' && S.rol !== 'planlayici') return; if (t.value === 'kilitli' && S.rol !== 'yonetici') { toast('Ayı yalnızca yönetici kilitler.'); } else mut(() => { S.plan.durum = t.value; }, 'Plan durumu', t.value); }
       else if (a === 'f-birim') { S.filtre.birim = t.value; S.pSayfa = 0; } else if (a === 'f-sinif') { S.filtre.sinif = t.value; S.pSayfa = 0; } else if (a === 'f-durum') { S.filtre.durum = t.value; S.pSayfa = 0; }
       else if (a === 'f-surucu') { S.filtre.surucu = t.value; S.pSayfa = 0; }
       else if (a === 'f-q') { S.filtre.q = t.value; S.pSayfa = 0; }

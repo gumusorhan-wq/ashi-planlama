@@ -753,7 +753,7 @@ function mount(root, opts = {}) {
   const depo = opts.depolama || varsayilanDepo();
   const S = {
     rol: (opts.kullanici && opts.kullanici.rol) || (opts.salt_okur ? 'salt_okur' : 'planlayici'),
-    y: 0, m: 0, plan: null, sayfa: 'pano', ist: '', ayar: null, filtre: {q: '', durum: '', birim: '', sinif: ''}, modal: null, planAnahtarlari: [], toastlar: [], rotKaynak: 'fazla', gorevSekme: 'deg', pSayfa: 0, pBoyut: 50, modul: 1, n2: {ist: '', sekme: 'istek', gorunum: 'yuva', oneri: null, kural: {}, sonuc: null}, arsivVeri: null, yuklemeler: null, arsivSecili: null, arsivIst: ''
+    y: 0, m: 0, plan: null, sayfa: 'pano', ist: '', ayar: null, filtre: {q: '', durum: '', birim: '', sinif: ''}, modal: null, planAnahtarlari: [], toastlar: [], rotKaynak: 'fazla', gorevSekme: 'deg', pSayfa: 0, pBoyut: 50, modul: 1, n2: {ist: '', sekme: 'plan', gorunum: 'yuva', oneri: null, kural: {}, sonuc: null}, arsivVeri: null, yuklemeler: null, arsivSecili: null, arsivIst: ''
   };
   const bugun = new Date(), sonraki = new Date(Date.UTC(bugun.getUTCFullYear(), bugun.getUTCMonth() + 1, 1));
   S.y = sonraki.getUTCFullYear(); S.m = sonraki.getUTCMonth() + 1;      // planlama bir sonraki ay içindir
@@ -850,11 +850,11 @@ function mount(root, opts = {}) {
       ${S.plan ? `<span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>` : ''}
       <span class="ap-sp"></span>
       <label class="ap-note" title="Tema"><select class="ap-sel" data-act="tema"><option value="acik" ${S.ayar.tema !== 'koyu' && S.ayar.tema !== 'sistem' ? 'selected' : ''}>Açık</option><option value="koyu" ${S.ayar.tema === 'koyu' ? 'selected' : ''}>Koyu</option><option value="sistem" ${S.ayar.tema === 'sistem' ? 'selected' : ''}>Sistem</option></select></label>
-      ${S.plan && S.rol !== 'salt_okur' ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}
+      ${S.plan && (S.rol === 'yonetici' || S.rol === 'planlayici') ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}
       ${opts.kullanici ? '' : `<label class="ap-note" title="Rol (demo)"><select class="ap-sel" data-act="rol">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`}</div>`;
   }
   const SAYFALAR = [['pano', 'Pano'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['personel', 'Personel'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['log', 'Değişiklik günlüğü'], ['ayar', 'Ayarlar']];
-  const navHtml = () => S.modul === 2 ? `<div class="ap-nav">${N2_SEKME.map(([k, t]) => `<button class="${S.n2.sekme === k ? 'on' : ''}" data-act="n2-sekme" data-v="${k}">${t}</button>`).join('')}</div>` : `<div class="ap-nav">${SAYFALAR.map(([k, t]) => `<button class="${S.sayfa === k ? 'on' : ''}" data-act="sayfa" data-v="${k}">${t}</button>`).join('')}</div>`;
+  const navHtml = () => S.modul === 2 ? `<div class="ap-nav">${N2_SEKME.filter(([k]) => k === 'plan' || n2Acik()).map(([k, t]) => `<button class="${(n2Acik() ? S.n2.sekme : 'plan') === k ? 'on' : ''}" data-act="n2-sekme" data-v="${k}">${t}</button>`).join('')}</div>` : `<div class="ap-nav">${SAYFALAR.map(([k, t]) => `<button class="${S.sayfa === k ? 'on' : ''}" data-act="sayfa" data-v="${k}">${t}</button>`).join('')}</div>`;
 
   function bosHtml() {
     const onceki = S.m === 1 ? C.iso(S.y - 1, 12, 1).slice(0, 7) : C.iso(S.y, S.m - 1, 1).slice(0, 7);
@@ -1331,9 +1331,12 @@ function mount(root, opts = {}) {
 
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
-  const N2_SEKME = [['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
+  const N2_SEKME = [['plan', 'Planlama'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
   const IHLAL_AD = {eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
+  // İstasyon sorumlusu, planlama onaylanmadan (Kesinleştir / Ayı kilitle) kendi istasyonunun planlamasını ve nöbet listesi araçlarını göremez
+  const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
+  const n2Acik = () => S.rol !== 'istasyon' || n2Onayli();
   const n2Ist = () => S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
   const n2Birim = () => S.plan && S.plan.birimler.find(b => b.ad === n2Ist());
   function n2Depo(ad) { const N = (S.plan.nobet = S.plan.nobet || {}); return N[ad] = N[ad] || {istek: {}, izin: {}, liste: null, kural: {}, kisiler: null}; }
@@ -1360,15 +1363,35 @@ function mount(root, opts = {}) {
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
   function n2UstHtml(b) {
-    const ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf);
+    const kisit = S.rol === 'istasyon' && opts.kullanici && opts.kullanici.birim, ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (!kisit || x.ad === kisit));
     return `<div class="ap-card"><div class="ap-row"><label>İstasyon <select class="ap-sel" data-n2="ist">${ists.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select></label>
       <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span></div></div>`;
   }
   function n2Html() {
     if (!S.plan) return `<div class="ap-card ap-empty"><h2>Modül 2 — İstasyon nöbet listesi</h2><p>Bu ay için plan yok. Önce Modül 1'den personel listelerini yükleyin.</p></div>`;
     const b = n2Birim(); if (!b) return '<div class="ap-card ap-empty">Açık istasyon yok.</div>';
-    const s = S.n2.sekme;
-    return n2UstHtml(b) + ({istek: n2IstekHtml, liste: n2ListeHtml, denetim: n2DenetimHtml, paket: n2PaketHtml}[s] || n2IstekHtml)(b);
+    const s = n2Acik() ? S.n2.sekme : 'plan';
+    return n2UstHtml(b) + ({plan: n2PlanHtml, istek: n2IstekHtml, liste: n2ListeHtml, denetim: n2DenetimHtml, paket: n2PaketHtml}[s] || n2PlanHtml)(b);
+  }
+  // ---- Planlama: Modül 1'de hazırlanan, bu istasyonun kendi planlaması (istasyon sorumlusu için yalnız onaydan sonra; sağlık nedenleri görünmez) ----
+  const NB_AD = {dok: 'Ekip şefi', isci: 'Sürücü', ke: 'Ekip şefi · YSP', ka: 'Ekip şefi · YSP · Sürücü', ysp: 'YSP', sy: 'YSP · Sürücü'};
+  function n2PlanHtml(b) {
+    const ist = S.rol === 'istasyon';
+    if (ist && !n2Onayli()) return `<div class="ap-card ap-empty"><h2>Planlama henüz onaylanmadı</h2><p>${ayEtiket()} planlaması planlama birimi tarafından <b>kesinleştirilince</b> burada görünecek; ardından istek takvimi ve nöbet listesi araçları açılır.</p></div>`;
+    const h = hesapla(b), D = durumlar(), plan = planlananToplam(h);
+    const durumMetin = s => { const k = s.k;
+      if (k._gelen) return `Geçici görevli (${esc(k.birim)} kadrosundan)`;
+      if (aileHek(k)) return 'Aile hekimliğinde';
+      if ((D[k.durum] || {}).disarida && k.gorev && (k.gorev.hedef || k.gorev.yer)) return `Başka yerde görevli: ${esc(k.gorev.hedef || k.gorev.yer)}`;
+      if (izinAyGun(k) > 0 && !s.nobetYok) return `İzinli (${fmt(izinAyGun(k))} gün)`;
+      if (s.nobetYok) return 'Nöbet tutmaz';
+      return 'Nöbet tutar'; };
+    const sat = h.satir.slice().sort((x, y) => personelSirala(x.k, y.k)).map(s => `<tr><td>${esc(s.k.ad)}</td><td>${esc(bransAd(s.k))}</td><td>${durumMetin(s)}</td><td>${s.nobetYok || (D[s.k.durum] || {}).disarida ? '' : esc(NB_AD[s.grup] || '')}</td><td class="num">${s.nobetYok || (D[s.k.durum] || {}).disarida || s.k.planlanan == null ? '' : '<b>' + fmt(sayi(s.k.planlanan)) + '</b>'}</td></tr>`).join('');
+    return `${!ist ? `<div class="ap-card" style="border-color:var(--ap-warn);background:var(--ap-warnbg)"><span class="ap-note">Planlama birimi görünümü. İstasyon sorumlusu bu bölümü yalnızca plan <b>Kesinleştirildiğinde</b> görür (şu an: <b>${S.plan.durum === 'taslak' ? 'Taslak' : S.plan.durum === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</b>). Sağlık nedenleri (rapor, doğum, muafiyet) istasyon sorumlusuna gösterilmez.</span></div>` : ''}
+      <div class="ap-card"><h2>${esc(b.ad)} — ${ayEtiket()} planlaması</h2>
+      <div class="ap-sum ap-sum1" style="margin-bottom:10px"><div><b>${fmt(plan)} / ${h.ihtiyac}</b><span>Yazılan / gereken nöbet</span></div><div><b>${h.satir.filter(s => !s.nobetYok && !(D[s.k.durum] || {}).disarida).length}</b><span>Nöbet tutan kişi</span></div>${[['es', 'Ekip şefi'], ['ysp', 'YSP'], ['sur', 'Sürücü']].map(([k, ad]) => `<div><b>${fmt(h.slot.dem[k] - Math.max(0, h.acikM[k]))}/${fmt(h.slot.dem[k])}</b><span>${ad}</span></div>`).join('')}</div>
+      <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Kadro</th><th>Durum</th><th>Nöbet branşı</th><th>Planlanan nöbet</th></tr></thead><tbody>${sat || '<tr><td colspan="5" class="ap-empty">Kişi yok</td></tr>'}</tbody></table></div>
+      <p class="ap-note" style="margin-top:8px">Planlanan nöbet, kişinin bu ay tutması planlanan 24 saatlik nöbet sayısıdır (12 saatlik nöbetler 0,5 sayılır). Nöbet listesini bu sayılara göre İstek takvimi ve Nöbet listesi sekmelerinden hazırlarsınız.</p>${S.rol !== 'istasyon' ? '' : '<div class="ap-row"><button class="ap-btn pri" data-act="n2-sekme" data-v="istek">İstek takvimine geç →</button></div>'}</div>`;
   }
 
   // ---- istek takvimi: kişi × gün matrisi ----
@@ -2182,7 +2205,7 @@ function mount(root, opts = {}) {
       const a = t.dataset.act;
       if (a === 'ist-sec') { S.ist = t.value; }
       else if (a === 'rol') { S.rol = t.value; }
-      else if (a === 'plan-durum') { if (t.value === 'kilitli' && S.rol !== 'yonetici') { toast('Ayı yalnızca yönetici kilitler.'); } else mut(() => { S.plan.durum = t.value; }, 'Plan durumu', t.value); }
+      else if (a === 'plan-durum') { if (S.rol !== 'yonetici' && S.rol !== 'planlayici') return; if (t.value === 'kilitli' && S.rol !== 'yonetici') { toast('Ayı yalnızca yönetici kilitler.'); } else mut(() => { S.plan.durum = t.value; }, 'Plan durumu', t.value); }
       else if (a === 'f-birim') { S.filtre.birim = t.value; S.pSayfa = 0; } else if (a === 'f-sinif') { S.filtre.sinif = t.value; S.pSayfa = 0; } else if (a === 'f-durum') { S.filtre.durum = t.value; S.pSayfa = 0; }
       else if (a === 'f-surucu') { S.filtre.surucu = t.value; S.pSayfa = 0; }
       else if (a === 'f-q') { S.filtre.q = t.value; S.pSayfa = 0; }
