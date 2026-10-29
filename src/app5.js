@@ -1,7 +1,7 @@
 
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
-  const N2_SEKME = [['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Paylaşım / çıktı']];
+  const N2_SEKME = [['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
   const IHLAL_AD = {eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
   const n2Ist = () => S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
@@ -35,8 +35,7 @@
       <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span></div></div>`;
   }
   function n2Html() {
-    if (!S.plan) return `<div class="ap-card ap-empty"><h2>Modül 2 — İstasyon nöbet listesi</h2><p>Bu ay için plan yok. Planlama biriminden aldığınız istasyon paketini (.json) yükleyin.</p>
-      <div class="ap-row" style="justify-content:center"><button class="ap-btn pri" data-act="n2-paket-yukle">İstasyon paketi yükle</button></div></div>`;
+    if (!S.plan) return `<div class="ap-card ap-empty"><h2>Modül 2 — İstasyon nöbet listesi</h2><p>Bu ay için plan yok. Önce Modül 1'den personel listelerini yükleyin.</p></div>`;
     const b = n2Birim(); if (!b) return '<div class="ap-card ap-empty">Açık istasyon yok.</div>';
     const s = S.n2.sekme;
     return n2UstHtml(b) + ({istek: n2IstekHtml, liste: n2ListeHtml, denetim: n2DenetimHtml, paket: n2PaketHtml}[s] || n2IstekHtml)(b);
@@ -112,12 +111,9 @@
 
   // ---- paylaşım / çıktı ----
   function n2PaketHtml(b) {
-    const dp = n2Depo(b.ad), duz = n2Duz();
-    return `<div class="ap-card"><h2>İstasyon paketi</h2>
-      <p class="ap-note">Planlama birimi, istasyon için kişi listesini, planlanan nöbet sayılarını ve izin aralıklarını <b>paket</b> olarak dışa aktarır (TC, telefon ve sağlık bilgisi paketlere yazılmaz). İstasyon sorumlusu paketi kendi Modül 2'sinde açar, istekleri girer, nöbet listesini oluşturur ve doldurulmuş paketi geri gönderir; planlama birimi paketi içe aktarınca liste burada görünür.</p>
-      <div class="ap-row"><button class="ap-btn pri" data-act="n2-paket-al">Bu istasyonun paketini indir (.json)</button><button class="ap-btn" data-act="n2-paket-yukle" ${duz ? '' : 'disabled'}>Paket yükle</button></div></div>
-      <div class="ap-card"><h2>ASOS'a giriş için çıktı</h2><p class="ap-note">Nöbet listeleri ASOS'a girilir; oradan alınan <b>Nöbet Listesi Raporu</b>, Modül 1'de sürücülük tespiti ve arşiv istatistikleri için kullanılır. Modül 2 çıktısı Excel olarak (gün × nöbet branşı ve kişi × gün sayfaları) alınır.</p>
-      <div class="ap-row"><button class="ap-btn" data-act="n2-excel" ${dp.liste ? '' : 'disabled'}>Excel çıktısı</button></div></div>`;
+    const dp = n2Depo(b.ad);
+    return `<div class="ap-card"><h2>ASOS'a giriş için çıktı</h2><p class="ap-note">Nöbet listeleri ASOS'a girilir; oradan alınan <b>Nöbet Listesi Raporu</b>, Modül 1'de sürücülük tespiti ve arşiv istatistikleri için kullanılır. Modül 2 çıktısı Excel olarak (gün × nöbet branşı ve kişi × gün sayfaları) alınır.</p>
+      <div class="ap-row"><button class="ap-btn pri" data-act="n2-excel" ${dp.liste ? '' : 'disabled'}>Excel çıktısı</button></div></div>`;
   }
   function n2Excel(b) {
     const {G, H, L} = n2Deneti(b), N = H.N, wb = XLSX.utils.book_new(), ad = id => (id == null ? '' : n2Ad(G, id));
@@ -157,23 +153,6 @@
       case 'n2-liste-temizle': if (confirm('Liste silinsin mi?')) mut2(() => { n2Depo(b.ad).liste = null; }, 'Modül 2: liste temizlendi', b.ad); break;
       case 'n2-uygula': { const [i, j] = v.split(':').map(Number), s = S.n2.oneri.oneriler[i].secenekler[j], dp = n2Depo(b.ad); mut2(() => { dp.liste[s.gun][s.yuva] = s.yeni; }, 'Modül 2: öneri uygulandı', `${s.gun}. gün ${s.yuva} → ${s.yeniAd}`); break; }
       case 'n2-excel': n2Excel(b); return true;
-      case 'n2-paket-al': {
-        const dp = n2Depo(b.ad), G = n2Girdi(b), kisiler = G.girdi.kisiler.map(k => ({id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, brans: k.brans, planlanan: k.planlanan, ust: k.ust, izin: (n2Kisiler(b).find(x => x.id === k.id) || {}).izin || [], izinGun: k.izinGun}));
-        indir(new Blob([JSON.stringify({tur: 'ashi-nobet-paketi', surum: 1, ay: ayAnahtari(), birim: b.ad, kisiler, izin: dp.izin, istek: dp.istek, kural: dp.kural, liste: dp.liste})], {type: 'application/json'}), `paket-${b.ad}-${ayAnahtari()}.json`); return true;
-      }
-      case 'n2-paket-yukle': {
-        const f = await dosyaSec('.json', false); if (!f) return true;
-        try {
-          const j = JSON.parse(new TextDecoder().decode(await dosyaOku(f))); if (j.tur !== 'ashi-nobet-paketi' || !j.birim) throw new Error('Bu bir istasyon paketi değil');
-          if (j.ay !== ayAnahtari()) { const [yy, mm] = j.ay.split('-').map(Number); S.y = yy; S.m = mm; await planYukle(); }
-          if (!S.plan) { S.plan = bosPlan(); S.plan.birimler = [{ad: j.birim, tur: 'istasyon', yuva: 3}]; }
-          else if (!S.plan.birimler.some(x => x.ad === j.birim)) S.plan.birimler.push({ad: j.birim, tur: 'istasyon', yuva: 3});
-          const dp = n2Depo(j.birim); dp.istek = j.istek || {}; dp.izin = j.izin || {}; dp.kural = j.kural || {}; if (j.liste) dp.liste = j.liste;
-          if (!S.plan.kayitlar.some(k => k.birim === j.birim)) dp.kisiler = j.kisiler;
-          S.n2.ist = j.birim; S.modul = 2; logla('Modül 2: paket yüklendi', j.birim); kaydet(); S.n2.oneri = null; toast('Paket yüklendi: ' + j.birim);
-        } catch (er) { toast('Paket okunamadı: ' + er.message); }
-        break;
-      }
       case 'arsiv-yaz': {
         if (!S.plan) break; const rec = ayMetrik(S.plan, S.y, S.m); await arsivYaz(rec);
         const kilit = root.querySelector('#ap-arsiv-kilit'); if (kilit && kilit.checked && S.rol === 'yonetici') mut(() => { S.plan.durum = 'kilitli'; }, 'Ay arşivlendi ve kilitlendi', rec.ay);
