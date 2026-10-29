@@ -106,7 +106,7 @@
       if (!rol) { ornek(tani.rolYok, r[gi]); return; }
       let saat = si >= 0 ? saatOku(r[si]) : 0;
       if (!(saat > 0)) { if (si >= 0) ornek(tani.sureYok, r[si]); saat = 1; }       // süre okunamazsa her kayıt eşit ağırlıkta sayılır (yalnız oran önemli)
-      tani.ok++; out.push({tc, rol, saat, ay: bi >= 0 ? C.tarihIso(r[bi]).slice(0, 7) : ''});
+      tani.ok++; out.push({tc, rol, saat, bas: bi >= 0 ? String(r[bi]) : '', ay: bi >= 0 ? C.tarihIso(r[bi]).slice(0, 7) : ''});
     });
     out.tani = tani; return out;
   }
@@ -179,7 +179,8 @@
   }
   const bugunIso = () => new Date().toISOString().slice(0, 10);
   function asosOnizle(sonuc, taban) {
-    const {tur, satirlar} = sonuc;
+    let {tur, satirlar} = sonuc;
+    if (tur === 'N') { const g = new Set(), tani = satirlar.tani; satirlar = satirlar.filter(r => { const k = `${r.tc}|${r.bas}|${r.rol}`; if (!r.bas) return true; if (g.has(k)) return false; g.add(k); return true; }); satirlar.tani = tani; }   // Nöbet Listesi ve Hareket Raporu birlikte yüklenirse aynı nöbet iki kez sayılmaz
     const kaynakPlan = taban || S.plan;
     const plan = kaynakPlan ? JSON.parse(JSON.stringify(kaynakPlan)) : bosPlan();
     if (tur === 'N') {
