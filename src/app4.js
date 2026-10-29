@@ -73,7 +73,7 @@
     Object.values(rec.ist).forEach(i => { if (i.of) { o.of++; return; } o.ihtiyac += i.ihtiyac; o.planlanan += i.planlanan; o.kapasite += i.kapasite; o.cikan += i.cikan.length; o.gelen += i.gelen.length; o.fazla += i.fazlaMesai; if (i.ihtiyacTur === 'oner') o.oner++; });
     return o;
   }
-  const tabloHtml = (bas, sat, ek) => `<div class="ap-tw"><table class="ap-t ${ek || ''}"><thead><tr>${bas.map(b => `<th>${b}</th>`).join('')}</tr></thead><tbody>${sat.map(r => `<tr>${r.map((c, i) => `<td${typeof c === 'number' ? ' class="num"' : ''}>${typeof c === 'number' ? fmt(c) : c}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${bas.length}" class="ap-empty">Kayıt yok</td></tr>`}</tbody></table></div>`;
+  const tabloHtml = (bas, sat, ek) => `<div class="ap-tw"><table class="ap-t ${ek || ''}"><thead><tr>${bas.map((b, i) => `<th${sat.length && typeof sat[0][i] === 'number' ? ' class="num"' : ''}>${b}</th>`).join('')}</tr></thead><tbody>${sat.map(r => `<tr>${r.map((c, i) => `<td${typeof c === 'number' ? ' class="num"' : ''}>${typeof c === 'number' ? fmt(c) : c}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${bas.length}" class="ap-empty">Kayıt yok</td></tr>`}</tbody></table></div>`;
 
   function arsivHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }

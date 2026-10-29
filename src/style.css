@@ -88,3 +88,4 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-azami.off{opacity:.5}.ap-azami .ap-in{width:56px;padding:3px 6px}
 .ap-top{flex-wrap:nowrap;gap:8px;overflow-x:auto}.ap-top>*{flex:none}.ap-top .ap-sel{max-width:170px}.ap-top .ap-ay b{min-width:96px}.ap-mod button{padding:5px 10px}
 .n2art{color:var(--ap-ok);font-weight:700}.n2eks{color:var(--ap-bad);font-weight:700}b.n2d{color:var(--ap-pri)}
+.ap-t th.num{text-align:right}.ap-t td.num,.ap-t th.num{padding-left:18px;white-space:nowrap}
