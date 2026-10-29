@@ -4,7 +4,7 @@
   const ayIlk = () => C.iso(S.y, S.m, 1);
   function ustHtml() {
     const d = S.plan ? S.plan.durum : '';
-    return `<div class="ap-top"><h1>HUSER ASHİ PLANLAMA <span class="ap-note">v${VERSION}</span></h1>
+    return `<div class="ap-top"><img class="ap-logo" src="${AP_LOGO}" alt="HUSER" title="HUSER"><h1>HUSER ASHİ PLANLAMA <span class="ap-note">v${VERSION}</span></h1>
       <div class="ap-mod">${S.rol === 'istasyon' ? '' : `<button class="${S.modul === 1 ? 'on' : ''}" data-act="modul" data-v="1">Modül 1 · Planlama</button>`}<button class="${S.modul === 2 ? 'on' : ''}" data-act="modul" data-v="2">Modül 2 · Nöbet listesi</button></div>
       <div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><b>${ayEtiket()}</b><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
       ${S.plan ? `<span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>` : ''}
@@ -219,7 +219,7 @@
     const opts = k => `<option value="">— (kaldır)</option>${birimler.map(b => `<option ${b.ad === k.gorev.hedef ? 'selected' : ''}>${esc(b.ad)}</option>`).join('')}`;
     const rows = gk.map(k => {
       const eng = C.gorevlendirmeEngeli(k, ayIlk()), dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
-      return `<tr><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
+      return `<tr data-ara="${esc(C.TR([k.ad, k.birim, k.gorev.hedef || '', k.gorev.yer || '', k.unvan].join(' ')))}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${duz ? '' : 'disabled'}>${opts(k)}</select>${k.gorev.hedef ? '' : `<div class="ap-note">${esc(k.gorev.yer || '')}</div>`}</td>
       <td style="min-width:235px"><input class="ap-in w" style="min-width:225px;font-variant-numeric:tabular-nums" title="${esc(k.gorev.tarih || '')}" data-id="${k.id}" data-f="gTarih" value="${esc(k.gorev.tarih || '')}" ${duz ? '' : 'disabled'}></td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${duz ? '' : 'disabled'}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === (k.gorev.yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
@@ -236,9 +236,9 @@
     const degerlendirme = `<div class="ap-card"><h2>Personel ihtiyacı değerlendirmesi — ${ayEtiket()}</h2>
       ${dagitimOzet}
       <p class="ap-note">${S.ayar.panoMod === 'mesai' ? 'Mod: <b>Mesai karşılığı</b>. Ölçüt: kişiler yalnız hedef nöbetlerini tutarsa istasyon açık kalıyorsa ve bu açık, gelen bir kişinin mesaisini orada tamamlamasına yetiyorsa personel önerilir.' : `Mod: <b>Fazla mesaili</b> (memur/doktor en çok ${fmt(S.ayar.azamiMemur)} nöbet). Ölçüt: fazla nöbet yazıldıktan sonra da istasyon açık kalıyorsa ve bu açık, gelen bir kişinin mesaisini tamamlamasına yetiyorsa personel önerilir; fazla nöbetle kapanıyorsa önerilmez.`} İsterseniz aşağıdaki "Görevlendirmeler" bölümünden elle görevlendirme yapabilirsiniz.</p>
-      <div class="ap-tw"><table class="ap-t"><thead><tr><th>İSTASYON</th><th>MESAİ KARŞILIĞI AÇIK</th>${S.ayar.panoMod === 'mesai' ? '' : '<th>FAZLA NÖBETLE AÇIK</th>'}<th>KAÇ KİŞİ GEREKİR</th><th>DEĞERLENDİRME</th></tr></thead><tbody>
+      <div class="ap-tw"><table class="ap-t"><thead><tr><th>İSTASYON</th><th>MESAİ KARŞILIĞI AÇIK</th>${S.ayar.panoMod === 'mesai' ? '' : '<th>FAZLA NÖBETLE AÇIK</th>'}<th>KAÇ KİŞİ GEREKİR</th><th style="padding-left:34px">DEĞERLENDİRME</th></tr></thead><tbody>
       ${[...acik, ...ic].map(x => `<tr><td><b>${esc(x.b.ad)}</b></td><td class="num">${fmt(x.h.hedefAcik)}</td>${S.ayar.panoMod === 'mesai' ? '' : `<td class="num">${fmt(Math.max(0, x.h.acikEf))}</td>`}<td class="num">${x.h.ihtiyacKisi}</td>
-      <td>${x.h.ihtiyacTur === 'oner' ? `<span class="ap-tag ap-t-ih">Personel öner: ${x.h.ihtiyacKisi} kişi</span>${x.h.kalanAcik > 0 ? ` <span class="ap-note">+ ${fmt(x.h.kalanAcik)} nöbet fazla nöbetle</span>` : ''}` : x.h.ihtiyacTur === 'icerde' ? '<span class="ap-tag ap-t-fz">Fazla nöbetle kapanır — personel önerilmez</span>' : `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">${S.ayar.panoMod === 'mesai' ? 'Açık kalıyor (bir kişiyi doldurmaz)' : 'Elle karar'}</span>`}</td></tr>`).join('') || `<tr><td colspan="${S.ayar.panoMod === 'mesai' ? 4 : 5}" class="ap-empty">Açık veren istasyon yok</td></tr>`}</tbody></table></div></div>`;
+      <td style="padding-left:34px">${x.h.ihtiyacTur === 'oner' ? `<span class="ap-tag ap-t-ih">Personel öner: ${x.h.ihtiyacKisi} kişi</span>${x.h.kalanAcik > 0 ? ` <span class="ap-note">+ ${fmt(x.h.kalanAcik)} nöbet fazla nöbetle</span>` : ''}` : x.h.ihtiyacTur === 'icerde' ? '<span class="ap-tag ap-t-fz">Fazla nöbetle kapanır — personel önerilmez</span>' : `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">${S.ayar.panoMod === 'mesai' ? 'Açık kalıyor (bir kişiyi doldurmaz)' : 'Elle karar'}</span>`}</td></tr>`).join('') || `<tr><td colspan="${S.ayar.panoMod === 'mesai' ? 4 : 5}" class="ap-empty">Açık veren istasyon yok</td></tr>`}</tbody></table></div></div>`;
     const sekme = S.gorevSekme || 'deg';
     const sekmeler = [['deg', 'Personel ihtiyacı değerlendirmesi'], ['rot', 'Aylık rotasyon'], ['list', `Görevlendirmeler (${gk.length})`], ['ozet', 'Açık / fazla istasyonlar']];
     const nav = `<div class="ap-subnav ap-noprint">${sekmeler.map(([v, t]) => `<button class="${sekme === v ? 'on' : ''}" data-act="gorev-sekme" data-v="${v}">${t}</button>`).join('')}</div>`;
@@ -247,7 +247,7 @@
       ${oner.length ? `<div class="ap-card"><h2>Eşleştirme önerisi</h2>${oner.map(t => `<div>${esc(t)}</div>`).join('')}<div class="ap-note">Öneri yalnızca büyüklük gösterir. Kişi seçerken 4/B kuralı (4 yıl dolmadan başka istasyona görevlendirme yasak) otomatik denetlenir.</div></div>` : ''}
 `;
     const liste = `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">Görevlendirmeler (${gk.length})</h2>
-      <input class="ap-in" list="ap-kisi-list" id="ap-g-kisi" placeholder="Kişi ara…"><datalist id="ap-kisi-list">${S.plan.kayitlar.filter(k => !k.gorev || !k.gorev.hedef).slice(0, 2000).map(k => `<option value="${esc(k.ad)}">`).join('')}</datalist>
+      <input class="ap-in" list="ap-kisi-list" id="ap-g-kisi" placeholder="Kişi ara (listeyi süzer) / seç…" title="Yazdıkça aşağıdaki görevlendirme listesi ad, kaynak ve hedefe göre süzülür; listeden bir kişi seçip yanındaki istasyonla Görevlendir diyerek yeni görevlendirme yapabilirsiniz"><datalist id="ap-kisi-list">${S.plan.kayitlar.filter(k => !k.gorev || !k.gorev.hedef).slice(0, 2000).map(k => `<option value="${esc(k.ad)}">`).join('')}</datalist>
       <select class="ap-sel" id="ap-g-hedef">${birimler.map(b => `<option>${esc(b.ad)}</option>`).join('')}</select>
       <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div></div>`;

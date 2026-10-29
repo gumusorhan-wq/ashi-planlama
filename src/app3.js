@@ -59,9 +59,14 @@
     if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1);
     const [u, v] = a.length < b.length ? [a, b] : [b, a]; return u.slice(i) === v.slice(i + 1);
   }
-  function adBul(kayitlar, adMap, ad) {
+  function adBul(kayitlar, adMap, ad, birim) {
     const exact = adMap.get(adAnahtar(ad)); if (exact) return exact;
-    const tok = C.TR(ad).split(' ').filter(Boolean); if (tok.length < 2) return null;
+    const tok = C.TR(ad).split(' ').filter(Boolean);
+    if (tok.length >= 2 && birim) {          // elle yalnızca ilk adı yazılmış kayıt: aynı istasyonda, ilk adı eşleşen tek TC'siz kayıt ASOS kişisiyle birleşir
+      const tek = kayitlar.filter(k => k.birim === birim && C.TR(k.ad).split(' ').filter(Boolean).length === 1 && lev1(C.TR(k.ad).split(' ')[0], tok[0]));
+      if (tek.length === 1) return tek[0];
+    }
+    if (tok.length < 2) return null;
     const adaylar = kayitlar.filter(k => {
       const kt = C.TR(k.ad).split(' ').filter(Boolean), [a, b] = tok.length <= kt.length ? [tok, kt] : [kt, tok];
       return a.length >= 2 && a.every(t => b.some(u => lev1(t, u)));
@@ -263,13 +268,14 @@
       if (a.kadroIstTip) { const bo = plan.birimler.find(x => x.ad === birim); if (bo && bo.tur === 'istasyon') bo.tip = a.kadroIstTip.toUpperCase(); }
       const sinif = asosSinif(a), dortB = C.dortB(a.kadroTur, a.unvan);
       if (dortB) { rapor.dortB++; if (!(a.atamaBas || a.memBas)) rapor.dortBTarihsiz++; }
-      let k = tcMap.get(a.tc) || adBul(plan.kayitlar.filter(x => !x.tc), adMap, a.ad);
+      let k = tcMap.get(a.tc) || adBul(plan.kayitlar.filter(x => !x.tc), adMap, a.ad, birim);
       if (!k) {
         k = {id: uid(), ad: a.ad, tc: a.tc, tel: a.tel || '', unvan: a.unvan, sinif, birim, durum: gelenKaynak ? 'GEÇİCİ GÖREVLİ' : '', durumMetin: '', izin: [], planlanan: null, kilit: false, gorev: null, dortB, memBas: '',
           kadroTur: a.kadroTur, sira: a.sira, istek: '', gecmis: [], gecmisAsos: []};
         plan.kayitlar.push(k); rapor.yeni.push(k.ad); tcMap.set(a.tc, k);
       } else {
         if (k.birim !== birim && k.tc) rapor.nakil.push(`${k.ad}: ${k.birim} → ${birim}`);
+        if (a.ad && C.TR(k.ad).split(' ').filter(Boolean).length < C.TR(a.ad).split(' ').filter(Boolean).length) k.ad = a.ad;      // elle eksik yazılmış ad ASOS'taki tam adla düzeltilir
         k.tc = a.tc; k.unvan = a.unvan || k.unvan; k.sinif = sinif; k.birim = birim; k.dortB = dortB; k.kadroTur = a.kadroTur || k.kadroTur; if (a.tel) k.tel = a.tel;
         rapor.degisen++;
       }
@@ -299,6 +305,14 @@
       if (!k.durumManuel) k.durumMetin = k.durumMetinB || k.durumMetinA || '';
       if (k.gorev && (k.gorev.hedef || k.gorev.yer)) rapor.gorevli++;
       goruldu.add(k.id);
+    });
+    // Elle yalnızca ilk adıyla eklenmiş TC'siz kayıt, aynı istasyondaki ilk adı eşleşen tek ASOS kaydıyla birleştirilir (mükerrer kayıt oluşmaz)
+    rapor.birlesen = 0;
+    plan.kayitlar.filter(m => !m.tc && C.TR(m.ad).split(' ').filter(Boolean).length === 1).forEach(m => {
+      const aday = plan.kayitlar.filter(x => x.tc && x.id !== m.id && x.birim === m.birim && C.TR(x.ad).split(' ').filter(Boolean).length >= 2 && lev1(C.TR(x.ad).split(' ')[0], C.TR(m.ad)));
+      if (aday.length !== 1) return; const x = aday[0];
+      if (m.kilit && m.planlanan != null) { x.planlanan = m.planlanan; x.kilit = true; } if (m.istek && !x.istek) x.istek = m.istek; if (m.rolManuel && !x.rolManuel) x.rolManuel = m.rolManuel;
+      plan.kayitlar = plan.kayitlar.filter(y => y.id !== m.id); rapor.birlesen++;
     });
     if (tur === 'A') plan.kayitlar.forEach(k => { if (!goruldu.has(k.id) && k.tc && !(durumlar()[k.durum] || {}).pasif) rapor.eksik.push(k); });
     birimTemizle(plan); birimSirala(plan);
@@ -339,6 +353,7 @@
       ${N ? `<p><b>Nöbet kayıtları (${N.aylar.join(', ')}):</b> ${N.kisi} kişinin nöbeti okundu, ${N.eslesen} kişi planda eşleşti. Memur (AABT+ATT, ${N.att} kişi): <b>${N.surucu}</b> sürücü olarak nöbet tutmuş, <b>${N.degil}</b> sürücü değil, <b>${N.dogrulanmadi}</b> kişinin nöbet kaydı yok (doğrulanmadı; sürücü sayılmaz). Başka aylara ait nöbet listelerini de yükleyerek doğrulamayı artırabilirsiniz.</p>${N.tani ? `<details ${N.eslesen < N.kisi * 0.8 || N.dogrulanmadi > N.att / 2 ? 'open' : ''}><summary>Nöbet dosyası tanılaması</summary><div class="ap-note" style="line-height:1.6">Okunan satır: <b>${N.tani.satir}</b> · kullanılan: <b>${N.tani.ok}</b> · TC'siz: ${N.tani.tcYok} · istasyon dışı ekip türü: ${N.tani.istasyonDisi} · ambulans dışı: ${N.tani.ambulansDisi}<br>Planda eşleşmeyen TC'li kişi: <b>${Math.max(0, N.kisi - N.eslesen)}</b><br>Başlıklar: ${esc(N.tani.baslik)}<br>Nöbet görevi değerleri: ${esc(Object.entries(N.tani.gorevler).slice(0, 12).map(([a, b]) => a + ' (' + b + ')').join(', '))}<br>${Object.keys(N.tani.rolYok).length ? '<b>Rolü tanınmayan görevler:</b> ' + esc(Object.entries(N.tani.rolYok).slice(0, 10).map(([a, b]) => a + ' (' + b + ')').join(', ')) + '<br>' : ''}${Object.keys(N.tani.sureYok).length ? '<b>Süresi okunamayan değerler:</b> ' + esc(Object.entries(N.tani.sureYok).slice(0, 10).map(([a, b]) => a + ' (' + b + ')').join(', ')) : ''}</div></details>` : ''}` : `<p class="ap-note"><b>ATT'lerin sürücülüğü nöbet listesinden doğrulanır.</b> "Nöbet Listesi / Nöbet İçi Hareket Raporu"nu (Nöbet Sayım uygulamasındaki dosya; son birkaç ayın dosyaları birlikte yüklenebilir) yüklemezseniz ATT'ler yalnız YSP sayılır.</p>`}
       ${Iz ? `<p><b>İzin-Muafiyet Raporu:</b> ${Iz.kisi} kişi, ${Iz.eslesen} kişi planda eşleşti${Iz.eslesmeyen ? ' (' + Iz.eslesmeyen + ' kişi planda yok)' : ''}; bu ay için ${Iz.izinli} izin/rapor ve ${Iz.muafiyet} muafiyet kaydı işlendi. Rapordaki kişilerin önceki ASOS izin bilgisi bu raporla yenilenir.</p>` : ''}
       ${!B && !Iz ? '<p class="ap-note">İzin, rapor, muafiyet ve süt izni bilgisi için "Personel Listesi Raporu"nu da yükleyin (iki dosyayı birlikte seçebilirsiniz).</p>' : ''}
+      ${A.raporlar.some(r => r.birlesen) ? `<p class="ap-note"><b>${A.raporlar.reduce((x, r) => x + (r.birlesen || 0), 0)}</b> elle eklenmiş kayıt, ASOS kaydıyla birleştirildi (ikinci kayıt oluşmadı).</p>` : ''}
       ${nakiller.length ? `<details><summary>Birimi değişenler (${nakiller.length})</summary>${nakiller.slice(0, 40).map(esc).join('<br>')}</details>` : ''}
       ${yeniler.length && !yenisi ? `<details><summary>Yeni eklenenler (${yeniler.length})</summary>${yeniler.slice(0, 60).map(esc).join('<br>')}</details>` : ''}
       ${eksik.length ? `<details open><summary>EKİP listesinde olmayan kayıtlar (${eksik.length})</summary>${eksik.slice(0, 40).map(k => esc(k.ad + ' — ' + k.birim)).join('<br>')}
@@ -673,6 +688,12 @@
       }
     } catch (er) { console.error(er); toast('Hata: ' + er.message); }
     render();
+  });
+  // Görevlendirmeler listesini yazdıkça süz (yeniden çizmeden)
+  root.addEventListener('input', e => {
+    const t = e.target; if (!t || t.id !== 'ap-g-kisi') return;
+    const q = C.TR(t.value).trim();
+    root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = !q || r.dataset.ara.includes(q) ? '' : 'none'; });
   });
   root.addEventListener('change', async e => {
     const t = e.target;
