@@ -127,4 +127,10 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   assert.strictEqual(C.kisiMesai(k({bas: '2026-10-14', bit: '2026-11-02', gun: 19, asos: true}), 2026, 11, {}, D), tam);     // 1 Kasım Pazar
   assert.strictEqual(C.kisiMesai(k({bas: '2026-10-14', bit: '2026-11-03', gun: 20, asos: true}), 2026, 11, {}, D), tam - 8);  // 2 Kasım Pazartesi izinli
   assert.strictEqual(C.kisiMesai(k({bas: '2026-11-02', bit: '2026-11-02', gun: 1}), 2026, 11, {}, D), tam - 8); }
+// Fazla mesaili modda personel yalnızca fazla nöbetle de kapanmayan açık bir kişiyi dolduruyorsa önerilir
+{ const gm = (n, mod) => C.istasyonHesap(mk(n, 'm', 'memur'), 2026, 11, {}, D2, {...AY, mod}, 3);
+  assert.strictEqual(gm(12, 'fazla').ihtiyacTur, 'icerde');                                   // azamiyle 96 ≥ 90: fazla nöbetle kapanır
+  assert.strictEqual(gm(11, 'fazla').ihtiyacTur, 'elle'); assert.strictEqual(gm(11, 'fazla').ihtiyacKisi, 0);   // 88 < 90 ama kalan 2 bir kişiye yetmez
+  assert.strictEqual(gm(11, 'mesai').ihtiyacTur, 'oner'); assert.strictEqual(gm(10, 'fazla').ihtiyacKisi, 1);   // 80 → 10 açık ≥ 7: 1 kişi
+  assert.strictEqual(gm(12, 'mesai').ihtiyacTur, 'icerde'); }
 console.log('çekirdek testleri geçti');

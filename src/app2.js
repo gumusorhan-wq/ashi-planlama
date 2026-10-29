@@ -40,12 +40,12 @@
     {ad: 'AABT', yuva: ['es', 'ysp']},
     {ad: 'AABT (sürücü teyitli)', yuva: ['es', 'ysp', 'sur']}];
   function eksikAnaliz(h, isciTam, doktorOk, fazlaMod) {
-    const rem = h.slot.hedef.rem, tam = h.tamHedef, yuvalar = ['es', 'ysp', 'sur'].map(k => ({k, ad: YUVA_ADLARI[k], gerek: h.slot.dem[k], hedefAcik: Math.max(0, rem[k]), acik: Math.max(0, (fazlaMod ? h.slot.azami.rem : rem)[k]), azamiAcik: Math.max(0, h.slot.azami.rem[k])}));
+    const rem = h.acikM || h.slot.hedef.rem, tam = h.tamHedef, yuvalar = ['es', 'ysp', 'sur'].map(k => ({k, ad: YUVA_ADLARI[k], gerek: h.slot.dem[k], hedefAcik: Math.max(0, h.slot.hedef.rem[k]), acik: Math.max(0, rem[k]), azamiAcik: Math.max(0, h.slot.azami.rem[k])}));
     // her aday branş, doldurabildiği nöbet branşlarındaki açık kadar nöbet tutar; gelen kişi o ay tüm hedefini (tam ay) tutabiliyorsa önerilir
     const adaylar = ADAY_BRANS.filter(x => x.ad !== 'Doktor' || doktorOk).map(x => ({...x, kapasite: x.yuva.reduce((t, y) => t + Math.max(0, rem[y]), 0), tam: x.isci ? isciTam : tam})).map(x => ({...x, kisi: x.tam > 0 ? Math.floor(x.kapasite / x.tam + 1e-9) : 0})).filter(x => x.kisi >= 1);
     // en dar branşlar önce (yuva sayısı az olan), aynı yuva kümesindeki doktor/AABT gibi seçenekler birlikte gösterilir
     adaylar.sort((a, c) => a.yuva.length - c.yuva.length);
-    const acikYuva = yuvalar.filter(y => y.hedefAcik >= 0.5);
+    const acikYuva = yuvalar.filter(y => y.acik >= 0.5);
     const fazlaGrup = Object.entries(h.slot.hedef.fazla).filter(([, v]) => v > 0.001).map(([g, v]) => ({g, v, ad: C.GRUP_AD[g]}));
     const cikabilir = h.fazlaH > 0.001 && tam > 0 ? Math.floor(h.fazlaH / tam + 1e-9) : 0;
     return {yuvalar, adaylar, acikYuva, fazlaGrup, cikabilir};
@@ -61,7 +61,7 @@
     let gelen = '';
     if (gelecek) {
       const secenek = E.adaylar.map(x => `${esc(x.ad)}${x.kisi > 1 ? ' ×' + x.kisi : ''}`).join(' · ');
-      gelen = `<div class="ap-ek ap-ek-g" title="Gelen kişi o ay boyunca (tam ay) bu istasyonda mesaisini tamamlayacak şekilde önerilir. Açık nöbet branşlarına girebilen branşlar listelenir."><b>+${gelecek} kişi gelmeli</b> <span>(ay boyu ${fmt(h.tamHedef)} nöbet tutar)</span><div class="ap-note">Mesai karşılığıyla açık: ${E.acikYuva.map(y => `${y.ad} ${fmt(y.hedefAcik)}`).join(', ') || '—'}<br>Uygun personel: ${secenek || 'AABT (sürücü teyitli)'}</div></div>`;
+      gelen = `<div class="ap-ek ap-ek-g" title="Gelen kişi o ay boyunca (tam ay) bu istasyonda mesaisini tamamlayacak şekilde önerilir. Açık nöbet branşlarına girebilen branşlar listelenir."><b>+${gelecek} kişi gelmeli</b> <span>(ay boyu ${fmt(h.tamHedef)} nöbet tutar)</span><div class="ap-note">${fazlaMod ? 'Fazla nöbetle de açık' : 'Mesai karşılığıyla açık'}: ${E.acikYuva.map(y => `${y.ad} ${fmt(y.acik)}`).join(', ') || '—'}<br>Uygun personel: ${secenek || 'AABT (sürücü teyitli)'}</div></div>`;
     } else if (h.ihtiyacTur === 'icerde') gelen = `<div class="ap-ek ap-ek-c" title="Açık bir kişinin tüm ay mesaisini doldurmaya yetmediği için personel önerilmez"><b>Personel gerekmez</b> <span>açık ${fmt(h.hedefAcik)} nöbet, fazla nöbetle kapanır</span></div>`;
     else if (h.ihtiyacTur === 'elle') gelen = fazlaMod ? `<div class="ap-ek ap-ek-e"><b>Elle karar</b> <span>fazla nöbetle de ${fmt(-h.farkAzami)} açık; bir kişinin ayı dolmaz</span></div>` : `<div class="ap-ek ap-ek-c"><b>Açık kalıyor</b> <span>${fmt(h.hedefAcik)} nöbet; bir kişinin ayını doldurmaz</span></div>`;
     // dışarı çıkabilecek personel
@@ -204,7 +204,7 @@
   function gorevHtml() {
     const D = durumlar(), duz = !salt(), birimler = S.plan.birimler;
     const ists = birimler.filter(b => b.tur === 'istasyon' && !b.ekipOf).map(b => ({b, h: hesapla(b)}));
-    const acik = ists.filter(x => x.h.ihtiyacTur === 'oner').sort((a, b) => b.h.hedefAcik - a.h.hedefAcik);
+    const acik = ists.filter(x => x.h.ihtiyacTur === 'oner').sort((a, b) => b.h.acikEf - a.h.acikEf);
     const ic = ists.filter(x => x.h.ihtiyacTur === 'icerde' || x.h.ihtiyacTur === 'elle').sort((a, b) => b.h.hedefAcik - a.h.hedefAcik);
     const fazla = ists.filter(x => x.h.durum === 'fazla').sort((a, b) => b.h.fazlaH - a.h.fazlaH);
     const gk = S.plan.kayitlar.filter(k => k.gorev && (k.gorev.hedef || k.gorev.yer)).sort((a, b) => trCollator.compare(a.birim, b.birim) || trCollator.compare(a.ad, b.ad));
@@ -227,10 +227,10 @@
     const dagitimOzet = `<div class="ap-ek ap-ek-c" style="margin:8px 0"><b>Dağıtım sonucu:</b> ${rotOner.filter(o => o.hedef).length} kişi gerçekten ihtiyacı olan istasyonlara yönlendirildi. ${karsilanamayan.length ? `<b>${karsilanamayan.length} istasyonun ihtiyacı karşılanamadı</b> (${karsilanamayan.slice(0, 8).map(x => `${esc(x.b.ad)} −${x.h.ihtiyacKisi - (gidenSay[x.b.ad] || 0)} kişi`).join(', ')}${karsilanamayan.length > 8 ? ' …' : ''}); kalan açık o istasyonlarda fazla nöbetle kapanır.` : 'Personel bekleyen istasyon kalmadı.'} ${fazlaIleDolan.length ? `Fazla nöbetle kapanan ${fazlaIleDolan.length} istasyona (açığı bir kişiye yetmiyor) personel gönderilmez.` : ''}</div>`;
     const degerlendirme = `<div class="ap-card"><h2>Personel ihtiyacı değerlendirmesi — ${ayEtiket()}</h2>
       ${dagitimOzet}
-      <p class="ap-note">Ölçüt: kişiler hedef nöbetlerini tamamen tutsa da istasyon açık kalıyorsa ve bu açık, gelen bir kişinin mesaisini orada tamamlamasına yetiyorsa personel önerilir. Açık bir kişiye yetmiyorsa istasyon fazla nöbetle kendi içinde döner ve personel önerilmez. İsterseniz aşağıdaki "Görevlendirmeler" bölümünden elle görevlendirme yapabilirsiniz.</p>
-      <div class="ap-tw"><table class="ap-t"><thead><tr><th>İSTASYON</th><th>HEDEFLE AÇIK</th><th>KAÇ KİŞİ MESAİSİNİ TAMAMLAR</th><th>AZAMİYLE DURUM</th><th>DEĞERLENDİRME</th></tr></thead><tbody>
-      ${[...acik, ...ic].map(x => `<tr><td><b>${esc(x.b.ad)}</b></td><td class="num">${fmt(x.h.hedefAcik)}</td><td class="num">${x.h.ihtiyacKisi}</td><td>${x.h.farkAzami >= 0 ? 'Doluyor (' + fmt(x.h.azamiKap) + ' / ' + x.h.ihtiyac + ')' : fmt(-x.h.farkAzami) + ' nöbet açık kalıyor'}</td>
-      <td>${x.h.ihtiyacTur === 'oner' ? `<span class="ap-tag ap-t-ih">Personel öner: ${x.h.ihtiyacKisi} kişi</span>${x.h.kalanAcik > 0 ? ` <span class="ap-note">+ ${fmt(x.h.kalanAcik)} nöbet fazla nöbetle</span>` : ''}` : x.h.ihtiyacTur === 'icerde' ? '<span class="ap-tag ap-t-fz">Fazla nöbetle kendi içinde döner — önerilmez</span>' : '<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Elle karar</span>'}</td></tr>`).join('') || '<tr><td colspan="5" class="ap-empty">Açık veren istasyon yok</td></tr>'}</tbody></table></div></div>`;
+      <p class="ap-note">${S.ayar.panoMod === 'mesai' ? 'Mod: <b>Mesai karşılığı</b>. Ölçüt: kişiler yalnız hedef nöbetlerini tutarsa istasyon açık kalıyorsa ve bu açık, gelen bir kişinin mesaisini orada tamamlamasına yetiyorsa personel önerilir.' : `Mod: <b>Fazla mesaili</b> (memur/doktor en çok ${fmt(S.ayar.azamiMemur)} nöbet). Ölçüt: fazla nöbet yazıldıktan sonra da istasyon açık kalıyorsa ve bu açık, gelen bir kişinin mesaisini tamamlamasına yetiyorsa personel önerilir; fazla nöbetle kapanıyorsa önerilmez.`} İsterseniz aşağıdaki "Görevlendirmeler" bölümünden elle görevlendirme yapabilirsiniz.</p>
+      <div class="ap-tw"><table class="ap-t"><thead><tr><th>İSTASYON</th><th>MESAİ KARŞILIĞI AÇIK</th>${S.ayar.panoMod === 'mesai' ? '' : '<th>FAZLA NÖBETLE AÇIK</th>'}<th>KAÇ KİŞİ GEREKİR</th><th>DEĞERLENDİRME</th></tr></thead><tbody>
+      ${[...acik, ...ic].map(x => `<tr><td><b>${esc(x.b.ad)}</b></td><td class="num">${fmt(x.h.hedefAcik)}</td>${S.ayar.panoMod === 'mesai' ? '' : `<td class="num">${fmt(Math.max(0, x.h.acikEf))}</td>`}<td class="num">${x.h.ihtiyacKisi}</td>
+      <td>${x.h.ihtiyacTur === 'oner' ? `<span class="ap-tag ap-t-ih">Personel öner: ${x.h.ihtiyacKisi} kişi</span>${x.h.kalanAcik > 0 ? ` <span class="ap-note">+ ${fmt(x.h.kalanAcik)} nöbet fazla nöbetle</span>` : ''}` : x.h.ihtiyacTur === 'icerde' ? '<span class="ap-tag ap-t-fz">Fazla nöbetle kapanır — personel önerilmez</span>' : `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">${S.ayar.panoMod === 'mesai' ? 'Açık kalıyor (bir kişiyi doldurmaz)' : 'Elle karar'}</span>`}</td></tr>`).join('') || `<tr><td colspan="${S.ayar.panoMod === 'mesai' ? 4 : 5}" class="ap-empty">Açık veren istasyon yok</td></tr>`}</tbody></table></div></div>`;
     const sekme = S.gorevSekme || 'deg';
     const sekmeler = [['deg', 'Personel ihtiyacı değerlendirmesi'], ['rot', 'Aylık rotasyon'], ['list', `Görevlendirmeler (${gk.length})`], ['ozet', 'Açık / fazla istasyonlar']];
     const nav = `<div class="ap-subnav ap-noprint">${sekmeler.map(([v, t]) => `<button class="${sekme === v ? 'on' : ''}" data-act="gorev-sekme" data-v="${v}">${t}</button>`).join('')}</div>`;

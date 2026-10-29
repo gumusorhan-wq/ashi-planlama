@@ -441,7 +441,7 @@
   const nedenMetin = k => k.istek === 'git' ? 'kişi isteği' : sonCikis(k) ? `son çıkış ${sonCikis(k)}` : 'daha önce çıkmadı';
   function rotasyonOneriler() {
     const ists = S.plan.birimler.filter(b => b.tur === 'istasyon').map(b => { const h = hesapla(b); return {b, h, r: rotasyon(b, h)}; });
-    const hedefler = ists.filter(x => x.h.ihtiyacTur === 'oner' && !x.b.ekipOf).map(x => ({ad: x.b.ad, acik: {...x.h.acik}, tam: x.h.tamHedef}));
+    const hedefler = ists.filter(x => x.h.ihtiyacTur === 'oner' && !x.b.ekipOf).map(x => ({ad: x.b.ad, acik: {...(x.h.acikM || x.h.acik)}, tam: x.h.tamHedef}));
     const kkm = S.plan.birimler.find(b => b.tur === 'kkm');
     const out = [];
     ists.filter(x => x.r.oneri.length && (S.rotKaynak !== 'fazla' || x.h.durum === 'fazla' || x.b.ekipOf)).sort((a, b) => b.h.fazlaH - a.h.fazlaH).forEach(src => src.r.oneri.forEach(k => {

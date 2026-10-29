@@ -202,9 +202,11 @@ const APCore = (() => {
     const durum = unmetH <= EPS ? (fazlaH > EPS ? 'fazla' : 'tam') : (unmetA <= EPS ? 'fazlaMesai' : 'ihtiyac');
     // Personel önerisi: hedef nöbetle tam mesai yapılınca kalan açık, yeni gelen kişinin mesaisini bu istasyonda tamamlamasına (tam ay hedefi) yetiyorsa görevlendirme önerilir.
     // Açık bir kişiyi doldurmaya yetmiyorsa istasyon fazla nöbetle kendi içinde döner (öneri yok); azamiyle de dolmuyorsa elle karar gerekir.
-    const hedefAcik = unmetH, ihtiyacKisi = tam > 0 ? Math.floor(hedefAcik / tam + EPS) : 0;
-    const ihtiyacTur = hedefAcik <= EPS ? 'yok' : ihtiyacKisi >= 1 ? 'oner' : unmetA <= EPS ? 'icerde' : 'elle';
-    return {gun, ihtiyac, satir, gruplar, kapasite, azamiKap, fark: r2(fazlaH - unmetH), fazlaH, farkAzami: unmetA > EPS ? -unmetA : r2(azamiKap - ihtiyac), durum, tamHedef: tam, hedefAcik, ihtiyacKisi, kalanAcik: r2(hedefAcik - ihtiyacKisi * tam), ihtiyacTur,
+    // Mod 'fazla' (fazla mesaili): kişilere azami nöbete kadar fazla nöbet yazılacağı kabul edilir; personel yalnızca fazla nöbetle de kapanmayan açık bir kişiyi dolduruyorsa önerilir.
+    // Mod verilmezse (ya da 'mesai'): açık, herkes yalnız hedef nöbetini tuttuğunda hesaplanır.
+    const hedefAcik = unmetH, fazlaMod = a.mod === 'fazla', acikEf = fazlaMod ? unmetA : unmetH, ihtiyacKisi = tam > 0 ? Math.floor(acikEf / tam + EPS) : 0;
+    const ihtiyacTur = hedefAcik <= EPS ? 'yok' : (fazlaMod && unmetA <= EPS) ? 'icerde' : ihtiyacKisi >= 1 ? 'oner' : unmetA <= EPS ? 'icerde' : 'elle';
+    return {gun, ihtiyac, satir, gruplar, kapasite, azamiKap, fark: r2(fazlaH - unmetH), fazlaH, farkAzami: unmetA > EPS ? -unmetA : r2(azamiKap - ihtiyac), durum, tamHedef: tam, hedefAcik, acikEf: r2(acikEf), acikM: fazlaMod ? A.rem : H.rem, ihtiyacKisi, kalanAcik: r2(acikEf - ihtiyacKisi * tam), ihtiyacTur,
       slot: {dem, hedef: H, azami: A, supH, supA}, acik: H.rem};
   }
   // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).

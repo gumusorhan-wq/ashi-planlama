@@ -48,7 +48,7 @@ function mount(root, opts = {}) {
   let kaydetZamani = null;
   const kaydet = () => { clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
   const ayarKaydet = () => { const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
-  const HESAP_SURUM = 6;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
+  const HESAP_SURUM = 7;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
   function toast(t) { const id = uid(); S.toastlar.push({id, t}); toastCiz(); setTimeout(() => { S.toastlar = S.toastlar.filter(x => x.id !== id); toastCiz(); }, 5000); }
   function toastCiz() { root.querySelectorAll('.ap-toast').forEach(e => e.remove()); S.toastlar.forEach((x, i) => { const e = document.createElement('div'); e.className = 'ap-toast'; e.style.bottom = (14 + i * 46) + 'px'; e.textContent = x.t; root.appendChild(e); }); }
   function logla(islem, detay) { if (!S.plan) return; (S.plan.log = S.plan.log || []).unshift({t: Date.now(), rol: S.rol, islem, detay: detay || ''}); if (S.plan.log.length > 1500) S.plan.log.length = 1500; }
@@ -82,7 +82,7 @@ function mount(root, opts = {}) {
   }
   const birimKisileri = ad => kisCtx(S.plan, ad);
   function hesaplaCtx(plan, y, m, birim, kisiler) {
-    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, azamiMemur: S.ayar.panoMod === 'mesai' ? 0 : (birim.azamiMemur != null ? birim.azamiMemur : S.ayar.azamiMemur), isciEk: 0, surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik}, birim.ekipOf ? 0 : birim.yuva);
+    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, azamiMemur: S.ayar.panoMod === 'mesai' ? 0 : (birim.azamiMemur != null ? birim.azamiMemur : S.ayar.azamiMemur), isciEk: 0, mod: S.ayar.panoMod, surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik}, birim.ekipOf ? 0 : birim.yuva);
   }
   const hesapla = birim => hesaplaCtx(S.plan, S.y, S.m, birim);
   const planlananToplam = (hesap) => hesap.satir.filter(s => !s.nobetYok).reduce((a, s) => a + sayi(s.k.planlanan), 0);
