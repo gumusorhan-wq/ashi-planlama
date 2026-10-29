@@ -199,6 +199,8 @@ const APCore = (() => {
   }
 
   // Kişinin ay mesaisi (saat). k: {sinif, durum, izin:[{gun, bas?, bit?}], sut}
+  // ASOS'taki izin/görev bitiş tarihi dönüş gününü gösterir (nöbet 09:00'da biter): son izinli gün bir önceki gündür. Elle girilen tarihli izinlerde bitiş dahildir.
+  function izinSon(iz) { if (!iz.asos || !iz.bit) return iz.bit; return new Date(Date.parse(iz.bit + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10); }
   function kisiMesai(k, y, m, ozel, durumlar) {
     const isci = k.sinif === 'isci', dt = durumlar[k.durum] || {};
     if (dt.mesaiYok) return 0;
@@ -207,7 +209,7 @@ const APCore = (() => {
     const gunler = {};
     (k.izin || []).forEach(iz => {
       if (iz.bas && iz.bit) {
-        for (let ms = Date.parse(iz.bas + 'T00:00:00Z'); ms <= Date.parse(iz.bit + 'T00:00:00Z'); ms += 864e5) {
+        for (let ms = Date.parse(iz.bas + 'T00:00:00Z'); ms <= Date.parse(izinSon(iz) + 'T00:00:00Z'); ms += 864e5) {
           const d = new Date(ms).toISOString().slice(0, 10);
           if (d.slice(0, 7) === `${y}-${pad(m)}`) gunler[d] = 1;
         }
@@ -445,7 +447,7 @@ const APCore = (() => {
     return Math.round(2 * 6371 * Math.asin(Math.sqrt(h)));
   }
 
-  const api = {surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
+  const api = {izinSon, surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
     durumAnahtar, sinifTespit, DURUM_VARSAYILAN, OZEL_TUR, RESMI, MESAI, YUVA_VARSAYILAN, ADIM};
   return api;
 })();
@@ -807,7 +809,7 @@ function mount(root, opts = {}) {
   function izinAyGun(k) {
     const ay = `${S.y}-${C.pad(S.m)}`; let n = 0;
     (k.izin || []).forEach(i => {
-      if (i.bas && i.bit) { for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(i.bit + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) n++; }
+      if (i.bas && i.bit) { for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(C.izinSon(i) + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) n++; }
       else n += sayi(i.gun);
     });
     return n;
@@ -1298,7 +1300,7 @@ function mount(root, opts = {}) {
     return hesapla(b).satir.filter(s => !s.nobetYok).map(s => {
       const k = s.k, azami = Math.floor(s.azami + 1e-9);
       return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), planlanan: sayi(k.planlanan), ust: k.sinif === 'isci' ? null : azami, gelen: !!k._gelen,
-        izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: i.bit, tur: i.tur})), izinGun: izinGun(k)};
+        izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
     }).sort((a, c) => ({doktor: 0, memur: 1, isci: 2}[a.sinif] - {doktor: 0, memur: 1, isci: 2}[c.sinif]) || trCollator.compare(a.ad, c.ad));
   }
   function n2Girdi(b) {
@@ -1646,8 +1648,8 @@ function mount(root, opts = {}) {
   // B raporundan plan ayına göre durum / izin / muafiyet / süt izni / geçici görev çıkarır
   function asosAyHesabi(a) {
     const bas = ayIlk(), son = gunSon(), sonuc = {durumB: '', izin: [], sut: 0, gorev: null, durumMetin: ''};
-    if (a.izin && a.izin.bit && a.izin.bit >= bas && (!a.izin.bas || a.izin.bas <= son)) {
-      const t = C.TR(a.izin.tip), uzun = a.izin.bit >= son && (!a.izin.bas || a.izin.bas <= bas);
+    if (a.izin && a.izin.bit && a.izin.bit > bas && (!a.izin.bas || a.izin.bas <= son)) {
+      const t = C.TR(a.izin.tip), uzun = a.izin.bit > son && (!a.izin.bas || a.izin.bas <= bas);
       const dm = /DOGUM ONCESI/.test(t) ? 'DOĞUM ÖNCESİ' : /DOGUM/.test(t) ? 'DOĞUM SONRASI' : /HEYET/.test(t) ? 'HEYET RAPORLU' : /RAPOR/.test(t) ? 'RAPORLU' : '';
       if (dm && uzun) { sonuc.durumB = dm; sonuc.durumMetin = `${a.izin.tip} ${trTarih(a.izin.bas)}–${trTarih(a.izin.bit)}`; }
       else sonuc.izin.push({tur: a.izin.tip.toLocaleUpperCase('tr-TR'), gun: a.izin.gun, bas: a.izin.bas, bit: a.izin.bit});

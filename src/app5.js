@@ -19,7 +19,7 @@
     return hesapla(b).satir.filter(s => !s.nobetYok).map(s => {
       const k = s.k, azami = Math.floor(s.azami + 1e-9);
       return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), planlanan: sayi(k.planlanan), ust: k.sinif === 'isci' ? null : azami, gelen: !!k._gelen,
-        izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: i.bit, tur: i.tur})), izinGun: izinGun(k)};
+        izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
     }).sort((a, c) => ({doktor: 0, memur: 1, isci: 2}[a.sinif] - {doktor: 0, memur: 1, isci: 2}[c.sinif]) || trCollator.compare(a.ad, c.ad));
   }
   function n2Girdi(b) {

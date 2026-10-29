@@ -157,8 +157,8 @@
   // B raporundan plan ayına göre durum / izin / muafiyet / süt izni / geçici görev çıkarır
   function asosAyHesabi(a) {
     const bas = ayIlk(), son = gunSon(), sonuc = {durumB: '', izin: [], sut: 0, gorev: null, durumMetin: ''};
-    if (a.izin && a.izin.bit && a.izin.bit >= bas && (!a.izin.bas || a.izin.bas <= son)) {
-      const t = C.TR(a.izin.tip), uzun = a.izin.bit >= son && (!a.izin.bas || a.izin.bas <= bas);
+    if (a.izin && a.izin.bit && a.izin.bit > bas && (!a.izin.bas || a.izin.bas <= son)) {
+      const t = C.TR(a.izin.tip), uzun = a.izin.bit > son && (!a.izin.bas || a.izin.bas <= bas);
       const dm = /DOGUM ONCESI/.test(t) ? 'DOĞUM ÖNCESİ' : /DOGUM/.test(t) ? 'DOĞUM SONRASI' : /HEYET/.test(t) ? 'HEYET RAPORLU' : /RAPOR/.test(t) ? 'RAPORLU' : '';
       if (dm && uzun) { sonuc.durumB = dm; sonuc.durumMetin = `${a.izin.tip} ${trTarih(a.izin.bas)}–${trTarih(a.izin.bit)}`; }
       else sonuc.izin.push({tur: a.izin.tip.toLocaleUpperCase('tr-TR'), gun: a.izin.gun, bas: a.izin.bas, bit: a.izin.bit});

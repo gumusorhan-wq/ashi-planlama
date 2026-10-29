@@ -120,4 +120,11 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri', rolSay: {es: 50, ysp: 50, sur: 0}}, esk), 'ke');
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri', rolSay: {es: 40, ysp: 30, sur: 30}}, esk), 'ka');
   assert.deepStrictEqual(C.YETENEK.ke, ['es', 'ysp']); }
+// ASOS izin bitişi dönüş günüdür (dahil değil): 14.10–01.11 Kasım mesaisini etkilemez; elle girilen tarihli izinde bitiş dahildir
+{ const D = C.DURUM_VARSAYILAN, k = (iz) => ({sinif: 'memur', durum: '', izin: [iz]});
+  const tam = C.kisiMesai({sinif: 'memur', durum: '', izin: []}, 2026, 11, {}, D);
+  assert.strictEqual(C.kisiMesai(k({bas: '2026-10-14', bit: '2026-11-01', gun: 18, asos: true}), 2026, 11, {}, D), tam);
+  assert.strictEqual(C.kisiMesai(k({bas: '2026-10-14', bit: '2026-11-02', gun: 19, asos: true}), 2026, 11, {}, D), tam);     // 1 Kasım Pazar
+  assert.strictEqual(C.kisiMesai(k({bas: '2026-10-14', bit: '2026-11-03', gun: 20, asos: true}), 2026, 11, {}, D), tam - 8);  // 2 Kasım Pazartesi izinli
+  assert.strictEqual(C.kisiMesai(k({bas: '2026-11-02', bit: '2026-11-02', gun: 1}), 2026, 11, {}, D), tam - 8); }
 console.log('çekirdek testleri geçti');

@@ -102,6 +102,8 @@ const APCore = (() => {
   }
 
   // Kişinin ay mesaisi (saat). k: {sinif, durum, izin:[{gun, bas?, bit?}], sut}
+  // ASOS'taki izin/görev bitiş tarihi dönüş gününü gösterir (nöbet 09:00'da biter): son izinli gün bir önceki gündür. Elle girilen tarihli izinlerde bitiş dahildir.
+  function izinSon(iz) { if (!iz.asos || !iz.bit) return iz.bit; return new Date(Date.parse(iz.bit + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10); }
   function kisiMesai(k, y, m, ozel, durumlar) {
     const isci = k.sinif === 'isci', dt = durumlar[k.durum] || {};
     if (dt.mesaiYok) return 0;
@@ -110,7 +112,7 @@ const APCore = (() => {
     const gunler = {};
     (k.izin || []).forEach(iz => {
       if (iz.bas && iz.bit) {
-        for (let ms = Date.parse(iz.bas + 'T00:00:00Z'); ms <= Date.parse(iz.bit + 'T00:00:00Z'); ms += 864e5) {
+        for (let ms = Date.parse(iz.bas + 'T00:00:00Z'); ms <= Date.parse(izinSon(iz) + 'T00:00:00Z'); ms += 864e5) {
           const d = new Date(ms).toISOString().slice(0, 10);
           if (d.slice(0, 7) === `${y}-${pad(m)}`) gunler[d] = 1;
         }
@@ -348,7 +350,7 @@ const APCore = (() => {
     return Math.round(2 * 6371 * Math.asin(Math.sqrt(h)));
   }
 
-  const api = {surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
+  const api = {izinSon, surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
     durumAnahtar, sinifTespit, DURUM_VARSAYILAN, OZEL_TUR, RESMI, MESAI, YUVA_VARSAYILAN, ADIM};
   return api;
 })();

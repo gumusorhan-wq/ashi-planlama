@@ -99,7 +99,7 @@ function mount(root, opts = {}) {
   function izinAyGun(k) {
     const ay = `${S.y}-${C.pad(S.m)}`; let n = 0;
     (k.izin || []).forEach(i => {
-      if (i.bas && i.bit) { for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(i.bit + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) n++; }
+      if (i.bas && i.bit) { for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(C.izinSon(i) + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) n++; }
       else n += sayi(i.gun);
     });
     return n;
