@@ -867,10 +867,10 @@ function mount(root, opts = {}) {
     {ad: 'ATT (sürücü teyitli)', yuva: ['ysp', 'sur']},
     {ad: 'AABT', yuva: ['es', 'ysp']},
     {ad: 'AABT (sürücü teyitli)', yuva: ['es', 'ysp', 'sur']}];
-  function eksikAnaliz(h, isciTam) {
+  function eksikAnaliz(h, isciTam, doktorOk) {
     const rem = h.slot.hedef.rem, tam = h.tamHedef, yuvalar = ['es', 'ysp', 'sur'].map(k => ({k, ad: YUVA_ADLARI[k], gerek: h.slot.dem[k], acik: Math.max(0, rem[k]), azamiAcik: Math.max(0, h.slot.azami.rem[k])}));
     // her aday branş, doldurabildiği yuvalardaki açık kadar nöbet tutar; gelen kişi o ay tüm hedefini (tam ay) tutabiliyorsa önerilir
-    const adaylar = ADAY_BRANS.map(x => ({...x, kapasite: x.yuva.reduce((t, y) => t + Math.max(0, rem[y]), 0), tam: x.isci ? isciTam : tam})).map(x => ({...x, kisi: x.tam > 0 ? Math.floor(x.kapasite / x.tam + 1e-9) : 0})).filter(x => x.kisi >= 1);
+    const adaylar = ADAY_BRANS.filter(x => x.ad !== 'Doktor' || doktorOk).map(x => ({...x, kapasite: x.yuva.reduce((t, y) => t + Math.max(0, rem[y]), 0), tam: x.isci ? isciTam : tam})).map(x => ({...x, kisi: x.tam > 0 ? Math.floor(x.kapasite / x.tam + 1e-9) : 0})).filter(x => x.kisi >= 1);
     // en dar branşlar önce (yuva sayısı az olan), aynı yuva kümesindeki doktor/AABT gibi seçenekler birlikte gösterilir
     adaylar.sort((a, c) => a.yuva.length - c.yuva.length);
     const acikYuva = yuvalar.filter(y => y.acik >= 0.5);
@@ -879,7 +879,7 @@ function mount(root, opts = {}) {
     return {yuvalar, adaylar, acikYuva, fazlaGrup, cikabilir};
   }
   function kartHtml(b, h, p, etiket, plFark, oran, dengeli, isciTam) {
-    const E = eksikAnaliz(h, isciTam), gelecek = h.ihtiyacTur === 'oner' ? h.ihtiyacKisi : 0;
+    const E = eksikAnaliz(h, isciTam, doktorluIstasyon(b)), gelecek = h.ihtiyacTur === 'oner' ? h.ihtiyacKisi : 0;
     const yuvaSatir = E.yuvalar.map(y => {
       const dolu = y.gerek - y.acik;
       return `<div class="ap-yuva"><span>${y.ad}</span><span class="v">${fmt(dolu)}/${fmt(y.gerek)}</span>${y.acik >= 0.5 ? `<span class="ap-tag ap-t-ih" title="${y.ad} yuvasında hedef nöbetlerle ${fmt(y.acik)} nöbet açık kalıyor${y.azamiAcik < y.acik ? '; azami nöbetle ' + fmt(y.azamiAcik) + ' açık kalır' : ''}">−${fmt(y.acik)}</span>` : '<span class="ap-tag ap-t-ok">tam</span>'}</div>`;
