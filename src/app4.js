@@ -21,7 +21,7 @@
     return {ay: `${y}-${C.pad(m)}`, zaman: Date.now(), hesapImza: hesapImza(), ist};
   }
   // Hesap imzası: hesaplama sürümü + sonucu etkileyen ayarlar. Değişirse arşivdeki aylar yeni yönteme göre arka planda yeniden hesaplanır.
-  const hesapImza = () => JSON.stringify([HESAP_SURUM, S.ayar.isciDusulen, S.ayar.azamiMemur, S.ayar.surEsik, S.ayar.surDegilEsik, Object.entries(S.ayar.durumlar).map(([k, v]) => [k, !!v.nobetYok, !!v.mesaiYok, !!v.disarida, !!v.pasif])]);
+  const hesapImza = () => JSON.stringify([HESAP_SURUM, S.ayar.isciDusulen, S.ayar.azamiMemur, S.ayar.panoMod, S.ayar.surEsik, S.ayar.surDegilEsik, Object.entries(S.ayar.durumlar).map(([k, v]) => [k, !!v.nobetYok, !!v.mesaiYok, !!v.disarida, !!v.pasif])]);
   // Arşivlenmiş bir ayın planını (kopya üzerinde) güncel yöntemle yeniden hesaplar; kayıtlı plana dokunulmaz
   function planiYenidenHesapla(plan, y, m) {
     const kopya = JSON.parse(JSON.stringify(plan)), yedek = {plan: S.plan, y: S.y, m: S.m, toplu: S.toplu};

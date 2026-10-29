@@ -39,10 +39,10 @@ const NobetCore = (() => {
       const L = liste[d];
       ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(s => { const id = L[s]; if (id != null && byId.has(id)) gorev.get(id).push({gun: d, tip: s}); });
       const surTamam = L.sur != null || (L.surG != null && L.surA != null);
-      if (L.es == null) ekle('eksik', 1000, d, null, `${d}. gün ${YUVA_AD.es} yuvası boş`, {yuva: 'es'});
-      if (L.ysp == null) ekle('eksik', 1000, d, null, `${d}. gün ${YUVA_AD.ysp} yuvası boş`, {yuva: 'ysp'});
-      if (!surTamam) ekle('eksik', 1000, d, null, `${d}. gün ${YUVA_AD.sur} yuvası ${L.surG == null && L.surA == null && L.sur == null ? 'boş' : 'eksik (12 saatlik yarısı boş)'}`, {yuva: 'sur'});
-      if (L.sur != null && (L.surG != null || L.surA != null)) ekle('cakisma', 800, d, L.sur, `${d}. gün sürücü yuvasında hem 24 saat hem 12 saatlik atama var`);
+      if (L.es == null) ekle('eksik', 1000, d, null, `${d}. gün ${YUVA_AD.es} nöbet branşı boş`, {yuva: 'es'});
+      if (L.ysp == null) ekle('eksik', 1000, d, null, `${d}. gün ${YUVA_AD.ysp} nöbet branşı boş`, {yuva: 'ysp'});
+      if (!surTamam) ekle('eksik', 1000, d, null, `${d}. gün ${YUVA_AD.sur} nöbet branşı ${L.surG == null && L.surA == null && L.sur == null ? 'boş' : 'eksik (12 saatlik yarısı boş)'}`, {yuva: 'sur'});
+      if (L.sur != null && (L.surG != null || L.surA != null)) ekle('cakisma', 800, d, L.sur, `${d}. gün sürücü nöbet branşında hem 24 saat hem 12 saatlik atama var`);
     }
     P.forEach(p => {
       const L = gorev.get(p.id).slice().sort((a, b) => a.gun - b.gun), gunde = {};
@@ -50,12 +50,12 @@ const NobetCore = (() => {
       // yetenek, izin, istek, aynı gün çakışma
       L.forEach(x => {
         const yuva = x.tip === 'surG' || x.tip === 'surA' ? 'sur' : x.tip;
-        if (!p.yet.includes(yuva)) ekle('yetenek', 900, x.gun, p.id, `${p.ad}: ${YUVA_AD[yuva]} yuvasında görevlendirilemez`);
+        if (!p.yet.includes(yuva)) ekle('yetenek', 900, x.gun, p.id, `${p.ad}: ${YUVA_AD[yuva]} nöbet branşında görevlendirilemez`);
         if (p.izin.has(x.gun)) ekle('izin', 900, x.gun, p.id, `${p.ad}: ${x.gun}. gün izinli`);
         else if (p.istek.has(x.gun)) ekle('istek', 80, x.gun, p.id, `${p.ad}: ${x.gun}. gün nöbet istemiyor`);
         if (p.once.has(x.gun) && !p.izin.has(x.gun)) ekle('izinOnce', 300, x.gun, p.id, `${p.ad}: yıllık izin öncesi ${K.izinOnce} gün boşluk kuralı (${x.gun}. gün)`);
       });
-      Object.keys(gunde).forEach(d => { if (gunde[d].length > 1) ekle('cakisma', 800, +d, p.id, `${p.ad}: ${d}. gün birden fazla yuvada`); });
+      Object.keys(gunde).forEach(d => { if (gunde[d].length > 1) ekle('cakisma', 800, +d, p.id, `${p.ad}: ${d}. gün birden fazla nöbet branşında`); });
       // 24 saatlik nöbetler: dinlenme (min boşluk gün) ve sürücü gün aşırı 3
       const g24 = L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).map(x => x.gun);
       for (let i = 1; i < g24.length; i++) if (g24[i] - g24[i - 1] - 1 < K.minAra) ekle('dinlenme', 700, g24[i], p.id, `${p.ad}: ${g24[i - 1]}. ve ${g24[i]}. gün art arda 24 saatlik nöbet (arada en az ${K.minAra} gün boşluk gerekir)`);
@@ -175,7 +175,7 @@ const NobetCore = (() => {
       const hareket = [];
       if (R() < 0.5) {            // değiştir
         hareket.push([d, y, yeni]);
-        // yeni kişi o gün başka yuvadaysa onu eskisiyle takas et
+        // yeni kişi o gün başka nöbet branşındaysa onu eskisiyle takas et
         yuvalar.forEach(s => { if (s !== y && mevcut[d][s] === yeni) hareket.push([d, s, eski]); });
       } else {                    // başka güne ait bir atamayla takas
         const d2 = 1 + Math.floor(R() * N), cand = yuvalar.filter(s => mevcut[d2][s] === yeni); if (!cand.length) continue;
@@ -220,7 +220,7 @@ const NobetCore = (() => {
           if (p.id === eski) return;
           const yuva = y === 'surG' || y === 'surA' ? 'sur' : y; if (!p.yet.includes(yuva) || ((y === 'surG' || y === 'surA') !== p.isci)) return;
           const onceki = kopya[ih.gun][y]; kopya[ih.gun][y] = p.id;
-          // aynı gün başka yuvada ise vazgeç
+          // aynı gün başka nöbet branşında ise vazgeç
           const cakisma = yuvalar.some(s => s !== y && kopya[ih.gun][s] === p.id);
           const c = cakisma ? Infinity : denetle(kopya, H).toplam;
           kopya[ih.gun][y] = onceki;
@@ -234,7 +234,7 @@ const NobetCore = (() => {
   }
 
   // Modül 1'deki planlanan nöbetlerden (24 saatlik eşdeğer) listeye yazılacak tam sayı nöbet adetlerini çıkarır.
-  // İşçi: 12 saatlik adet (planlanan × 2); diğerleri: 24 saatlik nöbet. Toplam, yuvaların gerektirdiği nöbet sayısına eşitlenir.
+  // İşçi: 12 saatlik adet (planlanan × 2); diğerleri: 24 saatlik nöbet. Toplam, nöbet branşlarının gerektirdiği nöbet sayısına eşitlenir.
   function adetHazirla(kisiler, gun) {
     const isci = kisiler.filter(k => k.grup === 'isci'), diger = kisiler.filter(k => k.grup !== 'isci');
     isci.forEach(k => { k.yarim = Math.max(0, Math.round((k.planlanan || 0) * 2)); k.adet = 0; });

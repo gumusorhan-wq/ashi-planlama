@@ -2,7 +2,7 @@
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
   const N2_SEKME = [['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Paylaşım / çıktı']];
-  const IHLAL_AD = {eksik: 'Boş yuva', yetenek: 'Yuvaya uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı'};
+  const IHLAL_AD = {eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
   const n2Ist = () => S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
   const n2Birim = () => S.plan && S.plan.birimler.find(b => b.ad === n2Ist());
@@ -89,7 +89,7 @@
       <button class="ap-btn" data-act="n2-liste-temizle" ${duz && dp.liste ? '' : 'disabled'}>Listeyi temizle</button>
       <button class="ap-btn" data-act="n2-excel" ${dp.liste ? '' : 'disabled'}>Excel çıktısı</button>
       <span class="ap-sp"></span><button class="ap-btn ${kisiGoruntu ? '' : 'pri'}" data-act="n2-gorunum" data-v="yuva">Gün görünümü</button><button class="ap-btn ${kisiGoruntu ? 'pri' : ''}" data-act="n2-gorunum" data-v="kisi">Kişi görünümü</button></div>
-      ${G.ozet.kalanFark > 0 ? `<div class="ap-note" style="margin-top:8px;color:var(--ap-bad)">Modül 1'deki planlanan nöbetler yuvaları dolduramıyor: ${G.ozet.kalanFark} nöbet açık kalır (Modül 1'de personel/azami nöbeti gözden geçirin).</div>` : ''}
+      ${G.ozet.kalanFark > 0 ? `<div class="ap-note" style="margin-top:8px;color:var(--ap-bad)">Modül 1'deki planlanan nöbetler nöbet branşları dolduramıyor: ${G.ozet.kalanFark} nöbet açık kalır (Modül 1'de personel/azami nöbeti gözden geçirin).</div>` : ''}
       <div style="margin-top:8px">${dp.liste ? `Ceza puanı <b>${d.toplam}</b> · ${ozetIh || '<span style="color:var(--ap-ok)"><b>Hiç kural ihlali yok</b></span>'} ${d.say.adet ? `· Nöbet sayısı farkı olan kişi: <b>${d.say.adet}</b>` : ''}` : '<span class="ap-note">Henüz liste yok. Önce istek takvimini doldurun, sonra butona basın.</span>'}</div></div>
       <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 sa.)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz (12)</th><th>Sürücü gece (12)</th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>
       <div class="ap-card"><h2>Kişi başına nöbet</h2>${tabloHtml(['Personel', 'Branş', 'Hedef (Modül 1)', 'Listede'], sayim.map(({k, birim, hedef}) => [esc(k.ad), k.brans || '', hedef, `<span class="${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(birim)}</span>`]))}</div>`;
@@ -116,7 +116,7 @@
     return `<div class="ap-card"><h2>İstasyon paketi</h2>
       <p class="ap-note">Planlama birimi, istasyon için kişi listesini, planlanan nöbet sayılarını ve izin aralıklarını <b>paket</b> olarak dışa aktarır (TC, telefon ve sağlık bilgisi paketlere yazılmaz). İstasyon sorumlusu paketi kendi Modül 2'sinde açar, istekleri girer, nöbet listesini oluşturur ve doldurulmuş paketi geri gönderir; planlama birimi paketi içe aktarınca liste burada görünür.</p>
       <div class="ap-row"><button class="ap-btn pri" data-act="n2-paket-al">Bu istasyonun paketini indir (.json)</button><button class="ap-btn" data-act="n2-paket-yukle" ${duz ? '' : 'disabled'}>Paket yükle</button></div></div>
-      <div class="ap-card"><h2>ASOS'a giriş için çıktı</h2><p class="ap-note">Nöbet listeleri ASOS'a girilir; oradan alınan <b>Nöbet Listesi Raporu</b>, Modül 1'de sürücülük tespiti ve arşiv istatistikleri için kullanılır. Modül 2 çıktısı Excel olarak (gün × yuva ve kişi × gün sayfaları) alınır.</p>
+      <div class="ap-card"><h2>ASOS'a giriş için çıktı</h2><p class="ap-note">Nöbet listeleri ASOS'a girilir; oradan alınan <b>Nöbet Listesi Raporu</b>, Modül 1'de sürücülük tespiti ve arşiv istatistikleri için kullanılır. Modül 2 çıktısı Excel olarak (gün × nöbet branşı ve kişi × gün sayfaları) alınır.</p>
       <div class="ap-row"><button class="ap-btn" data-act="n2-excel" ${dp.liste ? '' : 'disabled'}>Excel çıktısı</button></div></div>`;
   }
   function n2Excel(b) {

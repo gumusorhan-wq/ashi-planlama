@@ -207,12 +207,12 @@ const APCore = (() => {
     return {gun, ihtiyac, satir, gruplar, kapasite, azamiKap, fark: r2(fazlaH - unmetH), fazlaH, farkAzami: unmetA > EPS ? -unmetA : r2(azamiKap - ihtiyac), durum, tamHedef: tam, hedefAcik, ihtiyacKisi, kalanAcik: r2(hedefAcik - ihtiyacKisi * tam), ihtiyacTur,
       slot: {dem, hedef: H, azami: A, supH, supA}, acik: H.rem};
   }
-  // Grup yetenekleri ve yuva akışı. Yuvalar: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
-  // ATT hiçbir koşulda ekip şefi yuvasına girmez; ekip şefi nöbetlerini doktor ve AABT tutar.
+  // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
+  // ATT hiçbir koşulda ekip şefi nöbet branşına girmez; ekip şefi nöbetlerini doktor ve AABT tutar.
   const GRUPLAR = ['dok', 'isci', 'ke', 'ka', 'ysp', 'sy'];
   const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
   const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (sürücü dahil)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
-  // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) yuvaları doldurur; ATT geri kalan yuvaları doldurur.
+  // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) nöbet branşları doldurur; ATT geri kalan nöbet branşları doldurur.
   // Böylece AABT'nin hedef nöbetleri tam kullanılır, fazlalık ATT'de görünür (bir ATT bir ay dışarı çıkabilir).
   function akis(sup, dem) {
     const rem = {...dem}, fill = {}, fazla = {};
@@ -248,7 +248,7 @@ const APCore = (() => {
   function grupBelirle(k, esik, ayar) {
     if (k.sinif === 'doktor') return 'dok';
     if (k.sinif === 'isci') return 'isci';
-    if (kadroTip(k) === 'AABT') return surucuDurumu(k, esik).tip === 'surucu' ? 'ka' : 'ke';    // AABT de her yuvaya girmez: sürücü yuvası yalnızca nöbet listelerinde sürücü olarak nöbet tuttuğu doğrulananlara açılır
+    if (kadroTip(k) === 'AABT') return surucuDurumu(k, esik).tip === 'surucu' ? 'ka' : 'ke';    // AABT de her nöbet branşına girmez: sürücü nöbet branşı yalnızca nöbet listelerinde sürücü olarak nöbet tuttuğu doğrulananlara açılır
     return surucuDurumu(k, esik).tip === 'surucu' ? 'sy' : 'ysp';    // ATT: yalnızca nöbet listelerinde sürücü olarak nöbet tuttuğu doğrulanırsa sürücü + YSP; aksi halde yalnız YSP (ekip şefi olamaz)
   }
   // Nöbet rolü sınıflama: nöbet kayıtlarındaki ekip şefi / YSP / sürücü saatlerinden
