@@ -214,7 +214,7 @@
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('talep-') && a !== 'modul') return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('talep-') && a !== 'modul') return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
@@ -269,6 +269,7 @@
       case 'arsiv-ay': { const l = S.arsivSecili = S.arsivSecili || []; const i = l.indexOf(v); if (i >= 0) l.splice(i, 1); else l.push(v); break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
+      case 'arstat-sekme': S.arstatSekme = v; break;
       case 'arsiv-excel': arsivExcel(); return true;
       default: return false;
     }

@@ -154,28 +154,30 @@
       mat: Object.keys(mat).sort(trCollator.compare).map(ad => [esc(ad), ...BRANSLAR.map(b => mat[ad][b] || 0), BRANSLAR.reduce((x, b) => x + (mat[ad][b] || 0), 0)])};
   }
   function gercekKartlar() {
-    const G = gercekIstatistik(); if (!G.sec.length) return '';
-    return `<div class="ap-card"><h2>Gerçekleşen nöbet — planlananla karşılaştırma</h2><p class="ap-note">Nöbet Listesi Raporundan: istasyonda fiilen tutulan nöbet (24 saatlik; idari/mesai kayıtları hariç). Fark = gerçekleşen − planlanan (planı arşivlenmiş aylar için). Seçilen aylar: ${G.sec.map(ayAd).join(', ')}.</p>${tabloHtml(['İstasyon', 'Ay', 'Planlanan', 'Gerçekleşen nöbet', 'Fark', 'Nöbet tutan kişi-ay'], G.ist)}</div>
-      <div class="ap-card"><h2>Gerçekleşen fazla nöbet</h2><p class="ap-note">Kişinin o ay tuttuğu nöbet, standart aylık hedefinin (izin ve muafiyet düşülmeden) üstündeyse fazla sayılır. Kadro istasyonu başlığı altında toplanır.</p>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], G.faz)}</div>
-      <div class="ap-card"><h2>Kadrosu dışındaki istasyonlarda tutulan nöbetler</h2><p class="ap-note">Hangi istasyona hangi branştan kişi gelip nöbet tuttu (kişi-ay).</p>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], G.mat)}<h2 style="margin-top:14px">Liste</h2>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Nöbet tuttuğu istasyon', 'Nöbet', 'Aylar'], G.dis)}</div>`;
+    const G = gercekIstatistik(); if (!G.sec.length) return null;
+    const k = {};
+    k.gist = `<div class="ap-card"><h2>Gerçekleşen nöbet — planlananla karşılaştırma</h2><p class="ap-note">Nöbet Listesi Raporundan: istasyonda fiilen tutulan nöbet (24 saatlik; idari/mesai kayıtları hariç). Fark = gerçekleşen − planlanan (planı arşivlenmiş aylar için). Seçilen aylar: ${G.sec.map(ayAd).join(', ')}.</p>${tabloHtml(['İstasyon', 'Ay', 'Planlanan', 'Gerçekleşen nöbet', 'Fark', 'Nöbet tutan kişi-ay'], G.ist)}</div>`;
+    k.gfaz = `<div class="ap-card"><h2>Gerçekleşen fazla nöbet</h2><p class="ap-note">Kişinin o ay tuttuğu nöbet, standart aylık hedefinin (izin ve muafiyet düşülmeden) üstündeyse fazla sayılır. Kadro istasyonu başlığı altında toplanır.</p>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], G.faz)}</div>`;
+    k.gdis = `<div class="ap-card"><h2>Kadrosu dışındaki istasyonlarda tutulan nöbetler</h2><p class="ap-note">Hangi istasyona hangi branştan kişi gelip nöbet tuttu (kişi-ay).</p>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], G.mat)}<h2 style="margin-top:14px">Liste</h2>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Nöbet tuttuğu istasyon', 'Nöbet', 'Aylar'], G.dis)}</div>`;
+    return k;
   }
   function arstatHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
     const aylar = [...new Set([...Object.keys(S.arsivVeri), ...Object.keys(S.gercekVeri || {})])].sort();
     if (!aylar.length) return '<div class="ap-card ap-empty"><h2>Arşivde ay yok</h2><p>Önce "Arşiv" sayfasından aylık planı arşive kaydedin ya da Nöbet Listesi Raporu yükleyin.</p></div>';
-    const st = arsivIstatistik();
+    const st = arsivIstatistik(), gk = gercekKartlar();
+    const kartlar = {seyir: `<div class="ap-card"><h2>Aylara göre seyir (toplam)</h2>${tabloHtml(['Ay', 'İhtiyaç', 'Planlanan', 'Kapasite', 'Çıkan kişi', 'Gelen kişi', 'Fazla nöbet', 'Personel önerilen ist.'], st.seyir)}</div>`, ist: `<div class="ap-card"><h2>İstasyon özeti (seçilen aylar toplamı)</h2><p class="ap-note">Çıkan/gelen: kişi-ay (bir kişi 3 ay çıktıysa 3). Fazla nöbet: kişilerin hedeflerinin üstünde yazılan nöbetlerin toplamı.</p>${tabloHtml(['İstasyon', 'Açık ay', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Fazla nöbetli kişi-ay', 'Personel önerilen ay', 'Ekip OF ay'], st.ist)}</div>`, cik: `<div class="ap-card"><h2>Çıkan personel — kaç ay çıktı</h2>${tabloHtml(['Ad soyad', 'Branş', 'Çıktığı istasyon', 'Gittiği yer', 'Ay sayısı', 'Aylar'], st.cikSat)}</div>`, gel: `<div class="ap-card"><h2>Hangi istasyona hangi branştan personel geldi</h2>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], st.matSat)}
+        <h2 style="margin-top:14px">Gelen personel listesi</h2>${tabloHtml(['Ad soyad', 'Branş', 'Geldiği istasyon', 'Gittiği (gelen) istasyon', 'Ay sayısı', 'Aylar'], st.gelSat)}</div>`, faz: `<div class="ap-card"><h2>Fazla nöbet alan kişiler</h2>${tabloHtml(['Ad soyad', 'Branş', 'İstasyon', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], st.fazSat)}</div>`};
+    const sek = [['seyir', 'Aylara göre seyir'], ['ist', 'İstasyon özeti'], ['cik', 'Çıkan personel'], ['gel', 'Gelen personel'], ['faz', 'Fazla nöbet alanlar'], ...(gk ? [['gist', 'Gerçekleşen nöbet'], ['gfaz', 'Gerçekleşen fazla nöbet'], ['gdis', 'Kadro dışı nöbet']] : [])];
+    if (gk) Object.assign(kartlar, gk);
+    const aktif = sek.some(x => x[0] === S.arstatSekme) ? S.arstatSekme : 'seyir';
     return `<div class="ap-card"><h2>İstatistik — dönem ve istasyon seçimi</h2>
       <div class="ap-row">${aylar.map(a => `<label class="ap-note"><input type="checkbox" data-act="arsiv-ay" data-v="${a}" ${(S.arsivSecili || []).includes(a) ? 'checked' : ''}> ${ayAd(a)}</label>`).join(' ')}
       <button class="ap-btn sm" data-act="arsiv-ay-hepsi">Tümü</button><button class="ap-btn sm" data-act="arsiv-ay-hic">Hiçbiri</button></div>
       <div class="ap-row" style="margin-top:8px"><label class="ap-note">İstasyon <select class="ap-sel" data-act="arsiv-ist"><option value="">Tüm istasyonlar</option>${st.adlar.map(a => `<option ${a === S.arsivIst ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></label>
       <button class="ap-btn" data-act="arsiv-excel">Excel'e aktar</button><span class="ap-note">${(S.arsivSecili || []).filter(a => aylar.includes(a)).length} ay seçili</span></div></div>
-      ${gercekKartlar()}
-      <div class="ap-card"><h2>Aylara göre seyir (toplam)</h2>${tabloHtml(['Ay', 'İhtiyaç', 'Planlanan', 'Kapasite', 'Çıkan kişi', 'Gelen kişi', 'Fazla nöbet', 'Personel önerilen ist.'], st.seyir)}</div>
-      <div class="ap-card"><h2>İstasyon özeti (seçilen aylar toplamı)</h2><p class="ap-note">Çıkan/gelen: kişi-ay (bir kişi 3 ay çıktıysa 3). Fazla nöbet: kişilerin hedeflerinin üstünde yazılan nöbetlerin toplamı.</p>${tabloHtml(['İstasyon', 'Açık ay', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Fazla nöbetli kişi-ay', 'Personel önerilen ay', 'Ekip OF ay'], st.ist)}</div>
-      <div class="ap-card"><h2>Çıkan personel — kaç ay çıktı</h2>${tabloHtml(['Ad soyad', 'Branş', 'Çıktığı istasyon', 'Gittiği yer', 'Ay sayısı', 'Aylar'], st.cikSat)}</div>
-      <div class="ap-card"><h2>Hangi istasyona hangi branştan personel geldi</h2>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], st.matSat)}
-        <h2 style="margin-top:14px">Gelen personel listesi</h2>${tabloHtml(['Ad soyad', 'Branş', 'Geldiği istasyon', 'Gittiği (gelen) istasyon', 'Ay sayısı', 'Aylar'], st.gelSat)}</div>
-      <div class="ap-card"><h2>Fazla nöbet alan kişiler</h2>${tabloHtml(['Ad soyad', 'Branş', 'İstasyon', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], st.fazSat)}</div>`;
+      <div class="ap-subnav ap-noprint">${sek.map(([v, t]) => `<button class="${aktif === v ? 'on' : ''}" data-act="arstat-sekme" data-v="${v}">${t}</button>`).join('')}</div>
+      ${kartlar[aktif]}`;
   }
   function arsivExcel() {
     const st = arsivIstatistik(), wb = XLSX.utils.book_new(), temiz = r => r.map(c => typeof c === 'string' ? c.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"') : c);
