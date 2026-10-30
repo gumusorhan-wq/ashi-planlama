@@ -219,7 +219,7 @@
     const opts = k => `<option value="">— (kaldır)</option>${birimler.map(b => `<option ${b.ad === k.gorev.hedef ? 'selected' : ''}>${esc(b.ad)}</option>`).join('')}`;
     const rows = gk.map(k => {
       const eng = C.gorevlendirmeEngeli(k, ayIlk()), dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
-      return `<tr data-ara="${esc(C.TR([k.ad, k.birim, k.gorev.hedef || '', k.gorev.yer || '', k.unvan].join(' ')))}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
+      return `<tr data-ara="${esc(C.TR([k.ad, k.birim, k.gorev.hedef || '', k.gorev.yer || '', k.unvan].join(' ')))}" data-kay="${esc(k.birim)}" data-hed="${esc(k.gorev.hedef || '')}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${duz ? '' : 'disabled'}>${opts(k)}</select>${k.gorev.hedef ? '' : `<div class="ap-note">${esc(k.gorev.yer || '')}</div>`}</td>
       <td style="min-width:235px"><input class="ap-in w" style="min-width:225px;font-variant-numeric:tabular-nums" title="${esc(k.gorev.tarih || '')}" data-id="${k.id}" data-f="gTarih" value="${esc(k.gorev.tarih || '')}" ${duz ? '' : 'disabled'}></td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${duz ? '' : 'disabled'}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === (k.gorev.yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
@@ -248,7 +248,8 @@
 `;
     const liste = `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">Görevlendirmeler (${gk.length})</h2>
       <input class="ap-in" list="ap-kisi-list" id="ap-g-kisi" placeholder="Kişi ara (listeyi süzer) / seç…" title="Yazdıkça aşağıdaki görevlendirme listesi ad, kaynak ve hedefe göre süzülür; listeden bir kişi seçip yanındaki istasyonla Görevlendir diyerek yeni görevlendirme yapabilirsiniz"><datalist id="ap-kisi-list">${S.plan.kayitlar.filter(k => !k.gorev || !k.gorev.hedef).slice(0, 2000).map(k => `<option value="${esc(k.ad)}">`).join('')}</datalist>
-      <select class="ap-sel" id="ap-g-hedef">${birimler.map(b => `<option>${esc(b.ad)}</option>`).join('')}</select>
+      <label class="ap-note" title="Seçilen istasyondan görevli çıkanlar ve o istasyona gelenler listelenir">İstasyon süz <select class="ap-sel" id="ap-g-ist"><option value="">Tümü</option>${birimler.map(b => `<option>${esc(b.ad)}</option>`).join('')}</select></label>
+      <span class="ap-note">Yeni görevlendirme hedefi:</span><select class="ap-sel" id="ap-g-hedef">${birimler.map(b => `<option>${esc(b.ad)}</option>`).join('')}</select>
       <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div></div>`;
     return nav + ({deg: degerlendirme, rot: sekme === 'rot' ? rotasyonHtml() : '', ozet, list: liste}[sekme] || degerlendirme);
