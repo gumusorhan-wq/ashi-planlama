@@ -90,3 +90,12 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .n2art{color:var(--ap-ok);font-weight:700}.n2eks{color:var(--ap-bad);font-weight:700}b.n2d{color:var(--ap-pri)}
 .ap-t th.num{text-align:right}.ap-t td.num,.ap-t th.num{padding-left:18px;white-space:nowrap}
 .ap-logo{height:56px;width:auto;flex:none;display:block}
+.ap-popwrap{position:relative;display:inline-block}.ap-pop{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:340px;max-width:min(560px,92vw);background:var(--ap-card);border:1px solid var(--ap-line);border-radius:12px;padding:12px;box-shadow:0 12px 32px rgba(0,0,0,.28)}
+.ap-poph{font-size:12px;letter-spacing:.06em;color:var(--ap-pri)}.ap-popalt{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:8px;border-top:1px solid var(--ap-line)}
+.ap-yil{border:1px solid var(--ap-line);border-radius:10px;padding:8px;margin-top:8px}.ap-yilbas{display:flex;justify-content:space-between;align-items:center}.ap-yilbtn{background:none;border:0;font:inherit;color:var(--ap-ink);cursor:pointer;display:flex;gap:8px;align-items:center;font-size:15px}
+.ap-aygrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}.ap-aybtn{font:inherit;font-weight:600;padding:9px 0;border-radius:8px;border:1px solid var(--ap-line);background:var(--ap-bg);color:var(--ap-mut);cursor:pointer}.ap-aybtn[disabled]{opacity:.45;cursor:not-allowed}
+.ap-aybtn.mv{border-color:var(--ap-pri);color:var(--ap-pri);background:var(--ap-card)}.ap-aybtn.sec{background:var(--ap-pri);border-color:var(--ap-pri);color:#fff}
+.ap-lg{display:inline-block;width:11px;height:11px;border-radius:3px;border:2px solid var(--ap-pri);vertical-align:-1px}.ap-lg.sec{background:var(--ap-pri)}
+.ap-pop-ist{width:min(520px,92vw)}.ap-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;max-height:190px;overflow:auto}.ap-chip{font:inherit;padding:6px 12px;border-radius:99px;border:1px solid var(--ap-line);background:var(--ap-bg);color:var(--ap-ink);cursor:pointer}
+.ap-chip.sec{background:var(--ap-pri);border-color:var(--ap-pri);color:#fff}.ap-chip.kis{border-color:var(--ap-pri);color:var(--ap-pri)}
+.ap-ilist{max-height:220px;overflow:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:2px 12px;border-top:1px solid var(--ap-line);padding-top:6px}.ap-ilist label{display:flex;gap:6px;align-items:center;padding:3px 2px;cursor:pointer}

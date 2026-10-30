@@ -36,7 +36,7 @@ function mount(root, opts = {}) {
   const depo = opts.depolama || varsayilanDepo();
   const S = {
     rol: (opts.kullanici && opts.kullanici.rol) || (opts.salt_okur ? 'salt_okur' : 'planlayici'),
-    y: 0, m: 0, plan: null, sayfa: 'pano', ist: '', ayar: null, filtre: {q: '', durum: '', birim: '', sinif: ''}, modal: null, planAnahtarlari: [], toastlar: [], rotKaynak: 'fazla', gorevSekme: 'deg', pSayfa: 0, pBoyut: 50, modul: 1, n2: {ist: '', sekme: 'plan', gorunum: 'yuva', oneri: null, kural: {}, sonuc: null}, arsivVeri: null, yuklemeler: null, arsivSecili: null, arsivIst: ''
+    y: 0, m: 0, plan: null, sayfa: 'pano', ist: '', ayar: null, filtre: {q: '', durum: '', birim: '', sinif: ''}, modal: null, planAnahtarlari: [], toastlar: [], rotKaynak: 'fazla', gorevSekme: 'deg', pSayfa: 0, pBoyut: 50, modul: 1, n2: {ist: '', sekme: 'plan', gorunum: 'yuva', oneri: null, kural: {}, sonuc: null}, arsivVeri: null, yuklemeler: null, arsivIstler: [], arstatAc: '', arstatAra: '', arstatYil: {}, arsivSecili: null, arsivIst: ''
   };
   const bugun = new Date(), sonraki = new Date(Date.UTC(bugun.getUTCFullYear(), bugun.getUTCMonth() + 1, 1));
   S.y = sonraki.getUTCFullYear(); S.m = sonraki.getUTCMonth() + 1;      // planlama bir sonraki ay içindir

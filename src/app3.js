@@ -690,9 +690,14 @@
     } catch (er) { console.error(er); toast('Hata: ' + er.message); }
     render();
   });
+  // Açık seçim penceresi (aylar / istasyonlar): boşluğa tıklayınca ya da Esc ile kapanır
+  document.addEventListener('click', e => { if (S.arstatAc && root.isConnected && !e.target.closest('[data-pop],.ap-pop')) { S.arstatAc = ''; render(); } }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.arstatAc) { S.arstatAc = ''; render(); } });
   // Görevlendirmeler listesini yazdıkça süz (yeniden çizmeden)
   root.addEventListener('input', e => {
-    const t = e.target; if (!t || (t.id !== 'ap-g-kisi' && t.id !== 'ap-g-ist')) return;
+    const t = e.target;
+    if (t && t.id === 'ap-ist-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(); root.querySelectorAll('.ap-pop-ist [data-ara]').forEach(x => { x.style.display = !q || x.dataset.ara.includes(q) ? '' : 'none'; }); return; }
+    if (!t || (t.id !== 'ap-g-kisi' && t.id !== 'ap-g-ist')) return;
     const q = C.TR((root.querySelector('#ap-g-kisi') || {}).value || '').trim(), ist = (root.querySelector('#ap-g-ist') || {}).value || '';
     root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!ist || r.dataset.kay === ist || r.dataset.hed === ist) ? '' : 'none'; });
   });

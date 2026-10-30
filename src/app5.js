@@ -266,10 +266,16 @@
         toast(`${n} ay arşive eklendi.`); break;
       }
       case 'arsiv-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} arşivi silinsin mi?`)) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
-      case 'arsiv-ay': { const l = S.arsivSecili = S.arsivSecili || []; const i = l.indexOf(v); if (i >= 0) l.splice(i, 1); else l.push(v); break; }
+      case 'arsiv-ay': { const l = [...new Set(S.arsivSecili || [])]; S.arsivSecili = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
       case 'arstat-sekme': S.arstatSekme = v; break;
+      case 'arstat-pop': S.arstatAra = ''; S.arstatAc = S.arstatAc === v ? '' : v; if (S.arstatAc === 'ist') setTimeout(() => { const i = root.querySelector('#ap-ist-ara'); if (i) i.focus(); }, 0); break;
+      case 'arstat-yil': S.arstatYil[v] = !(S.arstatYil[v] != null ? S.arstatYil[v] : false); break;
+      case 'arstat-yil-hepsi': { const l = Object.keys(S.arsivVeri || {}).concat(Object.keys(S.gercekVeri || {})).filter((x, i, ar) => x.slice(0, 4) === v && ar.indexOf(x) === i), sec = S.arsivSecili = S.arsivSecili || [], hepsi = l.every(x => sec.includes(x)); S.arsivSecili = hepsi ? sec.filter(x => !l.includes(x)) : [...new Set([...sec, ...l])]; break; }
+      case 'arstat-ilce': { const l = istAdlari().filter(a => C.ilceAdi(a) === v), sec = S.arsivIstler = S.arsivIstler || [], hepsi = l.every(a => sec.includes(a)); S.arsivIstler = hepsi ? sec.filter(a => !l.includes(a)) : [...new Set([...sec, ...l])]; break; }
+      case 'arstat-ist-tumu': S.arsivIstler = istAdlari(); break;
+      case 'arstat-ist-temizle': S.arsivIstler = []; break;
       case 'arsiv-excel': arsivExcel(); return true;
       default: return false;
     }
@@ -277,7 +283,7 @@
   }
   async function ekChange(t) {
     const a = t.dataset.act, n = t.dataset.n2;
-    if (a === 'arsiv-ist') { S.arsivIst = t.value; return true; }
+    if (a === 'arstat-ist') { const l = S.arsivIstler = S.arsivIstler || [], v = t.dataset.v, i = l.indexOf(v); if (t.checked && i < 0) l.push(v); else if (!t.checked && i >= 0) l.splice(i, 1); return true; }
     if (a === 'arsiv-ay') return false;
     if (!n) return false;
     const b = S.plan && n2Birim();

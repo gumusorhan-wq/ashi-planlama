@@ -112,10 +112,10 @@
 
   // ---- istatistik: seçilen aylar ----
   function arsivIstatistik() {
-    const sec = (S.arsivSecili || []).filter(a => S.arsivVeri[a]).sort(), f = S.arsivIst, ayN = sec.length;
+    const sec = (S.arsivSecili || []).filter(a => S.arsivVeri[a]).sort(), ayN = sec.length;
     const recs = sec.map(a => S.arsivVeri[a]), adlar = new Set();
     recs.forEach(r => Object.keys(r.ist).forEach(a => adlar.add(a)));
-    const ister = ad => !f || ad === f;
+    const ister = ad => !(S.arsivIstler || []).length || S.arsivIstler.includes(ad);
     const seyir = recs.map(r => { const t = arsivToplam(r); return [ayAd(r.ay), t.ihtiyac, t.planlanan, t.kapasite, t.cikan, t.gelen, t.fazla, t.oner]; });
     const ist = [...adlar].filter(ister).sort(trCollator.compare).map(ad => {
       const o = {ad, ay: 0, ihtiyac: 0, planlanan: 0, cikan: 0, gelen: 0, fazla: 0, fazlaKisi: 0, oner: 0, of: 0};
@@ -138,7 +138,7 @@
   }
   // Gerçekleşen nöbetler (Nöbet Listesi Raporundan): planlananla karşılaştırma, fazla nöbet, kadrosu dışında tutulan nöbet
   function gercekIstatistik() {
-    const g = S.gercekVeri || {}, f = S.arsivIst, sec = (S.arsivSecili || []).filter(a => g[a]).sort(), ister = ad => !f || ad === f;
+    const g = S.gercekVeri || {}, sec = (S.arsivSecili || []).filter(a => g[a]).sort(), ister = ad => !(S.arsivIstler || []).length || S.arsivIstler.includes(ad);
     const ist = new Map(), faz = new Map(), dis = new Map(), mat = {};
     sec.forEach(a => {
       const rec = g[a], pl = S.arsivVeri && S.arsivVeri[a];
@@ -161,6 +161,37 @@
     k.gdis = `<div class="ap-card"><h2>Kadrosu dışındaki istasyonlarda tutulan nöbetler</h2><p class="ap-note">Hangi istasyona hangi branştan kişi gelip nöbet tuttu (kişi-ay).</p>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], G.mat)}<h2 style="margin-top:14px">Liste</h2>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Nöbet tuttuğu istasyon', 'Nöbet', 'Aylar'], G.dis)}</div>`;
     return k;
   }
+  // ---- seçim pencereleri: aylar (yıl yıl) ve istasyonlar (ilçe bazlı toplu seçim); boşluğa tıklayınca kapanır ----
+  const AY_KISA = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+  const ilceGoster = ad => { const t = ad.replace(/\s+\d+.*$/, '').trim().toLocaleLowerCase('tr-TR'); return t.charAt(0).toLocaleUpperCase('tr-TR') + t.slice(1); };
+  function istAdlari() {
+    const k = new Set(); (S.plan ? S.plan.birimler : []).forEach(b => { if (b.tur === 'istasyon') k.add(b.ad); });
+    Object.values(S.arsivVeri || {}).forEach(r => Object.keys(r.ist).forEach(a => k.add(a)));
+    return [...k].sort(trCollator.compare);
+  }
+  function aySecimHtml(aylar) {
+    const sec = [...new Set(S.arsivSecili || [])].filter(a => aylar.includes(a)), yillar = [...new Set([...aylar.map(a => +a.slice(0, 4)), ...(S.plan ? [S.y] : [])])].sort((a, b) => b - a);
+    const etiket = !sec.length ? 'Ay seçilmedi' : sec.length === 1 ? ayAd(sec[0]) : `${sec.length} ay seçili`, acik = S.arstatAc === 'ay';
+    const yilHtml = y => {
+      const var_ = aylar.filter(a => +a.slice(0, 4) === y), ac = S.arstatYil[y] != null ? S.arstatYil[y] : y === yillar[0];
+      return `<div class="ap-yil"><div class="ap-yilbas"><button class="ap-yilbtn" data-pop data-act="arstat-yil" data-v="${y}"><span>${ac ? '▼' : '▶'}</span> <b>${y}</b> <span class="ap-note">${var_.length} ay</span></button><button class="ap-btn sm" data-pop data-act="arstat-yil-hepsi" data-v="${y}" ${var_.length ? '' : 'disabled'}>Tüm yıl</button></div>
+        ${ac ? `<div class="ap-aygrid">${AY_KISA.map((ad, i) => { const key = `${y}-${C.pad(i + 1)}`, mv = aylar.includes(key), sc = sec.includes(key); return `<button class="ap-aybtn ${sc ? 'sec' : mv ? 'mv' : ''}" data-pop data-act="arsiv-ay" data-v="${key}" ${mv ? '' : 'disabled'}>${ad}</button>`; }).join('')}</div>` : ''}</div>`;
+    };
+    return `<div class="ap-popwrap"><button class="ap-btn" data-pop data-act="arstat-pop" data-v="ay">Aylar: ${etiket} ▾</button>${acik ? `<div class="ap-pop" data-pop><div class="ap-row" style="justify-content:space-between"><b class="ap-poph">ARŞİVDEN AY EKLE</b><span class="ap-note">${sec.length} ay seçili</span></div>${yillar.map(yilHtml).join('')}
+      <div class="ap-popalt"><span class="ap-note"><i class="ap-lg sec"></i> seçili &nbsp; <i class="ap-lg mv"></i> mevcut ay &nbsp; Yıla tıkla → ayları aç</span><button class="ap-btn sm" data-pop data-act="arstat-pop" data-v="">Kapat ✕</button></div></div>` : ''}</div>`;
+  }
+  function istSecimHtml() {
+    const tum = istAdlari(), sec = S.arsivIstler || [], q = C.TR(S.arstatAra || '').trim(), acik = S.arstatAc === 'ist';
+    const gruplar = new Map(); tum.forEach(a => { const k = C.ilceAdi(a), g = gruplar.get(k) || {ad: ilceGoster(a), list: []}; g.list.push(a); gruplar.set(k, g); });
+    const gizle = (...m) => q && !m.some(x => C.TR(x).includes(q));
+    const etiket = !sec.length || sec.length === tum.length ? 'Tüm istasyonlar' : sec.length === 1 ? sec[0] : `${sec.length} istasyon seçili`;
+    return `<div class="ap-popwrap"><button class="ap-btn" data-pop data-act="arstat-pop" data-v="ist">İstasyon: ${esc(etiket)} ▾</button>${acik ? `<div class="ap-pop ap-pop-ist" data-pop>
+      <div class="ap-row"><button class="ap-btn sm" data-pop data-act="arstat-ist-tumu">Tümü</button><button class="ap-btn sm" data-pop data-act="arstat-ist-temizle">Temizle</button><span class="ap-note">${sec.length ? sec.length + ' seçili' : 'seçim yok = tüm istasyonlar'}</span></div>
+      <input class="ap-in w" id="ap-ist-ara" data-pop placeholder="İlçe veya istasyon ara…" value="${esc(S.arstatAra || '')}" autocomplete="off">
+      <div class="ap-chips">${[...gruplar.entries()].map(([k, g]) => { const n = g.list.filter(a => sec.includes(a)).length; return `<button class="ap-chip ${n === g.list.length ? 'sec' : n ? 'kis' : ''}" data-pop data-act="arstat-ilce" data-v="${esc(k)}" data-ara="${esc(C.TR(g.ad + ' ' + g.list.join(' ')))}" ${gizle(g.ad, ...g.list) ? 'style="display:none"' : ''}>${esc(g.ad)} (${g.list.length})</button>`; }).join('')}</div>
+      <div class="ap-ilist">${tum.map(a => `<label data-ara="${esc(C.TR(a))}" ${gizle(a, ilceGoster(a)) ? 'style="display:none"' : ''}><input type="checkbox" data-pop data-act="arstat-ist" data-v="${esc(a)}" ${sec.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div>
+      <div class="ap-popalt"><span class="ap-note">İlçe düğmesi o ilçenin tüm istasyonlarını seçer / kaldırır</span><button class="ap-btn sm" data-pop data-act="arstat-pop" data-v="">Kapat ✕</button></div></div>` : ''}</div>`;
+  }
   function arstatHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
     const aylar = [...new Set([...Object.keys(S.arsivVeri), ...Object.keys(S.gercekVeri || {})])].sort();
@@ -172,10 +203,7 @@
     if (gk) Object.assign(kartlar, gk);
     const aktif = sek.some(x => x[0] === S.arstatSekme) ? S.arstatSekme : 'seyir';
     return `<div class="ap-card"><h2>İstatistik — dönem ve istasyon seçimi</h2>
-      <div class="ap-row">${aylar.map(a => `<label class="ap-note"><input type="checkbox" data-act="arsiv-ay" data-v="${a}" ${(S.arsivSecili || []).includes(a) ? 'checked' : ''}> ${ayAd(a)}</label>`).join(' ')}
-      <button class="ap-btn sm" data-act="arsiv-ay-hepsi">Tümü</button><button class="ap-btn sm" data-act="arsiv-ay-hic">Hiçbiri</button></div>
-      <div class="ap-row" style="margin-top:8px"><label class="ap-note">İstasyon <select class="ap-sel" data-act="arsiv-ist"><option value="">Tüm istasyonlar</option>${st.adlar.map(a => `<option ${a === S.arsivIst ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></label>
-      <button class="ap-btn" data-act="arsiv-excel">Excel'e aktar</button><span class="ap-note">${(S.arsivSecili || []).filter(a => aylar.includes(a)).length} ay seçili</span></div></div>
+      <div class="ap-row">${aySecimHtml(aylar)}${istSecimHtml()}<button class="ap-btn" data-act="arsiv-excel">Excel'e aktar</button></div></div>
       <div class="ap-subnav ap-noprint">${sek.map(([v, t]) => `<button class="${aktif === v ? 'on' : ''}" data-act="arstat-sekme" data-v="${v}">${t}</button>`).join('')}</div>
       ${kartlar[aktif]}`;
   }
