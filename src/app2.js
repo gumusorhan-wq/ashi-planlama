@@ -20,8 +20,8 @@
     const onceki = S.m === 1 ? C.iso(S.y - 1, 12, 1).slice(0, 7) : C.iso(S.y, S.m - 1, 1).slice(0, 7);
     const oncekiVar = S.planAnahtarlari.includes('plan:' + onceki);
     return `<div class="ap-card ap-empty"><h2>${ayEtiket()} için plan yok</h2>
-      <p>Planlama her ayın 10-15'inde bir sonraki ay için yapılır. ASOS'tan indirdiğiniz iki personel dosyasını yükleyin:</p>
-      <div class="ap-note" style="margin:6px 0 14px">1) <b>Personel Listesi Raporu</b> (izin, muafiyet, geçici görev tarihleri) &nbsp; 2) <b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi Raporu</b><br>İki dosyayı birlikte seçebilir ya da bu alana sürükleyip bırakabilirsiniz.</div>
+      <p>Planlama her ayın 10-15'inde bir sonraki ay için yapılır. ASOS'tan indirdiğiniz personel dosyalarını yükleyin (2 dosya zorunlu, 3. dosya önerilir):</p>
+      <div class="ap-note" style="margin:6px 0 14px">1) <b>Personel Listesi Raporu</b> (izin, muafiyet, geçici görev tarihleri) &nbsp; 2) <b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi Raporu</b><br>3) <b>Nöbet Listesi Raporu</b> <i>(önerilir)</i>: ATT'lerin sürücü olup olmadığı bu rapordan anlaşılır; yüklenmezse sürücü olanlar "doğrulanmadı" kalır. Önceki aylarda yüklendiyse son 6 ay birlikte değerlendirilir.<br>Dosyaları birlikte seçebilir ya da bu alana sürükleyip bırakabilirsiniz.</div>
       <div class="ap-row" style="justify-content:center">
         <button class="ap-btn pri" data-act="plan-asos" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''}>Personel listelerini yükle</button>
         <button class="ap-btn" data-act="plan-kopya" ${oncekiVar && S.rol !== 'salt_okur' && guncelAy() ? '' : 'disabled'}>Önceki aydan kopyala (${onceki})</button>
