@@ -626,6 +626,7 @@
         case 'sayfa': S.sayfa = v; break;
         case 'liste-surucu': S.filtre = {q: '', durum: '', birim: '', sinif: 'memur', surucu: 'dogrulanmadi'}; S.pSayfa = 0; S.sayfa = 'personel'; break;
         case 'gorev-sekme': S.gorevSekme = v; break;
+        case 'ozet-sekme': S.ozetSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;
         case 'pano-filtre': S.panoFiltre = S.panoFiltre === v ? '' : v; break;
         case 'guncel-ay': { S.y = GUNCEL_Y; S.m = GUNCEL_M; S.ist = ''; await planYukle(); S.sayfa = 'pano'; break; }
