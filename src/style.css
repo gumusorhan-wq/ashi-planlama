@@ -100,7 +100,7 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-chip.sec{background:var(--ap-pri);border-color:var(--ap-pri);color:#fff}.ap-chip.kis{border-color:var(--ap-pri);color:var(--ap-pri)}
 .ap-ilist{max-height:220px;overflow:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:2px 12px;border-top:1px solid var(--ap-line);padding-top:6px}.ap-ilist label{display:flex;gap:6px;align-items:center;padding:3px 2px;cursor:pointer}
 .ap-oku{background:var(--ap-warnbg);color:var(--ap-warn);border-bottom:1px solid var(--ap-line);padding:8px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.ap-t td.num+td:not(.num),.ap-t th.num+th:not(.num){padding-left:30px}
+.ap-t td.num+td:not(.num),.ap-t th.num+th:not(.num){padding-left:56px}
 .ap-ayno{font:inherit;font-weight:600;min-width:30px;padding:1px 10px;border:1px solid var(--ap-line,#cbd5e1);border-radius:999px;background:transparent;color:inherit;cursor:pointer}
 .ap-ayno:hover{background:rgba(14,116,144,.1)}
 .ap-ayliste{margin-top:4px;font-size:12px;opacity:.85;white-space:normal;max-width:260px}
