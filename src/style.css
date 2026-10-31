@@ -64,7 +64,7 @@ table.ap-t{border-collapse:collapse;width:100%;font-size:13px;background:var(--a
 
 /* İstasyon tablosu: sabit sütun genişlikleri, yana taşma yok */
 .ap-tw-ist{overflow-x:auto}
-table.ap-ist{table-layout:fixed;width:100%;min-width:1040px;font-size:12.5px}
+table.ap-ist{table-layout:fixed;width:100%;min-width:1240px;font-size:12.5px}
 .ap-ist th{padding:6px 4px;font-size:11px;white-space:normal;line-height:1.2}
 .ap-ist td{padding:3px 4px;overflow-wrap:anywhere;vertical-align:middle}
 .ap-ist .ap-in,.ap-ist .ap-sel{width:100%;min-width:0;max-width:100%;font-size:12.5px;padding:4px 5px;text-overflow:ellipsis}
@@ -105,7 +105,7 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-ayno:hover{background:rgba(14,116,144,.1)}
 .ap-ayliste{margin-top:4px;font-size:12px;opacity:.85;white-space:normal;max-width:260px}
 .ap-t.dar{width:auto;min-width:55%}.ap-t.dar td,.ap-t.dar th{padding-right:28px}
-.ap-gh{min-width:230px}.ap-gh .ap-sel,.ap-gh .ap-in{width:100%;margin-top:4px}.ap-gh .ap-sel{margin-top:0}
+.ap-gh{min-width:0}.ap-gh .ap-sel,.ap-gh .ap-in{width:100%;margin-top:4px}.ap-gh .ap-sel{margin-top:0}
 .ap-t tr.c td .ap-note{color:inherit;opacity:.85}
 .ap-ist input[data-f=planlanan]{-moz-appearance:auto;appearance:auto;width:78px}
 .ap-ist input[data-f=planlanan]::-webkit-inner-spin-button,.ap-ist input[data-f=planlanan]::-webkit-outer-spin-button{-webkit-appearance:inner-spin-button;opacity:1;margin-left:2px}
