@@ -40,7 +40,7 @@ function mount(root, opts = {}) {
   };
   const bugun = new Date(), sonraki = new Date(Date.UTC(bugun.getUTCFullYear(), bugun.getUTCMonth() + 1, 1));
   S.y = sonraki.getUTCFullYear(); S.m = sonraki.getUTCMonth() + 1;      // planlama bir sonraki ay içindir
-  const GUNCEL_Y = S.y, GUNCEL_M = S.m, guncelAy = () => S.y === GUNCEL_Y && S.m === GUNCEL_M;      // güncel ay dışındaki aylar yalnızca görüntülenir (salt okunur)
+  const GUNCEL_Y = S.y, GUNCEL_M = S.m, BUGUN = new Date(), MEVCUT = BUGUN.getFullYear() * 12 + BUGUN.getMonth() + 1, guncelAy = () => S.y * 12 + S.m >= MEVCUT;      // güncel ay dışındaki aylar yalnızca görüntülenir (salt okunur)
   const olay = (ad, d) => { try { root.dispatchEvent(new CustomEvent('ashiplan:' + ad, {detail: d, bubbles: true})); } catch (e) {} if (opts.olaylar && opts.olaylar[ad]) opts.olaylar[ad](d); };
 
   const anahtar = (y, m) => `plan:${y}-${C.pad(m)}`;

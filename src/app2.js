@@ -322,7 +322,7 @@
 
   function ayarHtml() {
     const D = durumlar(), yon = S.rol === 'yonetici';
-    return `<div class="ap-card"><h2>Durum tablosu</h2><p class="ap-note">Her durumun nöbet ve mesai etkisini ayarlayın. "Nöbet yok": kişi nöbet tutmaz (hedef 0). "Mesai yok": o ay mesai yükümlülüğü yoktur (izinli). Değişiklik yalnızca Yönetici içindir.</p>
+    const tum = `<div class="ap-card"><h2>Durum tablosu</h2><p class="ap-note">Her durumun nöbet ve mesai etkisini ayarlayın. "Nöbet yok": kişi nöbet tutmaz (hedef 0). "Mesai yok": o ay mesai yükümlülüğü yoktur (izinli). Değişiklik yalnızca Yönetici içindir.</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Durum</th><th>Renk</th><th>Nöbet yok</th><th>Mesai yok</th></tr></thead><tbody>${Object.entries(D).map(([k, v]) => `<tr><td>${k}</td><td><input type="color" data-d="${esc(k)}" data-f="renk" value="${v.renk || '#ffffff'}" ${yon ? '' : 'disabled'}></td><td><input type="checkbox" data-d="${esc(k)}" data-f="nobetYok" ${v.nobetYok ? 'checked' : ''} ${yon ? '' : 'disabled'}></td><td><input type="checkbox" data-d="${esc(k)}" data-f="mesaiYok" ${v.mesaiYok ? 'checked' : ''} ${yon ? '' : 'disabled'}></td></tr>`).join('')}</tbody></table></div></div>
       <div class="ap-card"><h2>Hesap ayarları</h2><div class="ap-row"><label>ATT sürücü sayılması için nöbetlerinin sürücü payı bu değerden büyük olmalı (%): <input class="ap-in n" type="number" min="0" max="100" data-ay="surDegilEsik" value="${S.ayar.surDegilEsik}" ${yon ? '' : 'disabled'}></label> <span class="ap-note">Nöbet kaydı olmayan ATT sürücü sayılmaz.</span></div>
       <div class="ap-row"><label>Memur/doktor genel azami nöbet (24 sa.; istasyon sayfasından istasyon bazında değiştirilebilir) <input class="ap-in n" type="number" step="0.5" data-ay="azamiMemur" value="${S.ayar.azamiMemur}" ${yon ? '' : 'disabled'}></label>
@@ -332,6 +332,8 @@
       <p class="ap-note">Yuvarlama: memur ve doktor hedefi yukarı 0,5 adıma, işçi hedefi aşağı tam 12 saatlik nöbete yuvarlanır.</p></div>
       <div class="ap-card"><h2>Yedek</h2><div class="ap-row"><button class="ap-btn" data-act="yedek-al">JSON yedeği al (bu ay)</button><button class="ap-btn" data-act="yedek-yukle" ${salt() ? 'disabled' : ''}>JSON yedeği yükle</button></div>
       <p class="ap-note">Yedek dosyasında kişisel veri bulunur; güvenli yerde saklayın. Şifreli ortak Drive arşivi sonraki sürümde eklenecek.</p></div>`;
+    const p = tum.split(/(?=<div class="ap-card"><h2>)/), sek = [['durum', 'Durum tablosu'], ['hesap', 'Hesap ayarları'], ['yedek', 'Yedek']], a = sek.some(x => x[0] === S.ayarSekme) ? S.ayarSekme : 'durum';
+    return `<div class="ap-subnav ap-noprint">${sek.map(([v, t]) => `<button class="${a === v ? 'on' : ''}" data-act="ayar-sekme" data-v="${v}">${t}</button>`).join('')}</div>` + p[sek.findIndex(x => x[0] === a)];
   }
 
   function sayfaHtml() {

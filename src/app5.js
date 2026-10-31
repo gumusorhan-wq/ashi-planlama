@@ -214,7 +214,7 @@
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && a !== 'modul') return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && a !== 'modul') return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
@@ -277,6 +277,8 @@
         toast('Yükleme kaydı silindi.'); break;
       }
       case 'arsiv-yil': S.arsivYilAc = S.arsivYilAc || {}; S.arsivYilAc[v] = !(S.arsivYilAc[v] != null ? S.arsivYilAc[v] : +v === GUNCEL_Y); break;
+      case 'ayar-sekme': S.ayarSekme = v; break;
+      case 'arsiv-sekme': S.arsivSekme = v; break;
       case 'arstat-sekme': S.arstatSekme = v; break;
       case 'arstat-pop': S.arstatAra = ''; S.arstatAc = S.arstatAc === v ? '' : v; if (S.arstatAc === 'ist') setTimeout(() => { const i = root.querySelector('#ap-ist-ara'); if (i) i.focus(); }, 0); break;
       case 'arstat-yil': S.arstatYil[v] = !(S.arstatYil[v] != null ? S.arstatYil[v] : false); break;
