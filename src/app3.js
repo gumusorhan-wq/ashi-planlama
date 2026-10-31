@@ -566,6 +566,7 @@
       case 'gGerekce': mut(() => { k.gorev.gerekce = v; k.gorev.kaynak = 'manuel'; }, 'Görevlendirme gerekçesi', `${k.ad}: ${v}`); break;
       case 'istek': mut(() => { k.istek = v; }, 'Kişi isteği', `${k.ad}: ${ISTEK[v] || 'Sırayla'}`); break;
       case 'gHedef':
+        if (v === '__yer__') break;
         if (v === '__diger__') { mut(() => { k.gorev = {...(k.gorev || {}), yer: '', hedef: null, diger: true, kaynak: 'manuel', yolluk: (k.gorev && k.gorev.yolluk) || '', tarih: (k.gorev && k.gorev.tarih) || '', gerekce: (k.gorev && k.gorev.gerekce) || ''}; k.durum = 'GEÇİCİ GÖREVDE'; k.durumManuel = true; }, 'Görevlendirme (diğer yer)', k.ad); }
         else gorevlendir(k, v, {yer: v, diger: false});
         break;

@@ -227,7 +227,7 @@
     const ic = ists.filter(x => x.h.ihtiyacTur === 'icerde' || x.h.ihtiyacTur === 'elle').sort((a, b) => b.h.hedefAcik - a.h.hedefAcik);
     const fazla = ists.filter(x => x.h.fazlaVar).sort((a, b) => b.h.fazlaEf - a.h.fazlaEf);
     const gk = S.plan.kayitlar.filter(k => k.gorev && (k.gorev.hedef || k.gorev.yer)).sort((a, b) => trCollator.compare(a.birim, b.birim) || trCollator.compare(a.ad, b.ad));
-    const opts = k => `<option value="">— (kaldır)</option>${birimler.map(b => `<option ${b.ad === k.gorev.hedef ? 'selected' : ''}>${esc(b.ad)}</option>`).join('')}`;
+    const opts = k => `<option value="">— (görevlendirmeyi kaldır)</option>${!k.gorev.hedef && k.gorev.yer ? `<option value="__yer__" selected>Diğer yer: ${esc(k.gorev.yer.length > 40 ? k.gorev.yer.slice(0, 40) + '…' : k.gorev.yer)}</option>` : ''}${birimler.map(b => `<option ${b.ad === k.gorev.hedef ? 'selected' : ''}>${esc(b.ad)}</option>`).join('')}`;
     const rows = gk.map(k => {
       const eng = C.gorevlendirmeEngeli(k, ayIlk()), dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
       return `<tr data-ara="${esc(C.TR([k.ad, k.birim, k.gorev.hedef || '', k.gorev.yer || '', k.unvan].join(' ')))}" data-kay="${esc(k.birim)}" data-hed="${esc(k.gorev.hedef || '')}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
