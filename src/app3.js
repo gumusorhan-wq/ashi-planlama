@@ -637,6 +637,7 @@
         case 'liste-surucu': S.filtre = {q: '', durum: '', birim: '', sinif: 'memur', surucu: 'dogrulanmadi'}; S.pSayfa = 0; S.sayfa = 'personel'; break;
         case 'gorev-sekme': S.gorevSekme = v; break;
         case 'oner-ac': S.onerAc = S.onerAc === v ? '' : v; break;
+        case 'plan-art': { const k = kayit(t.dataset.id); if (!k) break; const yeni = Math.max(0, Math.round((sayi(k.planlanan) + 0.5 * (+v)) * 2) / 2); mut(() => { k.planlanan = yeni; k.kilit = true; }, 'Planlanan nöbet (elle)', `${k.ad}: ${yeni}`); break; }
         case 'rot-sekme': S.rotSekme = v; break;
         case 'ozet-sekme': S.ozetSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;
