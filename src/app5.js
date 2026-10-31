@@ -265,8 +265,9 @@
         }
         toast(`${n} ay arşive eklendi.`); break;
       }
-      case 'arsiv-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} arşivi silinsin mi?`)) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
-      case 'arsiv-ay-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`)) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;
+      case 'arsiv-sil': if (planlamaRol() && confirm(`${ayAd(v)} arşivi silinsin mi?`)) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
+      case 'arstat-aylar': S.arstatAc = S.arstatAc === 'ayno' && S.arstatAyAc === v ? '' : 'ayno'; S.arstatAyAc = v; break;
+      case 'arsiv-ay-sil': if (planlamaRol() && confirm(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`)) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;
       case 'arsiv-ay': { const l = [...new Set(S.arsivSecili || [])]; S.arsivSecili = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
