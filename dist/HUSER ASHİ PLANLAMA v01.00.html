@@ -2443,6 +2443,11 @@ function mount(root, opts = {}) {
       out.push({id: k.id, ad: k.ad, sinif: k.sinif, rol: C.GRUP_AD[grup], kaynak: src.b.ad, uzun: !!src.b.ekipOf, kaynakDurum: src.h.durum, hedef, km, ayniIlce: t ? C.ilceAdi(t.ad) === ilce : false, neden: nedenMetin(k)});
       if (t) { let kalan = hd > 0 ? hd : t.tam; yet.slice().sort((x, y) => t.acik[y] - t.acik[x]).forEach(y => { const u = Math.min(kalan, t.acik[y]); t.acik[y] -= u; kalan -= u; }); }
     }));
+    // İşçi kendi istasyonu dışında tek başına kalamaz: hedef istasyonda başka işçi yoksa ve oraya en az iki işçi gitmiyorsa tek işçi önerilmez
+    const D = durumlar(), isciVar = ad => { const x = ists.find(y => y.b.ad === ad); return !!x && x.h.satir.some(s => s.grup === 'isci' && !s.nobetYok && !(D[s.k.durum] || {}).disarida && s.k.birim === ad); };
+    const gelenIsci = {}; S.plan.kayitlar.forEach(k => { if (k.sinif === 'isci' && gorevAktif(k.gorev) && k.gorev.hedef) gelenIsci[k.gorev.hedef] = (gelenIsci[k.gorev.hedef] || 0) + 1; });
+    out.forEach(o => { if (o.sinif === 'isci' && o.hedef) gelenIsci[o.hedef] = (gelenIsci[o.hedef] || 0) + 1; });
+    out.forEach(o => { if (o.sinif === 'isci' && o.hedef && !isciVar(o.hedef) && gelenIsci[o.hedef] < 2) { gelenIsci[o.hedef]--; o.neden += ' · hedefte tek işçi kalacağı için önerilmedi'; o.hedef = ''; o.km = null; o.ayniIlce = false; } });
     return out;
   }
   function rotasyonHtml() {
