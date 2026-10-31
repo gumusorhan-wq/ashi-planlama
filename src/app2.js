@@ -147,9 +147,10 @@
     const sup = {}; C.GRUPLAR.forEach(g => { sup[g] = 0; });
     h.satir.forEach(s => { if (!s.nobetYok) sup[s.grup] = (sup[s.grup] || 0) + sayi(s.k.planlanan); });
     const H = C.akis(sup, d.dem);
-    const katki = sl => C.GRUPLAR.filter(g => H.fill[g][sl] > 0.001).map(g => `${C.GRUP_AD[g]} ${fmt(H.fill[g][sl])}`).join(' + ') || '—';
+    const KT = [['DOKTOR', ['dok']], ['AABT', ['ke', 'ka']], ['ATT', ['ysp', 'sy']], ['İŞÇİ', ['isci']]];      // kadro sırası: doktor - AABT - ATT (- işçi)
+    const katki = sl => KT.map(([ad, gl]) => [ad, gl.reduce((x, g) => x + (H.fill[g] ? H.fill[g][sl] : 0), 0)]).filter(x => x[1] > 0.001).map(([ad, v]) => `${ad} ${fmt(v)}`).join(' - ') || '—';
     const satir = SL.map(([sl, ad]) => `<div class="r" style="margin:3px 0"><b style="min-width:150px;display:inline-block">${ad}</b> ${fmt(d.dem[sl])} nöbet · dolan <b>${fmt(d.dem[sl] - H.rem[sl])}</b> <span class="ap-note">(${katki(sl)})</span> ${H.rem[sl] > 0.001 ? `<span class="ap-tag ap-t-ih">${fmt(H.rem[sl])} açık</span>` : '<span class="ap-tag ap-t-ok">dolu</span>'}</div>`).join('');
-    const fazla = C.GRUPLAR.filter(g => H.fazla[g] > 0.001).map(g => `<span class="ap-tag ap-t-fz">${C.GRUP_AD[g]}: ${fmt(H.fazla[g])} nöbet fazla</span>`).join(' ');
+    const fazla = KT.map(([ad, gl]) => [ad, gl.reduce((x, g) => x + (H.fazla[g] || 0), 0)]).filter(x => x[1] > 0.001).map(([ad, v]) => `<span class="ap-tag ap-t-fz">${ad}: ${fmt(v)} nöbet fazla</span>`).join(' ');
     return `<div class="ap-card" style="margin-top:8px;padding:10px"><b>Nöbet branşı dengesi (listedeki planlanan nöbetle)</b>${satir}
       ${fazla ? `<div style="margin-top:4px">${fazla} <span class="ap-note">fazla = o gruptaki kişilere yazılan nöbet kendi nöbet branşlarını aşıyor; başka nöbet branşını dolduramaz</span></div>` : ''}
       <div class="ap-note" style="margin-top:4px">Yetenekler: doktor → ekip şefi · işçi → sürücü · AABT (sağlık teknikeri) → ekip şefi, YSP; sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa · ATT (sağlık memuru / teknisyeni) → YSP ve sürücü; ATT ekip şefi nöbet branşına girmez. Önce AABT nöbet branşları doldurur (ekip şefi öncelikli), fazlalık ATT'de görünür.</div></div>`;
