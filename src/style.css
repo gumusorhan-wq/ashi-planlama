@@ -110,3 +110,4 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-ist input[data-f=planlanan]{-moz-appearance:auto;appearance:auto;width:78px}
 .ap-ist input[data-f=planlanan]::-webkit-inner-spin-button,.ap-ist input[data-f=planlanan]::-webkit-outer-spin-button{-webkit-appearance:inner-spin-button;opacity:1;margin-left:2px}
 .ap-t.ap-ferah td,.ap-t.ap-ferah th{padding-top:12px;padding-bottom:12px}.ap-t.ap-ferah td.num+td:not(.num),.ap-t.ap-ferah th.num+th:not(.num){padding-left:80px}
+.ap-tagbtn{border:0;font:inherit;font-weight:700;cursor:pointer}.ap-onerac td{background:rgba(220,38,38,.05);padding:10px 14px}
