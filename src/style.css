@@ -104,3 +104,4 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-ayno{font:inherit;font-weight:600;min-width:30px;padding:1px 10px;border:1px solid var(--ap-line,#cbd5e1);border-radius:999px;background:transparent;color:inherit;cursor:pointer}
 .ap-ayno:hover{background:rgba(14,116,144,.1)}
 .ap-ayliste{margin-top:4px;font-size:12px;opacity:.85;white-space:normal;max-width:260px}
+.ap-t.dar{width:auto;min-width:55%}.ap-t.dar td,.ap-t.dar th{padding-right:28px}
