@@ -164,7 +164,10 @@
       return `<div class="ap-tw"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}<th>Liste</th><th>Hedef</th></tr></thead><tbody>${sayim.map(({k, birim, hedef}) => {
         const p = H.byId.get(k.id), c = [...Array(N)].map((_, i) => { const g = i + 1; let x = ''; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (L[g][t] === k.id) x = NC.KOD[t]; }); return `<td class="n2c ${x ? 'nb' : p.izin.has(g) ? 'iz' : p.istek.has(g) ? 'is' : ''}">${x || (p.izin.has(g) ? 'İ' : p.istek.has(g) ? '✕' : '')}</td>`; }).join('');
         return `<tr><td class="n2n">${esc(k.ad)}</td>${c}<td class="num"><b>${fmt(birim)}</b></td><td class="num ${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(hedef)}</td></tr>`; }).join('')}</tbody></table></div><p class="ap-note">E: ekip şefi · Y: YSP · S: sürücü (24 sa.) · G: sürücü gündüz · A: sürücü gece (12 sa. işçi)</p>`; };
-    return `<div class="ap-card"><h2>Otomatik nöbet listesi</h2>
+    const lSek = [['liste', 'Nöbet listesi'], ['kisi', 'Kişi başına nöbet']], la = lSek.some(x => x[0] === S.n2.altSekme) ? S.n2.altSekme : 'liste';
+    const lNav = `<div class="ap-subnav ap-noprint">${lSek.map(([v, t]) => `<button class="${la === v ? 'on' : ''}" data-act="n2-alt" data-v="${v}">${t}</button>`).join('')}</div>`;
+    const lKisi = `<div class="ap-card"><h2>Kişi başına nöbet</h2>${tabloHtml(['Personel', 'Branş', 'Hedef (Modül 1)', 'Listede'], sayim.map(({k, birim, hedef}) => [esc(k.ad), k.brans || '', hedef, `<span class="${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(birim)}</span>`]))}</div>`;
+    const lListe = `<div class="ap-card"><h2>Otomatik nöbet listesi</h2>
       <div class="ap-row"><label class="ap-note">İki nöbet arası en az <input class="ap-in n" type="number" min="0" max="5" data-n2="kural" data-k="minAra" value="${K.minAra}"> gün boş</label>
       <label class="ap-note">en fazla <input class="ap-in n" type="number" min="1" max="15" data-n2="kural" data-k="maxAra" value="${K.maxAra}"> gün</label>
       <label class="ap-note">yıllık izin öncesi <input class="ap-in n" type="number" min="0" max="10" data-n2="kural" data-k="izinOnce" value="${K.izinOnce}"> gün boşluk</label>
@@ -176,8 +179,8 @@
       <span class="ap-sp"></span><button class="ap-btn ${kisiGoruntu ? '' : 'pri'}" data-act="n2-gorunum" data-v="yuva">Gün görünümü</button><button class="ap-btn ${kisiGoruntu ? 'pri' : ''}" data-act="n2-gorunum" data-v="kisi">Kişi görünümü</button></div>
       ${kap.toplam > 0 ? `<div class="ap-note" style="margin-top:8px;color:var(--ap-bad)"><b>Bu kadroyla ${kap.toplam} nöbet boş kalacak:</b> ${Object.entries(kap.bos).map(([k, n]) => `${NC.YUVA_AD[k]} nöbet branşında ${n}`).join(', ')}. O nöbet branşını tutabilecek yeterli personel yok (ekip şefi: doktor/AABT; sürücü: işçi ya da sürücü teyitli AABT/ATT). Personel isteyin ya da Modül 1'de kişilerin nöbet branşlarını gözden geçirin.</div>` : ''}
       <div style="margin-top:8px">${dp.liste ? `Ceza puanı <b>${d.toplam}</b> · ${ozetIh || '<span style="color:var(--ap-ok)"><b>Hiç kural ihlali yok</b></span>'} ${d.say.adet ? `· Nöbet sayısı farkı olan kişi: <b>${d.say.adet}</b>` : ''}` : '<span class="ap-note">Henüz liste yok. Önce istek takvimini doldurun, sonra butona basın.</span>'}</div></div>
-      <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 sa.)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz (12)</th><th>Sürücü gece (12)</th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>
-      <div class="ap-card"><h2>Kişi başına nöbet</h2>${tabloHtml(['Personel', 'Branş', 'Hedef (Modül 1)', 'Listede'], sayim.map(({k, birim, hedef}) => [esc(k.ad), k.brans || '', hedef, `<span class="${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(birim)}</span>`]))}</div>`;
+      <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 sa.)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz (12)</th><th>Sürücü gece (12)</th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>`;
+    return lNav + (la === 'kisi' ? lKisi : lListe);
   }
 
   // ---- denetim ve öneriler ----
@@ -189,10 +192,13 @@
     const kart = (o, i) => `<div class="ap-card" style="margin:0 0 10px"><div><span class="ap-tag ${o.ihlal.agirlik >= 700 ? 'ap-t-ih' : 'ap-t-fz'}">${IHLAL_AD[o.ihlal.tur]}</span> ${esc(o.ihlal.mesaj)}</div>
       ${o.secenekler.length ? o.secenekler.map((s, j) => `<div class="ap-row" style="margin-top:6px"><span>${s.gun}. gün <b>${NC.YUVA_AD[s.yuva === 'surG' || s.yuva === 'surA' ? 'sur' : s.yuva]}${s.yuva === 'surG' ? ' (gündüz)' : s.yuva === 'surA' ? ' (gece)' : ''}</b>: ${esc(n2Ad(G, s.eski) || 'boş')} → <b>${esc(s.yeniAd)}</b></span><span class="ap-note">ceza −${s.kazanc}</span><button class="ap-btn sm pri" data-act="n2-uygula" data-v="${i}:${j}" ${duz ? '' : 'disabled'}>Uygula</button></div>`).join('') : '<div class="ap-note" style="margin-top:6px">Tek atama değişikliğiyle düzelen seçenek yok; elle takas gerekebilir ya da istek/izin kısıtlarını gözden geçirin.</div>'}</div>`;
     const adetIh = d.ihlal.filter(i => i.tur === 'adet');
-    return `<div class="ap-card"><h2>Denetim özeti</h2><p>Toplam ceza puanı <b>${d.toplam}</b> · ihlal sayısı <b>${d.ihlal.length}</b></p>
+    const dSek = [['ozet', 'Denetim özeti'], ['oner', `Öneriler (${O.oneriler.length})`]], da = dSek.some(x => x[0] === S.n2.altSekme) ? S.n2.altSekme : 'ozet';
+    const dNav = `<div class="ap-subnav ap-noprint">${dSek.map(([v, t]) => `<button class="${da === v ? 'on' : ''}" data-act="n2-alt" data-v="${v}">${t}</button>`).join('')}</div>`;
+    const dOzet = `<div class="ap-card"><h2>Denetim özeti</h2><p>Toplam ceza puanı <b>${d.toplam}</b> · ihlal sayısı <b>${d.ihlal.length}</b></p>
       <div class="ap-row">${Object.entries(d.say).map(([t, n]) => `<span class="ap-tag ${['eksik', 'yetenek', 'izin', 'cakisma', 'dinlenme'].includes(t) ? 'ap-t-ih' : 'ap-t-fz'}">${IHLAL_AD[t]}: ${n}</span>`).join('') || '<span class="ap-tag ap-t-ok">Kural ihlali yok</span>'}</div>
-      ${adetIh.length ? `<div class="ap-note" style="margin-top:8px">Nöbet sayısı farkı: ${adetIh.map(i => esc(i.mesaj)).join(' · ')}</div>` : ''}</div>
-      <div class="ap-card"><h2>Öneriler (${O.oneriler.length})</h2><p class="ap-note">Her ihlal için, atamayı başka kişiyle değiştirdiğinde toplam cezayı en çok düşüren seçenekler. "Uygula" listeyi değiştirir ve denetim yenilenir.</p>${O.oneriler.map(kart).join('') || '<span class="ap-note">Önerilecek bir düzeltme yok.</span>'}</div>`;
+      ${adetIh.length ? `<div class="ap-note" style="margin-top:8px">Nöbet sayısı farkı: ${adetIh.map(i => esc(i.mesaj)).join(' · ')}</div>` : ''}</div>`;
+    const dOner = `<div class="ap-card"><h2>Öneriler (${O.oneriler.length})</h2><p class="ap-note">Her ihlal için, atamayı başka kişiyle değiştirdiğinde toplam cezayı en çok düşüren seçenekler. "Uygula" listeyi değiştirir ve denetim yenilenir.</p>${O.oneriler.map(kart).join('') || '<span class="ap-note">Önerilecek bir düzeltme yok.</span>'}</div>`;
+    return dNav + (da === 'oner' ? dOner : dOzet);
   }
 
   // ---- paylaşım / çıktı ----
@@ -218,7 +224,7 @@
     const b = S.plan ? n2Birim() : null;
     switch (a) {
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
-      case 'n2-sekme': S.n2.sekme = v; break;
+      case 'n2-sekme': S.n2.sekme = v; S.n2.altSekme = ''; break;
       case 'n2-gonder': {
         const T = n2TeklifOzet(b); if (!n2Duzenlenir(b.ad)) break;
         const sorun = [T.fark ? `toplam nöbet gerekenden ${T.fark > 0 ? 'fazla' : 'eksik'} (${fmt(T.toplam)} / ${T.h.ihtiyac})` : '', T.asimSay ? `${T.asimSay} kişide üst sınır aşıldı` : ''].filter(Boolean);
@@ -280,6 +286,7 @@
       }
       case 'arsiv-yil': S.arsivYilAc = S.arsivYilAc || {}; S.arsivYilAc[v] = !(S.arsivYilAc[v] != null ? S.arsivYilAc[v] : +v === GUNCEL_Y); break;
       case 'ayar-sekme': S.ayarSekme = v; break;
+      case 'n2-alt': S.n2.altSekme = v; break;
       case 'arsiv-sekme': S.arsivSekme = v; break;
       case 'arstat-sekme': S.arstatSekme = v; break;
       case 'arstat-pop': S.arstatAra = ''; S.arstatAc = S.arstatAc === v ? '' : v; if (S.arstatAc === 'ist') setTimeout(() => { const i = root.querySelector('#ap-ist-ara'); if (i) i.focus(); }, 0); break;
