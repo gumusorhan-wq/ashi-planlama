@@ -165,7 +165,7 @@
     const g = k.gorev, aktif = dt.disarida || (g && (g.hedef || g.yer));
     if (!aktif) return esc(gorevMetin(k));
     const diger = !!g && !g.hedef && (g.diger || !!g.yer);
-    return `<select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${dis} title="Nereye görevlendirildi? İstasyon, Başhekimlik ve KKM listeden; diğer yerler için Diğer'i seçip yazın"><option value="">— yer seç —</option>${birimler.filter(x => x.ad !== b.ad).map(x => `<option ${g && x.ad === g.hedef ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}<option value="__diger__" ${diger ? 'selected' : ''}>Diğer (yaz)…</option></select>${diger ? `<input class="ap-in w" style="margin-top:4px" data-id="${k.id}" data-f="gYer" value="${esc(g.diger && g.yer === 'Diğer' ? '' : g.yer || '')}" placeholder="İlçe Sağlık Müd., Devlet Hastanesi…" ${dis}>` : ''}${g && (g.hedef || g.yer) && g.tarih ? `<div class="ap-note">${esc(g.tarih)}</div>` : ''}`;
+    return `<div class="ap-gh"><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${dis} title="Nereye görevlendirildi? İstasyon, Başhekimlik ve KKM listeden; diğer yerler için Diğer'i seçip yazın"><option value="">— yer seç —</option>${birimler.filter(x => x.ad !== b.ad).map(x => `<option ${g && x.ad === g.hedef ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}<option value="__diger__" ${diger ? 'selected' : ''}>Diğer (yaz)…</option></select>${diger ? `<input class="ap-in w" data-id="${k.id}" data-f="gYer" value="${esc(g.diger && g.yer === 'Diğer' ? '' : g.yer || '')}" placeholder="İlçe Sağlık Müd., Devlet Hastanesi…" ${dis}>` : ''}${g && (g.hedef || g.yer) && g.tarih ? `<div class="ap-note">${esc(g.tarih)}</div>` : ''}</div>`;
   }
   function istHtml() {
     const birimler = S.plan.birimler;
