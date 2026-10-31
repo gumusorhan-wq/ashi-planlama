@@ -156,6 +156,13 @@
     if (!l.length) return '';
     return `<details class="ap-card" style="margin-top:12px"><summary><b>Silinen kişiler (${l.length})</b> <span class="ap-note">yanlışlıkla silineni geri getirebilirsiniz</span></summary>${l.map(k => `<div class="ap-row"><b>${esc(k.ad)}</b><span class="ap-note">${esc(k.unvan || '')} · ${new Date(k._silZaman).toLocaleString('tr-TR')}</span><button class="ap-btn sm pri" data-act="kisi-geri" data-id="${k.id}" ${duz ? '' : 'disabled'}>Geri getir</button></div>`).join('')}</details>`;
   }
+  // Geçici görev hücresi: hedef istasyon / Başhekimlik / KKM seçilir; diğer yerler (ilçe sağlık müdürlüğü, devlet hastanesi…) elle yazılır
+  function gorevHucre(k, birimler, b, dt, dis) {
+    const g = k.gorev, aktif = dt.disarida || (g && (g.hedef || g.yer));
+    if (!aktif) return esc(gorevMetin(k));
+    const diger = !!g && !g.hedef && (g.diger || !!g.yer);
+    return `<select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${dis} title="Nereye görevlendirildi? İstasyon, Başhekimlik ve KKM listeden; diğer yerler için Diğer'i seçip yazın"><option value="">— yer seç —</option>${birimler.filter(x => x.ad !== b.ad).map(x => `<option ${g && x.ad === g.hedef ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}<option value="__diger__" ${diger ? 'selected' : ''}>Diğer (yaz)…</option></select>${diger ? `<input class="ap-in w" style="margin-top:4px" data-id="${k.id}" data-f="gYer" value="${esc(g.diger && g.yer === 'Diğer' ? '' : g.yer || '')}" placeholder="İlçe Sağlık Müd., Devlet Hastanesi…" ${dis}>` : ''}${g && (g.hedef || g.yer) && g.tarih ? `<div class="ap-note">${esc(g.tarih)}</div>` : ''}`;
+  }
   function istHtml() {
     const birimler = S.plan.birimler;
     const b = birimler.find(x => x.ad === S.ist) || birimler[0];
@@ -188,7 +195,7 @@
         <td>${istas && !(s && s.nobetYok) ? `<input class="ap-in n" type="number" min="0" step="0.5" data-id="${k.id}" data-f="planlanan" value="${k.planlanan ?? ''}" ${dis}>` : ''}</td>
         <td class="num ${fark > 0 ? 'ap-pos' : fark < 0 ? 'ap-neg' : ''}">${s && !s.nobetYok && k.planlanan != null ? (fark > 0 ? '+' : '') + fmt(fark) : ''}</td>
         <td>${istas && !(s && s.nobetYok) ? `<input type="checkbox" data-id="${k.id}" data-f="kilit" ${k.kilit ? 'checked' : ''} ${dis} title="Kilitli değer otomatik hesapta değişmez. Elle girilen planlanan değer kendiliğinden kilitlenir; kilidi açınca yeniden hesaplanır.">` : ''}</td>
-        <td>${esc(gelen ? k.birim + ' kadrosundan' : gorevMetin(k))}${eng ? `<div class="ap-note" style="color:var(--ap-bad)">${esc(eng)}</div>` : ''}</td>
+        <td>${gelen ? esc(k.birim + ' kadrosundan') : gorevHucre(k, birimler, b, dt, dis)}${eng ? `<div class="ap-note" style="color:var(--ap-bad)">${esc(eng)}</div>` : ''}</td>
         <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${dis}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === ((k.gorev || {}).yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
         <td>${gelen ? `<button class="ap-btn sm" data-act="gorev-bitir" data-id="${k.id}" ${duz ? '' : 'disabled'} title="Geri gönder: görevlendirmeyi bitirir, kişi ${esc(k.birim)} istasyonuna geri döner">↩ Geri</button>` : (gorevAktif(k.gorev) ? `<button class="ap-btn sm" data-act="gorev-bitir" data-id="${k.id}" ${duz ? '' : 'disabled'} title="Geri çağır: görevlendirmeyi bitirir, kişi bu istasyona geri döner">↩ Geri</button> ` : '')}${duz && !gelen ? `<button class="ap-btn sm dng" data-act="kisi-sil" data-id="${k.id}" title="Kaydı sil">✕</button>` : ''}</td></tr>`;
     });

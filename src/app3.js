@@ -565,7 +565,11 @@
       case 'gTarih': mut(() => { k.gorev.tarih = v; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${v}`); break;
       case 'gGerekce': mut(() => { k.gorev.gerekce = v; k.gorev.kaynak = 'manuel'; }, 'Görevlendirme gerekçesi', `${k.ad}: ${v}`); break;
       case 'istek': mut(() => { k.istek = v; }, 'Kişi isteği', `${k.ad}: ${ISTEK[v] || 'Sırayla'}`); break;
-      case 'gHedef': gorevlendir(k, v); break;
+      case 'gHedef':
+        if (v === '__diger__') { mut(() => { k.gorev = {...(k.gorev || {}), yer: '', hedef: null, diger: true, kaynak: 'manuel', yolluk: (k.gorev && k.gorev.yolluk) || '', tarih: (k.gorev && k.gorev.tarih) || '', gerekce: (k.gorev && k.gorev.gerekce) || ''}; k.durum = 'GEÇİCİ GÖREVDE'; k.durumManuel = true; }, 'Görevlendirme (diğer yer)', k.ad); }
+        else gorevlendir(k, v, {yer: v, diger: false});
+        break;
+      case 'gYer': mut(() => { k.gorev = {...(k.gorev || {}), yer: v.trim(), hedef: null, diger: true, kaynak: 'manuel'}; k.durum = 'GEÇİCİ GÖREVDE'; k.durumManuel = true; }, 'Görev yeri', `${k.ad}: ${v}`); break;
     }
   }
   // Görevlendirme engelleri: 4/B (4 yıl) ve doktor kısıtı (yalnızca doktorlu A1 ekipler ve KKM)
