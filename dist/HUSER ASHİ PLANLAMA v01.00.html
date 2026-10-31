@@ -2279,7 +2279,7 @@ function mount(root, opts = {}) {
     return (ozelGerekce + (g.hedef || g.yer) + (ozelGerekce && g.bit && g.bit > gunSon() ? ' ' + trTarih(g.bit) : '')).trim();
   }
   function birimSatirlari(b) {
-    const D = durumlar(), kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)).sort(personelSirala);
+    const D = durumlar(), kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)).filter(k => !gizliKisi(k)).sort(personelSirala);      // aile hekimliği / uzmanlık eğitimi çıktılarda yer almaz
     const h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
     return kis.map(k => {
       const gelen = k.birim !== b.ad;
