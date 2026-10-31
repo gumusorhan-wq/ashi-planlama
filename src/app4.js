@@ -141,7 +141,7 @@
       i.gelen.forEach(x => { if (!ister(ad)) return; const a = `${x.ad}|${ad}`; const e = gel.get(a) || {ad: x.ad, brans: x.brans, hedef: ad, kaynaklar: new Set(), aylar: []}; e.kaynaklar.add(x.kaynak); e.aylar.push(r.ay); gel.set(a, e); (mat[ad] = mat[ad] || {})[x.brans] = (mat[ad][x.brans] || 0) + 1; });
       i.fazla.forEach(x => { if (!ister(ad)) return; const a = `${x.ad}|${ad}`; const e = faz.get(a) || {ad: x.ad, brans: x.brans, ist: ad, aylar: [], toplam: 0}; e.aylar.push(r.ay); e.toplam += x.fazla; faz.set(a, e); });
     }));
-    const kisaAy = a => a.slice(2).replace('-', '/');
+    const kisaAy = a => `${AYLAR[+a.slice(5)]} / ${a.slice(2, 4)}`;
     const cikSat = [...cik.values()].sort((a, b) => b.aylar.length - a.aylar.length || trCollator.compare(a.ad, b.ad)).map(e => [esc(e.ad), e.brans, esc(e.kaynak), esc([...e.hedefler].join(', ')), e.aylar.length, e.aylar.map(kisaAy).join(', ')]);
     const gelSat = [...gel.values()].sort((a, b) => trCollator.compare(a.hedef, b.hedef) || trCollator.compare(a.ad, b.ad)).map(e => [esc(e.ad), e.brans, esc([...e.kaynaklar].join(', ')), esc(e.hedef), e.aylar.length, e.aylar.map(kisaAy).join(', ')]);
     const fazSat = [...faz.values()].sort((a, b) => b.toplam - a.toplam || trCollator.compare(a.ad, b.ad)).map(e => [esc(e.ad), e.brans, esc(e.ist), e.aylar.length, e.toplam, e.aylar.map(kisaAy).join(', ')]);
@@ -158,7 +158,7 @@
       rec.kisi.forEach(k => { if (k.fazla <= 0.01 || !ister(k.kadro)) return; const key = k.ad + '|' + k.kadro, e = faz.get(key) || {ad: k.ad, brans: k.brans, ist: k.kadro, aylar: [], toplam: 0}; e.aylar.push(a); e.toplam += k.fazla; faz.set(key, e); });
       rec.dis.forEach(x => { if (!ister(x.istasyon)) return; const key = x.ad + '|' + x.istasyon, e = dis.get(key) || {ad: x.ad, brans: x.brans, kadro: x.kadro, ist: x.istasyon, aylar: [], nobet: 0}; e.aylar.push(a); e.nobet += x.nobet; dis.set(key, e); (mat[x.istasyon] = mat[x.istasyon] || {})[x.brans] = (mat[x.istasyon][x.brans] || 0) + 1; });
     });
-    const kisa = a => a.slice(2).replace('-', '/'), r2 = v => Math.round(v * 100) / 100;
+    const kisa = a => `${AYLAR[+a.slice(5)]} / ${a.slice(2, 4)}`, r2 = v => Math.round(v * 100) / 100;
     return {sec,
       ist: [...ist.values()].sort((a, b) => trCollator.compare(a.ad, b.ad)).map(e => [esc(e.ad), e.ay, e.planVar ? r2(e.plan) : '—', r2(e.gercek), e.planVar ? r2(e.gercek - e.plan) : '—', e.kisi]),
       faz: [...faz.values()].sort((a, b) => b.toplam - a.toplam || trCollator.compare(a.ad, b.ad)).map(e => [esc(e.ad), esc(e.brans), esc(e.ist), e.aylar.length, r2(e.toplam), e.aylar.map(kisa).join(', ')]),
