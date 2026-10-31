@@ -20,10 +20,11 @@
     const onceki = S.m === 1 ? C.iso(S.y - 1, 12, 1).slice(0, 7) : C.iso(S.y, S.m - 1, 1).slice(0, 7);
     const oncekiVar = S.planAnahtarlari.includes('plan:' + onceki);
     return `<div class="ap-card ap-empty"><h2>${ayEtiket()} için plan yok</h2>
-      <p>Planlama her ayın 10-15'inde bir sonraki ay için yapılır. ASOS'tan indirdiğiniz personel dosyalarını yükleyin (2 dosya zorunlu, 3. dosya önerilir):</p>
-      <div class="ap-note" style="margin:6px 0 14px">1) <b>Personel Listesi Raporu</b> (izin, muafiyet, geçici görev tarihleri) &nbsp; 2) <b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi Raporu</b><br>3) <b>Nöbet Listesi Raporu</b> <i>(önerilir)</i>: ATT'lerin sürücü olup olmadığı bu rapordan anlaşılır; yüklenmezse sürücü olanlar "doğrulanmadı" kalır. Önceki aylarda yüklendiyse son 6 ay birlikte değerlendirilir.<br>Dosyaları birlikte seçebilir ya da bu alana sürükleyip bırakabilirsiniz.</div>
+      <p>Planlama her ayın 10-15'inde bir sonraki ay için yapılır. ASOS'tan indirdiğiniz üç dosyayı yükleyin:</p>
+      <div class="ap-note" style="margin:6px 0 14px">1) <b>Personel Listesi Raporu</b> (izin, muafiyet, geçici görev tarihleri) &nbsp; 2) <b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi Raporu</b><br>3) <b>Nöbet Listesi Raporu</b>: ATT'lerin sürücü olup olmadığı bu rapordan anlaşılır; yüklenmezse sürücüler "doğrulanmadı" kalır, sürücü nöbet branşı eksik hesaplanır. Önceki aylarda yüklendiyse son 6 ay birlikte değerlendirilir. <i>(İsteğe bağlı: Personel İzin-Muafiyet Raporu)</i><br>Dosyaları birlikte seçebilir ya da bu alana sürükleyip bırakabilirsiniz.</div>
       <div class="ap-row" style="justify-content:center">
         <button class="ap-btn pri" data-act="plan-asos" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''}>Personel listelerini yükle</button>
+        ${typeof opts.veriKaynagi === 'function' ? `<button class="ap-btn" data-act="asos-kaynak" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''} title="ASHİ'deki güncel Nöbet Listesi ve İzin-Muafiyet raporlarını doğrudan alır">ASHİ'den nöbet listesi + izin raporu getir</button>` : ''}
         <button class="ap-btn" data-act="plan-kopya" ${oncekiVar && S.rol !== 'salt_okur' && guncelAy() ? '' : 'disabled'}>Önceki aydan kopyala (${onceki})</button>
         <button class="ap-btn" data-act="plan-bos" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''}>Boş plan</button></div>
       <p class="ap-note">Veriler yalnızca bu tarayıcıda (IndexedDB) tutulur. Yedek almak için Ayarlar'daki JSON yedeğini kullanın.</p></div>`;

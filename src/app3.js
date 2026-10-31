@@ -323,13 +323,19 @@
     dosyalar = (dosyalar || []).filter(Boolean); if (!dosyalar.length) return;
     S.modal = () => '<div class="ap-modal"><div><h2>Dosyalar okunuyor…</h2><p class="ap-note">Büyük listelerde birkaç saniye sürebilir.</p></div></div>'; render();
     const sonuc = [];
+    // Kaynaklar: tarayıcı dosyası (File), {ad, veri: ArrayBuffer|Uint8Array} (ASHİ'den çekilen dosya) ya da {ad, tur: 'N'|'I'|'A'|'B', satirlar} (ASHİ'den okunan hazır veri)
     for (const f of dosyalar) {
+      const ad = f.name || f.ad || 'ASHİ verisi';
       try {
-        if (!/\.(xls|xlsx)$/i.test(f.name)) throw new Error('Yalnızca .xls / .xlsx dosyaları yüklenebilir.');
-        const p = asosParse(await xlsOku(f));
+        if (f.tur && Array.isArray(f.satirlar)) {
+          if (!f.satirlar.length) throw new Error('Veride satır yok.');
+          sonuc.push({ad, tur: f.tur, p: {tur: f.tur, satirlar: f.satirlar}, boyut: 0}); continue;
+        }
+        if (!/\.(xls|xlsx)$/i.test(ad)) throw new Error('Yalnızca .xls / .xlsx dosyaları yüklenebilir.');
+        const p = asosParse(f.veri ? XLSX.read(f.veri instanceof Uint8Array ? f.veri : new Uint8Array(f.veri), {type: 'array', cellDates: false}) : await xlsOku(f));
         if (!p.satirlar.length) throw new Error('Dosyada personel satırı bulunamadı (başlıklar var, veri satırı yok).');
-        sonuc.push({ad: f.name, tur: p.tur, p, boyut: f.size});
-      } catch (er) { sonuc.push({ad: f.name, hata: er.message || String(er)}); }
+        sonuc.push({ad, tur: p.tur, p, boyut: f.size || (f.veri && f.veri.byteLength) || 0});
+      } catch (er) { sonuc.push({ad, hata: er.message || String(er)}); }
     }
     const gecerli = sonuc.filter(x => x.p).sort((x, y) => x.tur.localeCompare(y.tur));
     let taban = S.plan, raporlar = [];
@@ -346,7 +352,8 @@
     const eksik = (A.raporlar.find(r => r.tur === 'A') || {eksik: []}).eksik;
     const yeniler = A.raporlar.flatMap(r => r.yeni), nakiller = A.raporlar.flatMap(r => r.nakil);
     const B = A.raporlar.find(r => r.tur === 'B'), N = A.raporlar.find(r => r.tur === 'N'), Iz = A.raporlar.find(r => r.tur === 'I');
-    return `<div class="ap-modal"><div><h2>Personel listeleri — önizleme</h2>${dosyaSatir}
+    const nYok = ok && !N && !(S.plan && (S.plan.nobetAylari || []).length) ? '<div class="ap-warn" style="margin:8px 0;padding:8px 10px;border-radius:8px;background:#fff7ed;color:#9a3412"><b>Nöbet Listesi Raporu yüklenmedi.</b> ATT personelin sürücü olup olmadığı belirlenemez ("doğrulanmadı" kalır); sürücü nöbet branşı eksik hesaplanabilir. Raporu da ekleyip yeniden yüklemeniz önerilir.</div>' : '';
+    return `<div class="ap-modal"><div><h2>Personel listeleri — önizleme</h2>${dosyaSatir}${nYok}
       ${ok ? `<div class="ap-sum"><div><b>${A.plan.kayitlar.length}</b><span>Plandaki kayıt</span></div><div><b>${yeniler.length}</b><span>Yeni kayıt</span></div><div><b>${topla(r => r.degisen)}</b><span>Güncellenen</span></div><div><b>${nakiller.length}</b><span>Birim değişen</span></div><div><b>${A.plan.kayitlar.filter(k => k.gorev && (k.gorev.hedef || k.gorev.yer)).length}</b><span>Geçici görevli</span></div>
       ${B ? `<div><b>${B.izinli}</b><span>Plan ayında izinli</span></div><div><b>${B.muafiyet}</b><span>Muafiyet / süt izni</span></div><div><b>${B.disKurum}</b><span>Dış kurum (alınmadı)</span></div><div><b>${B.gelen}</b><span>Kurum dışından gelen</span></div>` : ''}</div>
       <p>4/B personel: <b>${A.plan.kayitlar.filter(k => k.dortB).length}</b> kişi. ${A.plan.kayitlar.some(k => k.dortB && !k.memBas) ? `<span class="ap-tag ap-t-ih">${A.plan.kayitlar.filter(k => k.dortB && !k.memBas).length} kişide başlangıç tarihi yok</span> — "Personel Listesi Raporu" da yüklenirse 4 yıl kuralı denetlenir.` : '<span class="ap-tag ap-t-ok">Tümünde başlangıç tarihi var</span>'}</p>
@@ -638,6 +645,12 @@
         case 'gorev-sekme': S.gorevSekme = v; break;
         case 'oner-ac': S.onerAc = S.onerAc === v ? '' : v; break;
         case 'plan-art': { const k = kayit(t.dataset.id); if (!k) break; const yeni = Math.max(0, Math.round((sayi(k.planlanan) + 0.5 * (+v)) * 2) / 2); mut(() => { k.planlanan = yeni; k.kilit = true; }, 'Planlanan nöbet (elle)', `${k.ad}: ${yeni}`); break; }
+        case 'asos-kaynak': {      // ASHİ bağlantısı: Nöbet Listesi ve İzin-Muafiyet raporları güncel olarak kaynaktan alınır (opts.veriKaynagi)
+          if (typeof opts.veriKaynagi !== 'function') { toast('ASHİ bağlantısı tanımlı değil.'); break; }
+          if (salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
+          const l = await opts.veriKaynagi({ay: ayAnahtari(), turler: ['N', 'I']}); if (!l || !l.length) { toast('ASHİ\'den veri gelmedi.'); break; }
+          await asosDosyalariIsle(l); return;
+        }
         case 'rot-sekme': S.rotSekme = v; break;
         case 'ozet-sekme': S.ozetSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;
@@ -782,7 +795,7 @@
 
   // başlangıç
   const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); setTimeout(() => arsivArkaPlan(), 1200); })();
-  return {getState: () => S, hazir, yenile: render,  unmount: () => { root.innerHTML = ''; }};
+  return {getState: () => S, hazir, yenile: render, dosyaVer: asosDosyalariIsle, unmount: () => { root.innerHTML = ''; }};
 }
 return {mount, VERSION};
 })();

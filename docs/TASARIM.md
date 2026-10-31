@@ -315,3 +315,18 @@ Kalanlar:
 - **Modül 2** (istasyon sorumluları yalnız bunu görür): İstek takvimi (kişi×gün, istenmeyen gün + izin aralığı) → Otomatik nöbet listesi (kurallar: 24 sa. nöbetler arası ≥1 gün boş, iki nöbet arası ≤5 gün, sürücüye gün aşırı 3 nöbet yok, işçiye art arda 3 gece yok, yıllık izin öncesi 3 gün boşluk) → Denetim ve öneriler (tek tıkla uygula) → Paket (TC/sağlık içermez) ve Excel çıktısı.
 - Nöbet listeleri ASOS'a girilir; ASOS "Nöbet Listesi Raporu" Modül 1'de sürücülük tespitinde kullanılır. "Dönem İçi Hareket Raporu" için örnek dosya bekleniyor.
 - Açık: iki nöbet arası kuralı ay sınırını aşmıyor (önceki ayın son nöbeti dikkate alınmıyor).
+
+
+## ASHİ bağlantısı: Nöbet Listesi ve İzin-Muafiyet raporlarını kaynaktan alma (hazırlık)
+
+Şimdilik üç dosya elle yüklenir (EKİP, Personel Listesi Raporu, **Nöbet Listesi Raporu**; ayrıca isteğe bağlı İzin-Muafiyet Raporu). ASHİ ile bağlantı kurulduğunda Nöbet Listesi ve İzin-Muafiyet raporları ASHİ tarafında güncel tutulduğundan elle yüklemeye gerek kalmayacak. Uygulama bunun için iki hazır kapı sunar:
+
+1. **`AshiPlanlama.mount(kök, {veriKaynagi})`** — `veriKaynagi({ay: 'YYYY-MM', turler: ['N','I']})` bir fonksiyondur ve (asenkron) bir **liste** döndürür. Tanımlıysa başlangıç ekranında ve Arşiv › Yüklenen dosyalar bölümünde "ASHİ'den nöbet listesi + izin raporu getir" düğmesi çıkar. Düğme listeyi alır ve elle yüklemedeki akışa (önizleme → onay) verir.
+2. **`ornek.dosyaVer(liste)`** — aynı listeyi dışarıdan (ör. ana uygulama) vermek için; `mount` dönüş nesnesinde bulunur.
+
+Liste öğeleri üç biçimde olabilir:
+- tarayıcı `File` nesnesi,
+- `{ad: 'nobet.xls', veri: ArrayBuffer | Uint8Array}` — ASHİ'den indirilen ham dosya (özgün Excel biçimi),
+- `{ad, tur: 'N' | 'I' | 'A' | 'B', satirlar: [...]}` — ASHİ'den **doğrudan okunan veri**; `satirlar`, uygulamanın kendi ayrıştırıcılarının ürettiği satır biçimindedir (N: `{tc, ay, rol: 'es'|'ysp'|'sur', saat, bas, ...}`; I: izin/muafiyet satırları). Bu biçim Excel'e hiç gerek bırakmaz.
+
+Kişisel veri (TC vb.) bu hattan yalnızca tarayıcıda işlenir; arşive yazılmaz (bkz. bölüm 10).
