@@ -1,7 +1,7 @@
 
   // ================= MODÜL 1 — ARŞİV VE ARŞİV İSTATİSTİKLERİ =================
   const bransAd = k => k.sinif === 'doktor' ? 'Doktor' : k.sinif === 'isci' ? 'İşçi' : C.kadroTip(k);
-  const BRANSLAR = ['AABT', 'ATT', 'Doktor', 'İşçi'];
+  const BRANSLAR = ['Doktor', 'AABT', 'ATT', 'İşçi'];
   const arsivAnahtar = ay => 'arsiv:' + ay;
   const ayAd = ay => { const [y, m] = ay.split('-'); return `${AYLAR[+m]} ${y}`; };
 
