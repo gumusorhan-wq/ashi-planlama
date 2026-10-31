@@ -1007,10 +1007,11 @@ function mount(root, opts = {}) {
     const onceki = S.m === 1 ? C.iso(S.y - 1, 12, 1).slice(0, 7) : C.iso(S.y, S.m - 1, 1).slice(0, 7);
     const oncekiVar = S.planAnahtarlari.includes('plan:' + onceki);
     return `<div class="ap-card ap-empty"><h2>${ayEtiket()} için plan yok</h2>
-      <p>Planlama her ayın 10-15'inde bir sonraki ay için yapılır. ASOS'tan indirdiğiniz iki personel dosyasını yükleyin:</p>
-      <div class="ap-note" style="margin:6px 0 14px">1) <b>Personel Listesi Raporu</b> (izin, muafiyet, geçici görev tarihleri) &nbsp; 2) <b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi Raporu</b><br>İki dosyayı birlikte seçebilir ya da bu alana sürükleyip bırakabilirsiniz.</div>
+      <p>Planlama her ayın 10-15'inde bir sonraki ay için yapılır. ASOS'tan indirdiğiniz üç dosyayı yükleyin:</p>
+      <div class="ap-note" style="margin:6px 0 14px">1) <b>Personel Listesi Raporu</b> (izin, muafiyet, geçici görev tarihleri) &nbsp; 2) <b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi Raporu</b><br>3) <b>Nöbet Listesi Raporu</b>: ATT'lerin sürücü olup olmadığı bu rapordan anlaşılır; yüklenmezse sürücüler "doğrulanmadı" kalır, sürücü nöbet branşı eksik hesaplanır. Önceki aylarda yüklendiyse son 6 ay birlikte değerlendirilir. <i>(İsteğe bağlı: Personel İzin-Muafiyet Raporu)</i><br>Dosyaları birlikte seçebilir ya da bu alana sürükleyip bırakabilirsiniz.</div>
       <div class="ap-row" style="justify-content:center">
         <button class="ap-btn pri" data-act="plan-asos" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''}>Personel listelerini yükle</button>
+        ${typeof opts.veriKaynagi === 'function' ? `<button class="ap-btn" data-act="asos-kaynak" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''} title="ASHİ'deki güncel Nöbet Listesi ve İzin-Muafiyet raporlarını doğrudan alır">ASHİ'den nöbet listesi + izin raporu getir</button>` : ''}
         <button class="ap-btn" data-act="plan-kopya" ${oncekiVar && S.rol !== 'salt_okur' && guncelAy() ? '' : 'disabled'}>Önceki aydan kopyala (${onceki})</button>
         <button class="ap-btn" data-act="plan-bos" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''}>Boş plan</button></div>
       <p class="ap-note">Veriler yalnızca bu tarayıcıda (IndexedDB) tutulur. Yedek almak için Ayarlar'daki JSON yedeğini kullanın.</p></div>`;
@@ -1480,7 +1481,7 @@ function mount(root, opts = {}) {
     const aylar = Object.keys(S.arsivVeri).sort().reverse(), ay = ayAnahtari(), var_ = S.arsivVeri[ay], duz = S.rol !== 'salt_okur' && guncelAy();
     const kayitliPlan = S.planAnahtarlari.map(k => k.slice(5)).filter(a => !S.arsivVeri[a]);
     const yl = S.yuklemeler || [], kb = b => b ? (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB') : '';
-    const yuklemeHtml = `<div class="ap-card"><h2>Yüklenen dosyalar (${yl.length})</h2><p class="ap-note">ASOS'tan yüklenen her dosya, uygulandığı anda burada listelenir: ne zaman, hangi türde, kaç satır ve hangi plan ayına uygulandı. Dosyanın kendisi saklanmaz, yalnızca bu günlük tutulur.</p><div class="ap-drop"><div class="ap-row" style="justify-content:center"><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''}>Excel dosyası yükle (.xls / .xlsx)</button></div><div class="ap-note" style="text-align:center;margin-top:6px">ya da dosyaları bu alana sürükleyip bırakın · EKİP listesi, Personel Listesi Raporu, Nöbet Listesi, Nöbet İçi Hareket Raporu (birlikte seçilebilir)</div></div>${tabloHtml(['Tarih', 'Dosya', 'Tür', 'Satır', 'Boyut', 'Plan ayı', 'Sonuç', ''], yl.slice(0, 100).map((x, xi) => [new Date(x.t).toLocaleString('tr-TR'), esc(x.ad), DOSYA_TUR[x.tur] || x.tur, x.satir, kb(x.boyut), ayAd(x.ay), esc(x.ozet) + (x.guncel ? ` <span class="ap-note">(${x.guncel + 1}. yükleme, güncellendi)</span>` : ''), S.rol === 'salt_okur' ? '' : `<button class="ap-btn sm dng" data-act="yukleme-sil" data-v="${xi}" title="Bu yükleme kaydını sil">Sil</button>`]))}${yl.length > 100 ? '<div class="ap-note">Son 100 kayıt gösteriliyor.</div>' : ''}</div>`;
+    const yuklemeHtml = `<div class="ap-card"><h2>Yüklenen dosyalar (${yl.length})</h2><p class="ap-note">ASOS'tan yüklenen her dosya, uygulandığı anda burada listelenir: ne zaman, hangi türde, kaç satır ve hangi plan ayına uygulandı. Dosyanın kendisi saklanmaz, yalnızca bu günlük tutulur.</p><div class="ap-drop"><div class="ap-row" style="justify-content:center"><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''}>Excel dosyası yükle (.xls / .xlsx)</button>${typeof opts.veriKaynagi === 'function' ? `<button class="ap-btn" data-act="asos-kaynak" ${salt() ? 'disabled' : ''} title="ASHİ'deki güncel Nöbet Listesi ve İzin-Muafiyet raporlarını doğrudan alır">ASHİ'den nöbet listesi + izin raporu getir</button>` : ''}</div><div class="ap-note" style="text-align:center;margin-top:6px">ya da dosyaları bu alana sürükleyip bırakın · EKİP listesi, Personel Listesi Raporu, Nöbet Listesi, Nöbet İçi Hareket Raporu (birlikte seçilebilir)</div></div>${tabloHtml(['Tarih', 'Dosya', 'Tür', 'Satır', 'Boyut', 'Plan ayı', 'Sonuç', ''], yl.slice(0, 100).map((x, xi) => [new Date(x.t).toLocaleString('tr-TR'), esc(x.ad), DOSYA_TUR[x.tur] || x.tur, x.satir, kb(x.boyut), ayAd(x.ay), esc(x.ozet) + (x.guncel ? ` <span class="ap-note">(${x.guncel + 1}. yükleme, güncellendi)</span>` : ''), S.rol === 'salt_okur' ? '' : `<button class="ap-btn sm dng" data-act="yukleme-sil" data-v="${xi}" title="Bu yükleme kaydını sil">Sil</button>`]))}${yl.length > 100 ? '<div class="ap-note">Son 100 kayıt gösteriliyor.</div>' : ''}</div>`;
     const asek = [['dosya', 'Yüklenen dosyalar'], ['ay', 'Aylara göre arşiv'], ['kayit', 'Aylık arşiv']], aa = asek.some(x => x[0] === S.arsivSekme) ? S.arsivSekme : 'dosya';
     const nav = `<div class="ap-subnav ap-noprint">${asek.map(([v, t]) => `<button class="${aa === v ? 'on' : ''}" data-act="arsiv-sekme" data-v="${v}">${t}</button>`).join('')}</div>`;
     const kayit = `<div class="ap-card"><h2>Aylık arşiv</h2>
@@ -2246,13 +2247,19 @@ function mount(root, opts = {}) {
     dosyalar = (dosyalar || []).filter(Boolean); if (!dosyalar.length) return;
     S.modal = () => '<div class="ap-modal"><div><h2>Dosyalar okunuyor…</h2><p class="ap-note">Büyük listelerde birkaç saniye sürebilir.</p></div></div>'; render();
     const sonuc = [];
+    // Kaynaklar: tarayıcı dosyası (File), {ad, veri: ArrayBuffer|Uint8Array} (ASHİ'den çekilen dosya) ya da {ad, tur: 'N'|'I'|'A'|'B', satirlar} (ASHİ'den okunan hazır veri)
     for (const f of dosyalar) {
+      const ad = f.name || f.ad || 'ASHİ verisi';
       try {
-        if (!/\.(xls|xlsx)$/i.test(f.name)) throw new Error('Yalnızca .xls / .xlsx dosyaları yüklenebilir.');
-        const p = asosParse(await xlsOku(f));
+        if (f.tur && Array.isArray(f.satirlar)) {
+          if (!f.satirlar.length) throw new Error('Veride satır yok.');
+          sonuc.push({ad, tur: f.tur, p: {tur: f.tur, satirlar: f.satirlar}, boyut: 0}); continue;
+        }
+        if (!/\.(xls|xlsx)$/i.test(ad)) throw new Error('Yalnızca .xls / .xlsx dosyaları yüklenebilir.');
+        const p = asosParse(f.veri ? XLSX.read(f.veri instanceof Uint8Array ? f.veri : new Uint8Array(f.veri), {type: 'array', cellDates: false}) : await xlsOku(f));
         if (!p.satirlar.length) throw new Error('Dosyada personel satırı bulunamadı (başlıklar var, veri satırı yok).');
-        sonuc.push({ad: f.name, tur: p.tur, p, boyut: f.size});
-      } catch (er) { sonuc.push({ad: f.name, hata: er.message || String(er)}); }
+        sonuc.push({ad, tur: p.tur, p, boyut: f.size || (f.veri && f.veri.byteLength) || 0});
+      } catch (er) { sonuc.push({ad, hata: er.message || String(er)}); }
     }
     const gecerli = sonuc.filter(x => x.p).sort((x, y) => x.tur.localeCompare(y.tur));
     let taban = S.plan, raporlar = [];
@@ -2269,7 +2276,8 @@ function mount(root, opts = {}) {
     const eksik = (A.raporlar.find(r => r.tur === 'A') || {eksik: []}).eksik;
     const yeniler = A.raporlar.flatMap(r => r.yeni), nakiller = A.raporlar.flatMap(r => r.nakil);
     const B = A.raporlar.find(r => r.tur === 'B'), N = A.raporlar.find(r => r.tur === 'N'), Iz = A.raporlar.find(r => r.tur === 'I');
-    return `<div class="ap-modal"><div><h2>Personel listeleri — önizleme</h2>${dosyaSatir}
+    const nYok = ok && !N && !(S.plan && (S.plan.nobetAylari || []).length) ? '<div class="ap-warn" style="margin:8px 0;padding:8px 10px;border-radius:8px;background:#fff7ed;color:#9a3412"><b>Nöbet Listesi Raporu yüklenmedi.</b> ATT personelin sürücü olup olmadığı belirlenemez ("doğrulanmadı" kalır); sürücü nöbet branşı eksik hesaplanabilir. Raporu da ekleyip yeniden yüklemeniz önerilir.</div>' : '';
+    return `<div class="ap-modal"><div><h2>Personel listeleri — önizleme</h2>${dosyaSatir}${nYok}
       ${ok ? `<div class="ap-sum"><div><b>${A.plan.kayitlar.length}</b><span>Plandaki kayıt</span></div><div><b>${yeniler.length}</b><span>Yeni kayıt</span></div><div><b>${topla(r => r.degisen)}</b><span>Güncellenen</span></div><div><b>${nakiller.length}</b><span>Birim değişen</span></div><div><b>${A.plan.kayitlar.filter(k => k.gorev && (k.gorev.hedef || k.gorev.yer)).length}</b><span>Geçici görevli</span></div>
       ${B ? `<div><b>${B.izinli}</b><span>Plan ayında izinli</span></div><div><b>${B.muafiyet}</b><span>Muafiyet / süt izni</span></div><div><b>${B.disKurum}</b><span>Dış kurum (alınmadı)</span></div><div><b>${B.gelen}</b><span>Kurum dışından gelen</span></div>` : ''}</div>
       <p>4/B personel: <b>${A.plan.kayitlar.filter(k => k.dortB).length}</b> kişi. ${A.plan.kayitlar.some(k => k.dortB && !k.memBas) ? `<span class="ap-tag ap-t-ih">${A.plan.kayitlar.filter(k => k.dortB && !k.memBas).length} kişide başlangıç tarihi yok</span> — "Personel Listesi Raporu" da yüklenirse 4 yıl kuralı denetlenir.` : '<span class="ap-tag ap-t-ok">Tümünde başlangıç tarihi var</span>'}</p>
@@ -2561,6 +2569,12 @@ function mount(root, opts = {}) {
         case 'gorev-sekme': S.gorevSekme = v; break;
         case 'oner-ac': S.onerAc = S.onerAc === v ? '' : v; break;
         case 'plan-art': { const k = kayit(t.dataset.id); if (!k) break; const yeni = Math.max(0, Math.round((sayi(k.planlanan) + 0.5 * (+v)) * 2) / 2); mut(() => { k.planlanan = yeni; k.kilit = true; }, 'Planlanan nöbet (elle)', `${k.ad}: ${yeni}`); break; }
+        case 'asos-kaynak': {      // ASHİ bağlantısı: Nöbet Listesi ve İzin-Muafiyet raporları güncel olarak kaynaktan alınır (opts.veriKaynagi)
+          if (typeof opts.veriKaynagi !== 'function') { toast('ASHİ bağlantısı tanımlı değil.'); break; }
+          if (salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
+          const l = await opts.veriKaynagi({ay: ayAnahtari(), turler: ['N', 'I']}); if (!l || !l.length) { toast('ASHİ\'den veri gelmedi.'); break; }
+          await asosDosyalariIsle(l); return;
+        }
         case 'rot-sekme': S.rotSekme = v; break;
         case 'ozet-sekme': S.ozetSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;
@@ -2705,7 +2719,7 @@ function mount(root, opts = {}) {
 
   // başlangıç
   const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); setTimeout(() => arsivArkaPlan(), 1200); })();
-  return {getState: () => S, hazir, yenile: render,  unmount: () => { root.innerHTML = ''; }};
+  return {getState: () => S, hazir, yenile: render, dosyaVer: asosDosyalariIsle, unmount: () => { root.innerHTML = ''; }};
 }
 return {mount, VERSION};
 })();
