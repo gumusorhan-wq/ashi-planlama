@@ -860,7 +860,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '
 const sayi = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
 const fmt = v => (Math.round(v * 100) / 100).toLocaleString('tr-TR', {maximumFractionDigits: 2});
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-const trCollator = new Intl.Collator('tr');
+const trCollator = new Intl.Collator('tr', {numeric: true});
 const adAnahtar = ad => C.TR(ad).split(' ').filter(Boolean).sort().join(' ');
 
 // Varsayılan depolama: IndexedDB (kullanılamazsa bellek)
