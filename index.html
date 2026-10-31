@@ -878,7 +878,7 @@ function mount(root, opts = {}) {
   };
   const bugun = new Date(), sonraki = new Date(Date.UTC(bugun.getUTCFullYear(), bugun.getUTCMonth() + 1, 1));
   S.y = sonraki.getUTCFullYear(); S.m = sonraki.getUTCMonth() + 1;      // planlama bir sonraki ay içindir
-  const GUNCEL_Y = S.y, GUNCEL_M = S.m, guncelAy = () => S.y === GUNCEL_Y && S.m === GUNCEL_M;      // güncel ay dışındaki aylar yalnızca görüntülenir (salt okunur)
+  const GUNCEL_Y = S.y, GUNCEL_M = S.m, BUGUN = new Date(), MEVCUT = BUGUN.getFullYear() * 12 + BUGUN.getMonth() + 1, guncelAy = () => S.y * 12 + S.m >= MEVCUT;      // güncel ay dışındaki aylar yalnızca görüntülenir (salt okunur)
   const olay = (ad, d) => { try { root.dispatchEvent(new CustomEvent('ashiplan:' + ad, {detail: d, bubbles: true})); } catch (e) {} if (opts.olaylar && opts.olaylar[ad]) opts.olaylar[ad](d); };
 
   const anahtar = (y, m) => `plan:${y}-${C.pad(m)}`;
@@ -901,8 +901,15 @@ function mount(root, opts = {}) {
     S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, otoGeriCek: true, panoMod: 'fazla', azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 15, kapsam: [], ...a, ...(opts.ayarlar || {})};
     Object.keys(C.DURUM_VARSAYILAN).forEach(k => { if (!S.ayar.durumlar[k]) S.ayar.durumlar[k] = C.DURUM_VARSAYILAN[k]; });
   }
+  // Ekip OF (kapalı istasyon) bilgisi aylar arasında kalıcıdır: kullanıcı açana kadar her ayın planında kapalı gelir
+  function ofUygula(plan) {
+    if (!plan || !S.ayar) return;
+    if (!Array.isArray(S.ayar.ofIst)) S.ayar.ofIst = plan.birimler.filter(b => b.ekipOf).map(b => b.ad);
+    plan.birimler.forEach(b => { if (b.tur === 'istasyon') b.ekipOf = S.ayar.ofIst.includes(b.ad); });
+  }
   async function planYukle() {
     S.plan = (await depo.get(anahtar(S.y, S.m))) || null;
+    if (S.plan && guncelAy()) ofUygula(S.plan);
     S.planAnahtarlari = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort();
     if (S.plan && !S.ist) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     if (S.plan && S.ist && !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
@@ -949,6 +956,8 @@ function mount(root, opts = {}) {
   }
   // Aile hekimliğine geçen personel listede görünür ama hiçbir hesaba girmez; kendi isteği olmadan görevlendirilmez ya da geri çağrılmaz (durumu ancak elle değiştirilebilir)
   const aileHek = k => !!k && k.durum === 'AİLE HEKİMLİĞİNDE';
+  // Aile hekimliği ve uzmanlık eğitimindekiler: yalnız planlama yapanlara (yönetici/planlayıcı) ve listelerin en altında görünür; istasyon planlama görünümünde yer almaz
+  const gizliKisi = k => !!k && (k.durum === 'AİLE HEKİMLİĞİNDE' || k.durum === 'UZMANLIK EĞİTİMİ'), planlamaRol = () => S.rol === 'yonetici' || S.rol === 'planlayici';
   const izinTarihli = k => (k.izin || []).some(i => i.bas && i.bit);
   const izinMetin = k => (k.izin || []).filter(i => sayi(i.gun) > 0).map(i => `${fmt(sayi(i.gun))} ${i.tur || ''}`.trim()).join(', ');
   const izinGun = k => (k.izin || []).reduce((a, i) => a + sayi(i.gun), 0);
@@ -962,7 +971,7 @@ function mount(root, opts = {}) {
   // İstasyon listesi sırası: ekip şefi (doktor, AABT) üstte, YSP (ATT) ortada, sürücü (işçi) en altta
   const NB_SIRA = {dok: 0, ke: 1, ka: 1, ysp: 2, sy: 3, isci: 4};
   const nbSira = (k, satirMap) => { const s = satirMap && satirMap.get(k.id); return s ? NB_SIRA[s.grup] : k.sinif === 'doktor' ? 0 : k.sinif === 'isci' ? 4 : (C.kadroTip(k) === 'AABT' ? 1 : 2); };
-  const nobetSirala = satirMap => (a, b) => (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
+  const nobetSirala = satirMap => (a, b) => (gizliKisi(a) - gizliKisi(b)) || (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
   function personelSirala(a, b) {
     const sg = {doktor: 0, memur: 1, isci: 2};
     return (sg[a.sinif] - sg[b.sinif]) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad, b.ad);
@@ -1131,7 +1140,7 @@ function mount(root, opts = {}) {
     if (!b) return '<div class="ap-card ap-empty">Birim yok.</div>';
     S.ist = b.ad;
     const D = durumlar(), duz = !salt();
-    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida));
+    const kis = S.plan.kayitlar.filter(k => (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)) && (planlamaRol() || !gizliKisi(k)));
     const istas = b.tur === 'istasyon', h = istas ? hesapla(b) : null;
     const disSay = S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef).length;
     const satirMap = new Map(); if (h) h.satir.forEach(s => satirMap.set(s.k.id, s));
@@ -1225,7 +1234,8 @@ function mount(root, opts = {}) {
   }
   function personelHtml() {
     const D = durumlar(), f = S.filtre, q = C.TR(f.q);
-    let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)));
+    let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)) && (planlamaRol() || !gizliKisi(k)));
+    liste = [...liste.filter(k => !gizliKisi(k)), ...liste.filter(gizliKisi)];
     const boyut = S.pBoyut || 50, sayfaSay = Math.max(1, Math.ceil(liste.length / boyut)); if (S.pSayfa >= sayfaSay) S.pSayfa = sayfaSay - 1; if (S.pSayfa < 0) S.pSayfa = 0;
     const bas = S.pSayfa * boyut, gos = liste.slice(bas, bas + boyut);
     const rows = gos.map(k => {
@@ -1291,7 +1301,7 @@ function mount(root, opts = {}) {
 
   function ayarHtml() {
     const D = durumlar(), yon = S.rol === 'yonetici';
-    return `<div class="ap-card"><h2>Durum tablosu</h2><p class="ap-note">Her durumun nöbet ve mesai etkisini ayarlayın. "Nöbet yok": kişi nöbet tutmaz (hedef 0). "Mesai yok": o ay mesai yükümlülüğü yoktur (izinli). Değişiklik yalnızca Yönetici içindir.</p>
+    const tum = `<div class="ap-card"><h2>Durum tablosu</h2><p class="ap-note">Her durumun nöbet ve mesai etkisini ayarlayın. "Nöbet yok": kişi nöbet tutmaz (hedef 0). "Mesai yok": o ay mesai yükümlülüğü yoktur (izinli). Değişiklik yalnızca Yönetici içindir.</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Durum</th><th>Renk</th><th>Nöbet yok</th><th>Mesai yok</th></tr></thead><tbody>${Object.entries(D).map(([k, v]) => `<tr><td>${k}</td><td><input type="color" data-d="${esc(k)}" data-f="renk" value="${v.renk || '#ffffff'}" ${yon ? '' : 'disabled'}></td><td><input type="checkbox" data-d="${esc(k)}" data-f="nobetYok" ${v.nobetYok ? 'checked' : ''} ${yon ? '' : 'disabled'}></td><td><input type="checkbox" data-d="${esc(k)}" data-f="mesaiYok" ${v.mesaiYok ? 'checked' : ''} ${yon ? '' : 'disabled'}></td></tr>`).join('')}</tbody></table></div></div>
       <div class="ap-card"><h2>Hesap ayarları</h2><div class="ap-row"><label>ATT sürücü sayılması için nöbetlerinin sürücü payı bu değerden büyük olmalı (%): <input class="ap-in n" type="number" min="0" max="100" data-ay="surDegilEsik" value="${S.ayar.surDegilEsik}" ${yon ? '' : 'disabled'}></label> <span class="ap-note">Nöbet kaydı olmayan ATT sürücü sayılmaz.</span></div>
       <div class="ap-row"><label>Memur/doktor genel azami nöbet (24 sa.; istasyon sayfasından istasyon bazında değiştirilebilir) <input class="ap-in n" type="number" step="0.5" data-ay="azamiMemur" value="${S.ayar.azamiMemur}" ${yon ? '' : 'disabled'}></label>
@@ -1301,6 +1311,8 @@ function mount(root, opts = {}) {
       <p class="ap-note">Yuvarlama: memur ve doktor hedefi yukarı 0,5 adıma, işçi hedefi aşağı tam 12 saatlik nöbete yuvarlanır.</p></div>
       <div class="ap-card"><h2>Yedek</h2><div class="ap-row"><button class="ap-btn" data-act="yedek-al">JSON yedeği al (bu ay)</button><button class="ap-btn" data-act="yedek-yukle" ${salt() ? 'disabled' : ''}>JSON yedeği yükle</button></div>
       <p class="ap-note">Yedek dosyasında kişisel veri bulunur; güvenli yerde saklayın. Şifreli ortak Drive arşivi sonraki sürümde eklenecek.</p></div>`;
+    const p = tum.split(/(?=<div class="ap-card"><h2>)/), sek = [['durum', 'Durum tablosu'], ['hesap', 'Hesap ayarları'], ['yedek', 'Yedek']], a = sek.some(x => x[0] === S.ayarSekme) ? S.ayarSekme : 'durum';
+    return `<div class="ap-subnav ap-noprint">${sek.map(([v, t]) => `<button class="${a === v ? 'on' : ''}" data-act="ayar-sekme" data-v="${v}">${t}</button>`).join('')}</div>` + p[sek.findIndex(x => x[0] === a)];
   }
 
   function sayfaHtml() {
@@ -1433,9 +1445,9 @@ function mount(root, opts = {}) {
     const yil = y => {
       const aylar = [...kume].filter(a => +a.slice(0, 4) === y).sort().reverse(), ac = S.arsivYilAc && S.arsivYilAc[y] != null ? S.arsivYilAc[y] : y === GUNCEL_Y;
       return `<div class="ap-yil"><div class="ap-yilbas"><button class="ap-yilbtn" data-act="arsiv-yil" data-v="${y}"><span>${ac ? '▼' : '▶'}</span> <b>${y}</b> <span class="ap-note">${aylar.length} ay</span></button></div>
-        ${ac ? tabloHtml(['Ay', 'Plan', 'Arşiv kaydı', 'Gerçekleşen nöbet', 'Yüklenen dosya', ''], aylar.map(a => [ayAd(a) + (a === guncel ? ' <span class="ap-tag ap-t-ok">güncel</span>' : '') + (a === simdi ? ' <span class="ap-tag ap-t-ih">açık</span>' : ''), planVar(a) ? '✓' : '—', S.arsivVeri && S.arsivVeri[a] ? new Date(S.arsivVeri[a].zaman).toLocaleDateString('tr-TR') : '—', S.gercekVeri && S.gercekVeri[a] ? '✓' : '—', say(a) || '—', a === simdi ? '' : `<button class="ap-btn sm" data-act="arsiv-ac" data-v="${a}">${a === guncel ? 'Güncel aya dön' : 'Aç (salt okunur)'}</button>`])) : ''}</div>`;
+        ${ac ? tabloHtml(['Ay', 'Plan', 'Arşiv kaydı', 'Gerçekleşen nöbet', 'Yüklenen dosya', ''], aylar.map(a => [ayAd(a) + (a === guncel ? ' <span class="ap-tag ap-t-ok">güncel</span>' : '') + (a === simdi ? ' <span class="ap-tag ap-t-ih">açık</span>' : ''), planVar(a) ? '✓' : '—', S.arsivVeri && S.arsivVeri[a] ? new Date(S.arsivVeri[a].zaman).toLocaleDateString('tr-TR') : '—', S.gercekVeri && S.gercekVeri[a] ? '✓' : '—', say(a) || '—', a === simdi ? '' : `<button class="ap-btn sm" data-act="arsiv-ac" data-v="${a}">${a >= `${BUGUN.getFullYear()}-${C.pad(BUGUN.getMonth() + 1)}` ? 'Aç' : 'Aç (salt okunur)'}</button>` + ((S.arsivVeri && S.arsivVeri[a]) || (S.gercekVeri && S.gercekVeri[a]) ? (S.rol === 'yonetici' ? ` <button class="ap-btn sm dng" data-act="arsiv-ay-sil" data-v="${a}" title="Bu ayın arşiv kaydını ve gerçekleşen nöbet verisini siler (plan silinmez)">Arşivi sil</button>` : '') : '')])) : ''}</div>`;
     };
-    return `<div class="ap-card"><h2>Aylara göre arşiv</h2><p class="ap-note">Geçmiş bir ayı açarak o ayın planını, personelini ve istatistiklerini görebilirsiniz. <b>Güncel ay (${ayAd(guncel)}) dışındaki aylar salt okunurdur</b>: değiştirilemez, dosya yüklenemez.</p>${yillar.map(yil).join('') || '<span class="ap-note">Kayıt yok</span>'}</div>`;
+    return `<div class="ap-card"><h2>Aylara göre arşiv</h2><p class="ap-note">Geçmiş bir ayı açarak o ayın planını, personelini ve istatistiklerini görebilirsiniz. <b>Bu ay (${AYLAR[BUGUN.getMonth() + 1]}) ve sonraki aylar düzenlenebilir; daha önceki aylar salt okunurdur</b>: değiştirilemez, dosya yüklenemez.</p>${yillar.map(yil).join('') || '<span class="ap-note">Kayıt yok</span>'}</div>`;
   }
   function arsivHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
@@ -1443,14 +1455,17 @@ function mount(root, opts = {}) {
     const kayitliPlan = S.planAnahtarlari.map(k => k.slice(5)).filter(a => !S.arsivVeri[a]);
     const yl = S.yuklemeler || [], kb = b => b ? (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB') : '';
     const yuklemeHtml = `<div class="ap-card"><h2>Yüklenen dosyalar (${yl.length})</h2><p class="ap-note">ASOS'tan yüklenen her dosya, uygulandığı anda burada listelenir: ne zaman, hangi türde, kaç satır ve hangi plan ayına uygulandı. Dosyanın kendisi saklanmaz, yalnızca bu günlük tutulur.</p><div class="ap-drop"><div class="ap-row" style="justify-content:center"><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''}>Excel dosyası yükle (.xls / .xlsx)</button></div><div class="ap-note" style="text-align:center;margin-top:6px">ya da dosyaları bu alana sürükleyip bırakın · EKİP listesi, Personel Listesi Raporu, Nöbet Listesi, Nöbet İçi Hareket Raporu (birlikte seçilebilir)</div></div>${tabloHtml(['Tarih', 'Dosya', 'Tür', 'Satır', 'Boyut', 'Plan ayı', 'Sonuç', ''], yl.slice(0, 100).map((x, xi) => [new Date(x.t).toLocaleString('tr-TR'), esc(x.ad), DOSYA_TUR[x.tur] || x.tur, x.satir, kb(x.boyut), ayAd(x.ay), esc(x.ozet) + (x.guncel ? ` <span class="ap-note">(${x.guncel + 1}. yükleme, güncellendi)</span>` : ''), S.rol === 'salt_okur' ? '' : `<button class="ap-btn sm dng" data-act="yukleme-sil" data-v="${xi}" title="Bu yükleme kaydını sil">Sil</button>`]))}${yl.length > 100 ? '<div class="ap-note">Son 100 kayıt gösteriliyor.</div>' : ''}</div>`;
-    return dosyaDurumHtml() + arsivAyListeHtml() + `<div class="ap-card"><h2>Aylık arşiv</h2>
+    const asek = [['dosya', 'Yüklenen dosyalar'], ['ay', 'Aylara göre arşiv'], ['kayit', 'Aylık arşiv']], aa = asek.some(x => x[0] === S.arsivSekme) ? S.arsivSekme : 'dosya';
+    const nav = `<div class="ap-subnav ap-noprint">${asek.map(([v, t]) => `<button class="${aa === v ? 'on' : ''}" data-act="arsiv-sekme" data-v="${v}">${t}</button>`).join('')}</div>`;
+    const kayit = `<div class="ap-card"><h2>Aylık arşiv</h2>
       <p class="ap-note">Arşiv, her ayın istasyon bazlı özetini saklar: ihtiyaç, planlanan, kapasite, <b>çıkan ve gelen personel (branş ve istasyon)</b>, <b>fazla nöbet</b> alan kişiler. TC, telefon ve sağlık bilgisi arşive yazılmaz. Arşiv aynı tarayıcı veritabanında tutulur; yedeği Ayarlar'dan alınır.</p>
       <div class="ap-row"><button class="ap-btn pri" data-act="arsiv-yaz" ${duz ? '' : 'disabled'}>${ayEtiket()} ayını arşive kaydet${var_ ? ' (güncelle)' : ''}</button>
       <label class="ap-note"><input type="checkbox" id="ap-arsiv-kilit" ${S.rol === 'yonetici' ? '' : 'disabled'}> Kaydederken ayı kilitle (yalnız yönetici)</label>
       <button class="ap-btn" data-act="arsiv-hepsi" ${duz && kayitliPlan.length + (var_ ? 0 : 1) > 0 ? '' : 'disabled'} title="Tarayıcıdaki arşivlenmemiş tüm aylık planları arşive ekler">Kayıtlı tüm planları arşivle (${kayitliPlan.length})</button></div>
       ${var_ ? `<div class="ap-note" style="margin-top:8px">${ayEtiket()} son arşivleme: ${new Date(var_.zaman).toLocaleString('tr-TR')}</div>` : ''}</div>
       <div class="ap-card"><h2>Arşivlenen aylar (${aylar.length})</h2>${tabloHtml(['Ay', 'Arşivleme', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Personel önerilen ist.', 'Hesap', ''],
-      aylar.map(a => { const r = S.arsivVeri[a], t = arsivToplam(r); return [ayAd(a), new Date(r.zaman).toLocaleDateString('tr-TR'), t.ihtiyac, t.planlanan, t.cikan, t.gelen, t.fazla, t.oner, r.hesapImza === hesapImza() ? (r.yenilendi ? `<span class="ap-note" title="Güncel yönteme göre yeniden hesaplandı">güncellendi ${new Date(r.yenilendi).toLocaleDateString('tr-TR')}</span>` : 'güncel') : '<span class="ap-note" style="color:var(--ap-warn)" title="Bu ayın planı bu tarayıcıda yoksa eski yöntemle kalır">eski hesap</span>', S.rol === 'yonetici' ? `<button class="ap-btn sm dng" data-act="arsiv-sil" data-v="${a}">Sil</button>` : '']; }))}</div>` + yuklemeHtml;
+      aylar.map(a => { const r = S.arsivVeri[a], t = arsivToplam(r); return [ayAd(a), new Date(r.zaman).toLocaleDateString('tr-TR'), t.ihtiyac, t.planlanan, t.cikan, t.gelen, t.fazla, t.oner, r.hesapImza === hesapImza() ? (r.yenilendi ? `<span class="ap-note" title="Güncel yönteme göre yeniden hesaplandı">güncellendi ${new Date(r.yenilendi).toLocaleDateString('tr-TR')}</span>` : 'güncel') : '<span class="ap-note" style="color:var(--ap-warn)" title="Bu ayın planı bu tarayıcıda yoksa eski yöntemle kalır">eski hesap</span>', S.rol === 'yonetici' ? `<button class="ap-btn sm dng" data-act="arsiv-sil" data-v="${a}">Sil</button>` : '']; }))}</div>`;
+    return nav + (aa === 'dosya' ? dosyaDurumHtml() + yuklemeHtml : aa === 'ay' ? arsivAyListeHtml() : kayit);
   }
 
   // ---- istatistik: seçilen aylar ----
@@ -1501,7 +1516,8 @@ function mount(root, opts = {}) {
     const k = {};
     k.gist = `<div class="ap-card"><h2>Gerçekleşen nöbet — planlananla karşılaştırma</h2><p class="ap-note">Nöbet Listesi Raporundan: istasyonda fiilen tutulan nöbet (24 saatlik; idari/mesai kayıtları hariç). Fark = gerçekleşen − planlanan (planı arşivlenmiş aylar için). Seçilen aylar: ${G.sec.map(ayAd).join(', ')}.</p>${tabloHtml(['İstasyon', 'Ay', 'Planlanan', 'Gerçekleşen nöbet', 'Fark', 'Nöbet tutan kişi-ay'], G.ist)}</div>`;
     k.gfaz = `<div class="ap-card"><h2>Gerçekleşen fazla nöbet</h2><p class="ap-note">Kişinin o ay tuttuğu nöbet, standart aylık hedefinin (izin ve muafiyet düşülmeden) üstündeyse fazla sayılır. Kadro istasyonu başlığı altında toplanır.</p>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], G.faz)}</div>`;
-    k.gdis = `<div class="ap-card"><h2>Kadrosu dışındaki istasyonlarda tutulan nöbetler</h2><p class="ap-note">Hangi istasyona hangi branştan kişi gelip nöbet tuttu (kişi-ay).</p>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], G.mat)}<h2 style="margin-top:14px">Liste</h2>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Nöbet tuttuğu istasyon', 'Nöbet', 'Aylar'], G.dis)}</div>`;
+    k.gdism = `<div class="ap-card"><h2>Kadrosu dışındaki istasyonlarda tutulan nöbetler</h2><p class="ap-note">Hangi istasyona hangi branştan kişi gelip nöbet tuttu (kişi-ay).</p>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], G.mat)}</div>`;
+    k.gdis = `<div class="ap-card"><h2>Kadrosu dışındaki istasyonlarda tutulan nöbetler — liste</h2>${tabloHtml(['Ad soyad', 'Branş', 'Kadro istasyonu', 'Nöbet tuttuğu istasyon', 'Nöbet', 'Aylar'], G.dis)}</div>`;
     return k;
   }
   // ---- seçim pencereleri: aylar (yıl yıl) ve istasyonlar (ilçe bazlı toplu seçim); boşluğa tıklayınca kapanır ----
@@ -1540,9 +1556,8 @@ function mount(root, opts = {}) {
     const aylar = [...new Set([...Object.keys(S.arsivVeri), ...Object.keys(S.gercekVeri || {})])].sort();
     if (!aylar.length) return '<div class="ap-card ap-empty"><h2>Arşivde ay yok</h2><p>Önce "Arşiv" sayfasından aylık planı arşive kaydedin ya da Nöbet Listesi Raporu yükleyin.</p></div>';
     const st = arsivIstatistik(), gk = gercekKartlar();
-    const kartlar = {seyir: `<div class="ap-card"><h2>Aylara göre seyir (toplam)</h2>${tabloHtml(['Ay', 'İhtiyaç', 'Planlanan', 'Kapasite', 'Çıkan kişi', 'Gelen kişi', 'Fazla nöbet', 'Personel önerilen ist.'], st.seyir)}</div>`, ist: `<div class="ap-card"><h2>İstasyon özeti (seçilen aylar toplamı)</h2><p class="ap-note">Çıkan/gelen: kişi-ay (bir kişi 3 ay çıktıysa 3). Fazla nöbet: kişilerin hedeflerinin üstünde yazılan nöbetlerin toplamı.</p>${tabloHtml(['İstasyon', 'Açık ay', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Fazla nöbetli kişi-ay', 'Personel önerilen ay', 'Ekip OF ay'], st.ist)}</div>`, cik: `<div class="ap-card"><h2>Çıkan personel — kaç ay çıktı</h2>${tabloHtml(['Ad soyad', 'Branş', 'Çıktığı istasyon', 'Gittiği yer', 'Ay sayısı', 'Aylar'], st.cikSat)}</div>`, gel: `<div class="ap-card"><h2>Hangi istasyona hangi branştan personel geldi</h2>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], st.matSat)}
-        <h2 style="margin-top:14px">Gelen personel listesi</h2>${tabloHtml(['Ad soyad', 'Branş', 'Geldiği istasyon', 'Gittiği (gelen) istasyon', 'Ay sayısı', 'Aylar'], st.gelSat)}</div>`, faz: `<div class="ap-card"><h2>Fazla nöbet alan kişiler</h2>${tabloHtml(['Ad soyad', 'Branş', 'İstasyon', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], st.fazSat)}</div>`};
-    const sek = [['seyir', 'Aylara göre seyir'], ['ist', 'İstasyon özeti'], ['cik', 'Çıkan personel'], ['gel', 'Gelen personel'], ['faz', 'Fazla nöbet alanlar'], ...(gk ? [['gist', 'Gerçekleşen nöbet'], ['gfaz', 'Gerçekleşen fazla nöbet'], ['gdis', 'Kadro dışı nöbet']] : [])];
+    const kartlar = {seyir: `<div class="ap-card"><h2>Aylara göre seyir (toplam)</h2>${tabloHtml(['Ay', 'İhtiyaç', 'Planlanan', 'Kapasite', 'Çıkan kişi', 'Gelen kişi', 'Fazla nöbet', 'Personel önerilen ist.'], st.seyir)}</div>`, ist: `<div class="ap-card"><h2>İstasyon özeti (seçilen aylar toplamı)</h2><p class="ap-note">Çıkan/gelen: kişi-ay (bir kişi 3 ay çıktıysa 3). Fazla nöbet: kişilerin hedeflerinin üstünde yazılan nöbetlerin toplamı.</p>${tabloHtml(['İstasyon', 'Açık ay', 'İhtiyaç', 'Planlanan', 'Çıkan', 'Gelen', 'Fazla nöbet', 'Fazla nöbetli kişi-ay', 'Personel önerilen ay', 'Ekip OF ay'], st.ist)}</div>`, cik: `<div class="ap-card"><h2>Çıkan personel — kaç ay çıktı</h2>${tabloHtml(['Ad soyad', 'Branş', 'Çıktığı istasyon', 'Gittiği yer', 'Ay sayısı', 'Aylar'], st.cikSat)}</div>`, gelm: `<div class="ap-card"><h2>Hangi istasyona hangi branştan personel geldi</h2>${tabloHtml(['İstasyon', ...BRANSLAR, 'Toplam'], st.matSat)}</div>`, gel: `<div class="ap-card"><h2>Gelen personel listesi</h2>${tabloHtml(['Ad soyad', 'Branş', 'Geldiği istasyon', 'Gittiği (gelen) istasyon', 'Ay sayısı', 'Aylar'], st.gelSat)}</div>`, faz: `<div class="ap-card"><h2>Fazla nöbet alan kişiler</h2>${tabloHtml(['Ad soyad', 'Branş', 'İstasyon', 'Ay sayısı', 'Toplam fazla nöbet', 'Aylar'], st.fazSat)}</div>`};
+    const sek = [['seyir', 'Aylara göre seyir'], ['ist', 'İstasyon özeti'], ['cik', 'Çıkan personel'], ['gelm', 'Gelen branş matrisi'], ['gel', 'Gelen personel listesi'], ['faz', 'Fazla nöbet alanlar'], ...(gk ? [['gist', 'Gerçekleşen nöbet'], ['gfaz', 'Gerçekleşen fazla nöbet'], ['gdism', 'Kadro dışı nöbet (özet)'], ['gdis', 'Kadro dışı nöbet (liste)']] : [])];
     if (gk) Object.assign(kartlar, gk);
     const aktif = sek.some(x => x[0] === S.arstatSekme) ? S.arstatSekme : 'seyir';
     return `<div class="ap-card"><h2>İstatistik — dönem ve istasyon seçimi</h2>
@@ -1619,7 +1634,7 @@ function mount(root, opts = {}) {
   // Bir istasyonun teklif değerleri ve uyarıları
   function n2TeklifOzet(b) {
     const h = hesapla(b), o = n2OnayOku(b.ad), D = durumlar();
-    const satir = h.satir.map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
+    const satir = h.satir.filter(s => !gizliKisi(s.k)).map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
       return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => (NB_SIRA[x.s.grup] - NB_SIRA[y.s.grup]) || personelSirala(x.k, y.k));
     const toplam = satir.reduce((a, x) => a + x.tek, 0), mevcutT = satir.reduce((a, x) => a + (x.tutar ? x.mevcut : 0), 0);
     return {h, o, satir, toplam, mevcutT, fark: Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
@@ -1778,7 +1793,7 @@ function mount(root, opts = {}) {
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && a !== 'modul') return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && a !== 'modul') return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
@@ -1830,6 +1845,7 @@ function mount(root, opts = {}) {
         toast(`${n} ay arşive eklendi.`); break;
       }
       case 'arsiv-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} arşivi silinsin mi?`)) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
+      case 'arsiv-ay-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`)) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;
       case 'arsiv-ay': { const l = [...new Set(S.arsivSecili || [])]; S.arsivSecili = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
@@ -1841,6 +1857,8 @@ function mount(root, opts = {}) {
         toast('Yükleme kaydı silindi.'); break;
       }
       case 'arsiv-yil': S.arsivYilAc = S.arsivYilAc || {}; S.arsivYilAc[v] = !(S.arsivYilAc[v] != null ? S.arsivYilAc[v] : +v === GUNCEL_Y); break;
+      case 'ayar-sekme': S.ayarSekme = v; break;
+      case 'arsiv-sekme': S.arsivSekme = v; break;
       case 'arstat-sekme': S.arstatSekme = v; break;
       case 'arstat-pop': S.arstatAra = ''; S.arstatAc = S.arstatAc === v ? '' : v; if (S.arstatAc === 'ist') setTimeout(() => { const i = root.querySelector('#ap-ist-ara'); if (i) i.focus(); }, 0); break;
       case 'arstat-yil': S.arstatYil[v] = !(S.arstatYil[v] != null ? S.arstatYil[v] : false); break;
@@ -2508,7 +2526,7 @@ function mount(root, opts = {}) {
         case 'plan-bos': S.plan = bosPlan(); logla('Boş plan oluşturuldu'); kaydet(); S.sayfa = 'ist'; break;
         case 'plan-kopya': {
           const pk = S.m === 1 ? `plan:${S.y - 1}-12` : `plan:${S.y}-${C.pad(S.m - 1)}`, onceki = await depo.get(pk); if (!onceki) { toast('Önceki ay planı yok.'); break; }
-          S.plan = bosPlan(); S.plan.birimler = JSON.parse(JSON.stringify(onceki.birimler));
+          S.plan = bosPlan(); S.plan.birimler = JSON.parse(JSON.stringify(onceki.birimler)); ofUygula(S.plan);
           const ofBirim = new Set((onceki.birimler || []).filter(b => b.ekipOf).map(b => b.ad));
           S.plan.kayitlar = JSON.parse(JSON.stringify(onceki.kayitlar)).map(k => {
             const y = {...k, izin: [], planlanan: null, kilit: false};
@@ -2526,7 +2544,7 @@ function mount(root, opts = {}) {
           if (S.plan && salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
           const pasif = root.querySelector('#ap-asos-pasif') && root.querySelector('#ap-asos-pasif').checked, eksik = (A.raporlar.find(r => r.tur === 'A') || {eksik: []}).eksik;
           const yeni = A.plan; if (pasif) yeni.kayitlar.forEach(k => { if (eksik.some(e => e.id === k.id)) k.durum = 'PASİF'; });
-          S.plan = yeni; otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
+          S.plan = yeni; ofUygula(S.plan); otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | '));
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
@@ -2596,6 +2614,7 @@ function mount(root, opts = {}) {
         const b = S.plan.birimler.find(x => x.ad === t.dataset.v);
         if (b) {
           const aciliyor = !t.checked && b.ekipOf, dis = aciliyor ? geriCagirmaAdaylari(b) : [];
+          S.ayar.ofIst = (Array.isArray(S.ayar.ofIst) ? S.ayar.ofIst : []).filter(x => x !== b.ad); if (t.checked) S.ayar.ofIst.push(b.ad); await ayarKaydet();
           mut(() => { b.ekipOf = t.checked; }, t.checked ? 'Ekip OF işaretlendi' : 'Ekip OF kaldırıldı (ekip açıldı)', b.ad);
           if (aciliyor && dis.length && confirm(`${b.ad} yeniden açılıyor. Başka birimlere görevli ${dis.length} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`)) toast(`${geriCagir(b)} personel geri çağrıldı.`);
         }
