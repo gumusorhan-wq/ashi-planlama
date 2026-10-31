@@ -594,7 +594,7 @@
   }
   // Her değişiklikte (kilitli değerler hariç) tüm istasyonlarda planlanan nöbeti yeniden hesaplar
   function otoHesapla() {
-    if (!S.plan || S.ayar.otoOner === false) return;
+    if (!S.plan || S.ayar.otoOner === false || !guncelAy()) return;      // geçmiş aylar dondurulur
     S.plan.birimler.forEach(b => { if (b.tur === 'istasyon') oner(b.ad); });
   }
   function oner(birimAd) {
@@ -624,6 +624,8 @@
         case 'gorev-sekme': S.gorevSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;
         case 'pano-filtre': S.panoFiltre = S.panoFiltre === v ? '' : v; break;
+        case 'guncel-ay': { S.y = GUNCEL_Y; S.m = GUNCEL_M; S.ist = ''; await planYukle(); S.sayfa = 'pano'; break; }
+        case 'arsiv-ac': { const [yy, mm] = String(v).split('-').map(Number); S.y = yy; S.m = mm; S.ist = ''; await planYukle(); S.modul = 1; S.sayfa = S.plan ? 'pano' : 'pano'; break; }
         case 'ay-': case 'ay+': { const d = a === 'ay+' ? 1 : -1; S.m += d; if (S.m > 12) { S.m = 1; S.y++; } if (S.m < 1) { S.m = 12; S.y--; } S.ist = ''; await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); kaydet(); } break; }
         case 'ist-ac': S.ist = v; S.sayfa = 'ist'; break;
         case 'ist-onceki': case 'ist-sonraki': { const L = S.plan.birimler, i = L.findIndex(b => b.ad === S.ist); S.ist = L[(i + (a === 'ist-sonraki' ? 1 : -1) + L.length) % L.length].ad; break; }
@@ -651,7 +653,7 @@
           });
           otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); } logla('Önceki aydan kopyalandı', pk); kaydet(); S.sayfa = 'pano'; break;
         }
-        case 'plan-asos': { const f = await dosyaSec('.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', true); if (f.length) await asosDosyalariIsle(f); return; }
+        case 'plan-asos': { if (salt()) { toast(!guncelAy() ? 'Geçmiş aya dosya yüklenemez (salt okunur).' : 'Düzenleme yetkiniz yok / ay kilitli.'); break; } const f = await dosyaSec('.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', true); if (f.length) await asosDosyalariIsle(f); return; }
         case 'asos-uygula': {
           const A = S.asos; if (!A || !A.plan) break;
           if (S.plan && salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
@@ -739,7 +741,7 @@
   });
 
   root.addEventListener('dragover', e => { if (e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files')) e.preventDefault(); });
-  root.addEventListener('drop', e => { if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); if (S.rol === 'salt_okur' || (S.plan && S.plan.durum === 'kilitli')) { toast('Düzenleme yetkiniz yok / ay kilitli.'); return; } asosDosyalariIsle([...e.dataTransfer.files]); });
+  root.addEventListener('drop', e => { if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); if (salt()) { toast('Düzenleme yetkiniz yok / ay kilitli / geçmiş ay salt okunur.'); return; } asosDosyalariIsle([...e.dataTransfer.files]); });
 
   // başlangıç
   const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); setTimeout(() => arsivArkaPlan(), 1200); })();

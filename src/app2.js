@@ -10,7 +10,7 @@
       ${S.plan ? `<span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>` : ''}
       <span class="ap-sp"></span>
       <label class="ap-note" title="Tema"><select class="ap-sel" data-act="tema"><option value="acik" ${S.ayar.tema !== 'koyu' && S.ayar.tema !== 'sistem' ? 'selected' : ''}>Açık</option><option value="koyu" ${S.ayar.tema === 'koyu' ? 'selected' : ''}>Koyu</option><option value="sistem" ${S.ayar.tema === 'sistem' ? 'selected' : ''}>Sistem</option></select></label>
-      ${S.plan && (S.rol === 'yonetici' || S.rol === 'planlayici') ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir (istasyonlara gönder)'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}
+      ${S.plan && guncelAy() && (S.rol === 'yonetici' || S.rol === 'planlayici') ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir (istasyonlara gönder)'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}
       ${opts.kullanici ? '' : `<label class="ap-note" title="Rol (demo)"><select class="ap-sel" data-act="rol">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`}</div>`;
   }
   const SAYFALAR = [['pano', 'Pano'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['talep', 'İstasyon talepleri'], ['personel', 'Personel'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['log', 'Değişiklik günlüğü'], ['ayar', 'Ayarlar']];
@@ -23,9 +23,9 @@
       <p>Planlama her ayın 10-15'inde bir sonraki ay için yapılır. ASOS'tan indirdiğiniz iki personel dosyasını yükleyin:</p>
       <div class="ap-note" style="margin:6px 0 14px">1) <b>Personel Listesi Raporu</b> (izin, muafiyet, geçici görev tarihleri) &nbsp; 2) <b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi Raporu</b><br>İki dosyayı birlikte seçebilir ya da bu alana sürükleyip bırakabilirsiniz.</div>
       <div class="ap-row" style="justify-content:center">
-        <button class="ap-btn pri" data-act="plan-asos" ${S.rol === 'salt_okur' ? 'disabled' : ''}>Personel listelerini yükle</button>
-        <button class="ap-btn" data-act="plan-kopya" ${oncekiVar && S.rol !== 'salt_okur' ? '' : 'disabled'}>Önceki aydan kopyala (${onceki})</button>
-        <button class="ap-btn" data-act="plan-bos" ${S.rol === 'salt_okur' ? 'disabled' : ''}>Boş plan</button></div>
+        <button class="ap-btn pri" data-act="plan-asos" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''}>Personel listelerini yükle</button>
+        <button class="ap-btn" data-act="plan-kopya" ${oncekiVar && S.rol !== 'salt_okur' && guncelAy() ? '' : 'disabled'}>Önceki aydan kopyala (${onceki})</button>
+        <button class="ap-btn" data-act="plan-bos" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''}>Boş plan</button></div>
       <p class="ap-note">Veriler yalnızca bu tarayıcıda (IndexedDB) tutulur. Yedek almak için Ayarlar'daki JSON yedeğini kullanın.</p></div>`;
   }
 
@@ -344,7 +344,7 @@
     const koyu = S.ayar && (S.ayar.tema === 'koyu' || (S.ayar.tema === 'sistem' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
     root.className = 'ap-root' + (koyu ? ' ap-dark' : ''); document.body.style.background = koyu ? '#0f1720' : '#f4f6f9';
     if (S.rol === 'istasyon') S.modul = 2;
-    root.innerHTML = ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + `<div class="ap-main">${sayfaHtml()}</div>` + (S.modal ? S.modal() : '');
+    root.innerHTML = ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + (guncelAy() ? '' : `<div class="ap-oku"><b>Arşiv görünümü — ${ayEtiket()} salt okunur.</b> Geçmiş aylar yalnızca görüntülenir, değiştirilemez. <button class="ap-btn sm" data-act="guncel-ay">Güncel aya dön (${AYLAR[GUNCEL_M]} ${GUNCEL_Y})</button></div>`) + `<div class="ap-main">${sayfaHtml()}</div>` + (S.modal ? S.modal() : '');
     // Sayı sütunları: tüm hücreleri sayı olan sütunun başlığı ve hücreleri sağa yaslanır (başlık ile sayı aynı hizada)
     root.querySelectorAll('table').forEach(t => {
       const ths = [...t.querySelectorAll('thead th')]; if (!ths.length) return;

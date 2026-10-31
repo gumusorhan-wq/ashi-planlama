@@ -10,7 +10,7 @@
   const n2Ist = () => S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
   const n2Birim = () => S.plan && S.plan.birimler.find(b => b.ad === n2Ist());
   function n2Depo(ad) { const N = (S.plan.nobet = S.plan.nobet || {}); return N[ad] = N[ad] || {istek: {}, izin: {}, liste: null, kural: {}, kisiler: null}; }
-  const n2Duz = () => S.rol !== 'salt_okur' && !(S.plan && S.plan.durum === 'kilitli');
+  const n2Duz = () => S.rol !== 'salt_okur' && guncelAy() && !(S.plan && S.plan.durum === 'kilitli');
   function mut2(fn, islem, detay) {
     if (!n2Duz()) { toast(S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : 'Salt okur modundasınız.'); return false; }
     fn(); S.n2.oneri = null; if (islem) logla(islem, detay); kaydet(); return true;
@@ -214,7 +214,7 @@
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('talep-') && a !== 'modul') return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && a !== 'modul') return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
@@ -269,6 +269,14 @@
       case 'arsiv-ay': { const l = [...new Set(S.arsivSecili || [])]; S.arsivSecili = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
+      case 'yukleme-sil': {
+        const l = S.yuklemeler || [], x = l[+v]; if (!x || S.rol === 'salt_okur') break;
+        if (!confirm(`"${x.ad}" yükleme kaydı silinsin mi?\n\nNot: Dosyanın plana işlediği veriler (kişiler, izinler, nöbetler) geri alınmaz; yalnızca bu günlük kaydı silinir.`)) break;
+        l.splice(+v, 1); await depo.put('yuklemeler', l); S.yuklemeler = l;
+        if (x.tur === 'N' && x.aylar && confirm(`Bu dosyadan oluşturulan gerçekleşen nöbet kayıtları da (${x.aylar.split(',').map(ayAd).join(', ')}) silinsin mi?\n\nTamam: arşiv istatistiklerinden de kalkar. İptal: kayıtlar kalır.`)) { for (const ay of x.aylar.split(',')) { await depo.del('gercek:' + ay); if (S.gercekVeri) delete S.gercekVeri[ay]; } }
+        toast('Yükleme kaydı silindi.'); break;
+      }
+      case 'arsiv-yil': S.arsivYilAc = S.arsivYilAc || {}; S.arsivYilAc[v] = !(S.arsivYilAc[v] != null ? S.arsivYilAc[v] : +v === GUNCEL_Y); break;
       case 'arstat-sekme': S.arstatSekme = v; break;
       case 'arstat-pop': S.arstatAra = ''; S.arstatAc = S.arstatAc === v ? '' : v; if (S.arstatAc === 'ist') setTimeout(() => { const i = root.querySelector('#ap-ist-ara'); if (i) i.focus(); }, 0); break;
       case 'arstat-yil': S.arstatYil[v] = !(S.arstatYil[v] != null ? S.arstatYil[v] : false); break;
