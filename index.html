@@ -1124,12 +1124,16 @@ function mount(root, opts = {}) {
 
   // Yuva bazlı özet: üç yuva (ekip şefi, YSP, sürücü) için dolan/açık ve hangi grubun doldurduğu; gruplara göre fazlalar
   function slotOzet(h) {
-    const d = h.slot, H = d.hedef, A = d.azami, SL = [['es', 'Ekip şefi nöbet branşı'], ['ysp', 'YSP nöbet branşı'], ['sur', 'Sürücü nöbet branşı']];
+    // dolan / açık / dolu etiketleri listedeki kişi bazlı planlanan nöbetlerle hesaplanır (nöbet girildikçe değişir); azami notu yalnız açık kalan yuvada gösterilir
+    const d = h.slot, A = d.azami, SL = [['es', 'Ekip şefi nöbet branşı'], ['ysp', 'YSP nöbet branşı'], ['sur', 'Sürücü nöbet branşı']];
+    const sup = {}; C.GRUPLAR.forEach(g => { sup[g] = 0; });
+    h.satir.forEach(s => { if (!s.nobetYok) sup[s.grup] = (sup[s.grup] || 0) + sayi(s.k.planlanan); });
+    const H = C.akis(sup, d.dem);
     const katki = sl => C.GRUPLAR.filter(g => H.fill[g][sl] > 0.001).map(g => `${C.GRUP_AD[g]} ${fmt(H.fill[g][sl])}`).join(' + ') || '—';
     const satir = SL.map(([sl, ad]) => `<div class="r" style="margin:3px 0"><b style="min-width:150px;display:inline-block">${ad}</b> ${fmt(d.dem[sl])} nöbet · dolan <b>${fmt(d.dem[sl] - H.rem[sl])}</b> <span class="ap-note">(${katki(sl)})</span> ${H.rem[sl] > 0.001 ? `<span class="ap-tag ap-t-ih">${fmt(H.rem[sl])} açık</span> <span class="ap-note">${A.rem[sl] > 0.001 ? 'azamiyle de ' + fmt(A.rem[sl]) + ' açık kalır' : 'azami nöbetle kapanır'}</span>` : '<span class="ap-tag ap-t-ok">dolu</span>'}</div>`).join('');
     const fazla = C.GRUPLAR.filter(g => H.fazla[g] > 0.001).map(g => `<span class="ap-tag ap-t-fz">${C.GRUP_AD[g]}: ${fmt(H.fazla[g])} nöbet fazla</span>`).join(' ');
-    return `<div class="ap-card" style="margin-top:8px;padding:10px"><b>Nöbet branşı dengesi (hedef nöbetle)</b>${satir}
-      ${fazla ? `<div style="margin-top:4px">${fazla} <span class="ap-note">fazla = o gruptaki kişiler hedef nöbetlerini tamamlayamıyor; başka nöbet branşını dolduramaz</span></div>` : ''}
+    return `<div class="ap-card" style="margin-top:8px;padding:10px"><b>Nöbet branşı dengesi (planlanan nöbetle)</b>${satir}
+      ${fazla ? `<div style="margin-top:4px">${fazla} <span class="ap-note">fazla = o gruptaki kişilere yazılan nöbet kendi nöbet branşlarını aşıyor; başka nöbet branşını dolduramaz</span></div>` : ''}
       <div class="ap-note" style="margin-top:4px">Yetenekler: doktor → ekip şefi · işçi → sürücü · AABT (sağlık teknikeri) → ekip şefi, YSP; sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa · ATT (sağlık memuru / teknisyeni) → YSP ve sürücü; ATT ekip şefi nöbet branşına girmez. Önce AABT nöbet branşları doldurur (ekip şefi öncelikli), fazlalık ATT'de görünür.</div></div>`;
   }
   // Silinen kişiler: kayıt kalıcı silinmez, buradan geri getirilebilir
@@ -1189,6 +1193,7 @@ function mount(root, opts = {}) {
     return `<div class="ap-row ap-noprint"><select class="ap-sel" data-act="ist-sec">${birimler.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select>
       <button class="ap-btn" data-act="ist-onceki">‹</button><button class="ap-btn" data-act="ist-sonraki">›</button>
       ${istas ? `<button class="ap-btn pri" data-act="oner" ${duz ? '' : 'disabled'} title="Plan her değişiklikte otomatik hesaplanır; bu düğme kilitli olmayan değerleri yeniden hesaplar">Yeniden hesapla</button>` : ''}
+      ${istas ? `<button class="ap-btn" data-act="ist-onayla" data-v="1" ${duz ? '' : 'disabled'} title="Bu istasyonda yazılı tüm planlanan nöbetleri onaylar: elle değiştirdiğiniz değerler gibi kilitlenir, otomatik hesap bunları değiştirmez">Planı onayla (kilitle)</button><button class="ap-btn" data-act="ist-onayla" data-v="0" ${duz ? '' : 'disabled'} title="Bu istasyondaki tüm kilitleri açar; değerler yeniden otomatik hesaplanır">Kilitleri aç</button>` : ''}
       <button class="ap-btn" data-act="kisi-ekle" ${duz ? '' : 'disabled'}>+ Kişi ekle</button>
       ${disSay ? `<button class="ap-btn" data-act="geri-cagir" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'} title="Bu ekibin başka birimlere görevli personelini geri çağırır">Personeli geri çağır (${disSay})</button>` : ''}<button class="ap-btn" data-act="png" data-v="${esc(b.ad)}">Görüntü (PNG)</button><button class="ap-btn" data-act="excel-ist" data-v="${esc(b.ad)}">Excel</button>
       ${istas ? `<label class="ap-note" title="Kapalı ekip: ihtiyaç 0 sayılır; işareti kaldırınca ekip açılır ve personel geri çağrılabilir"><input type="checkbox" data-act="ekip-of" data-v="${esc(b.ad)}" ${b.ekipOf ? 'checked' : ''} ${duz ? '' : 'disabled'}> <b>Ekip OF (kapalı)</b></label>` : ''}
@@ -2572,6 +2577,12 @@ function mount(root, opts = {}) {
         }
         case 'pano-mod': { S.ayar.panoMod = v === 'mesai' ? 'mesai' : 'fazla'; await ayarKaydet(); if (S.plan && !salt()) { otoHesapla(); kaydet(); } break; }
         case 'oto-geri-cek': { const gc = acikGeriCek(true); toast(gc.length ? `${gc.length} personel geri çağrıldı: ${gc.slice(0, 4).map(x => x.k.ad).join(', ')}${gc.length > 4 ? ' …' : ''}` : 'Geri çağrılacak personel yok: açığı olan istasyonların dışarıdaki personeli bulunmuyor.'); kaydet(); break; }
+        case 'ist-onayla': {      // istasyondaki tüm planlanan değerleri elle girilmiş gibi kilitler (ya da kilitleri açar)
+          const b = S.plan.birimler.find(x => x.ad === S.ist); if (!b || salt()) break; const ac = v === '0', h = hesapla(b); let n = 0;
+          S.toplu = true; try { mut(() => { h.satir.forEach(s => { if (s.nobetYok) return; const k = s.k; if (k.birim !== b.ad) return; if (ac) { if (k.kilit) { k.kilit = false; n++; } } else if (k.planlanan != null && !k.kilit) { k.kilit = true; n++; } }); }, ac ? 'İstasyon kilitleri açıldı' : 'İstasyon planı onaylandı (değerler kilitlendi)', `${b.ad}: ${n} kişi`); } finally { S.toplu = false; }
+          if (ac) { otoHesapla(); kaydet(); }
+          toast(ac ? `${n} kişinin kilidi açıldı.` : `${n} kişinin nöbeti onaylandı (kilitlendi).`); break;
+        }
         case 'geri-cagir': { const b = S.plan.birimler.find(x => x.ad === v); if (!b) break; const n = geriCagirmaAdaylari(b).length; if (n && confirm(`${b.ad} ekibine bağlı, başka birimlere görevli ${n} personel geri çağrılsın mı?`)) toast(`${geriCagir(b)} personel geri çağrıldı.`); break; }
         case 'gorev-bitir': {
           const k = kayit(t.dataset.id); if (!k || !k.gorev) break;
