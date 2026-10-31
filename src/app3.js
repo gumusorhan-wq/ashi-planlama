@@ -673,6 +673,12 @@
         }
         case 'pano-mod': { S.ayar.panoMod = v === 'mesai' ? 'mesai' : 'fazla'; await ayarKaydet(); if (S.plan && !salt()) { otoHesapla(); kaydet(); } break; }
         case 'oto-geri-cek': { const gc = acikGeriCek(true); toast(gc.length ? `${gc.length} personel geri çağrıldı: ${gc.slice(0, 4).map(x => x.k.ad).join(', ')}${gc.length > 4 ? ' …' : ''}` : 'Geri çağrılacak personel yok: açığı olan istasyonların dışarıdaki personeli bulunmuyor.'); kaydet(); break; }
+        case 'ist-onayla': {      // istasyondaki tüm planlanan değerleri elle girilmiş gibi kilitler (ya da kilitleri açar)
+          const b = S.plan.birimler.find(x => x.ad === S.ist); if (!b || salt()) break; const ac = v === '0', h = hesapla(b); let n = 0;
+          S.toplu = true; try { mut(() => { h.satir.forEach(s => { if (s.nobetYok) return; const k = s.k; if (k.birim !== b.ad) return; if (ac) { if (k.kilit) { k.kilit = false; n++; } } else if (k.planlanan != null && !k.kilit) { k.kilit = true; n++; } }); }, ac ? 'İstasyon kilitleri açıldı' : 'İstasyon planı onaylandı (değerler kilitlendi)', `${b.ad}: ${n} kişi`); } finally { S.toplu = false; }
+          if (ac) { otoHesapla(); kaydet(); }
+          toast(ac ? `${n} kişinin kilidi açıldı.` : `${n} kişinin nöbeti onaylandı (kilitlendi).`); break;
+        }
         case 'geri-cagir': { const b = S.plan.birimler.find(x => x.ad === v); if (!b) break; const n = geriCagirmaAdaylari(b).length; if (n && confirm(`${b.ad} ekibine bağlı, başka birimlere görevli ${n} personel geri çağrılsın mı?`)) toast(`${geriCagir(b)} personel geri çağrıldı.`); break; }
         case 'gorev-bitir': {
           const k = kayit(t.dataset.id); if (!k || !k.gorev) break;
