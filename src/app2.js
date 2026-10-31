@@ -162,7 +162,7 @@
     if (!b) return '<div class="ap-card ap-empty">Birim yok.</div>';
     S.ist = b.ad;
     const D = durumlar(), duz = !salt();
-    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida));
+    const kis = S.plan.kayitlar.filter(k => (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)) && (planlamaRol() || !gizliKisi(k)));
     const istas = b.tur === 'istasyon', h = istas ? hesapla(b) : null;
     const disSay = S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef).length;
     const satirMap = new Map(); if (h) h.satir.forEach(s => satirMap.set(s.k.id, s));
@@ -256,7 +256,8 @@
   }
   function personelHtml() {
     const D = durumlar(), f = S.filtre, q = C.TR(f.q);
-    let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)));
+    let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)) && (planlamaRol() || !gizliKisi(k)));
+    liste = [...liste.filter(k => !gizliKisi(k)), ...liste.filter(gizliKisi)];
     const boyut = S.pBoyut || 50, sayfaSay = Math.max(1, Math.ceil(liste.length / boyut)); if (S.pSayfa >= sayfaSay) S.pSayfa = sayfaSay - 1; if (S.pSayfa < 0) S.pSayfa = 0;
     const bas = S.pSayfa * boyut, gos = liste.slice(bas, bas + boyut);
     const rows = gos.map(k => {

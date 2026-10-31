@@ -55,7 +55,7 @@
   // Bir istasyonun teklif değerleri ve uyarıları
   function n2TeklifOzet(b) {
     const h = hesapla(b), o = n2OnayOku(b.ad), D = durumlar();
-    const satir = h.satir.map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
+    const satir = h.satir.filter(s => !gizliKisi(s.k)).map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
       return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => (NB_SIRA[x.s.grup] - NB_SIRA[y.s.grup]) || personelSirala(x.k, y.k));
     const toplam = satir.reduce((a, x) => a + x.tek, 0), mevcutT = satir.reduce((a, x) => a + (x.tutar ? x.mevcut : 0), 0);
     return {h, o, satir, toplam, mevcutT, fark: Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
@@ -266,6 +266,7 @@
         toast(`${n} ay arşive eklendi.`); break;
       }
       case 'arsiv-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} arşivi silinsin mi?`)) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
+      case 'arsiv-ay-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`)) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;
       case 'arsiv-ay': { const l = [...new Set(S.arsivSecili || [])]; S.arsivSecili = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;

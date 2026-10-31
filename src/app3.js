@@ -641,7 +641,7 @@
         case 'plan-bos': S.plan = bosPlan(); logla('Boş plan oluşturuldu'); kaydet(); S.sayfa = 'ist'; break;
         case 'plan-kopya': {
           const pk = S.m === 1 ? `plan:${S.y - 1}-12` : `plan:${S.y}-${C.pad(S.m - 1)}`, onceki = await depo.get(pk); if (!onceki) { toast('Önceki ay planı yok.'); break; }
-          S.plan = bosPlan(); S.plan.birimler = JSON.parse(JSON.stringify(onceki.birimler));
+          S.plan = bosPlan(); S.plan.birimler = JSON.parse(JSON.stringify(onceki.birimler)); ofUygula(S.plan);
           const ofBirim = new Set((onceki.birimler || []).filter(b => b.ekipOf).map(b => b.ad));
           S.plan.kayitlar = JSON.parse(JSON.stringify(onceki.kayitlar)).map(k => {
             const y = {...k, izin: [], planlanan: null, kilit: false};
@@ -659,7 +659,7 @@
           if (S.plan && salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
           const pasif = root.querySelector('#ap-asos-pasif') && root.querySelector('#ap-asos-pasif').checked, eksik = (A.raporlar.find(r => r.tur === 'A') || {eksik: []}).eksik;
           const yeni = A.plan; if (pasif) yeni.kayitlar.forEach(k => { if (eksik.some(e => e.id === k.id)) k.durum = 'PASİF'; });
-          S.plan = yeni; otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
+          S.plan = yeni; ofUygula(S.plan); otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | '));
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
@@ -729,6 +729,7 @@
         const b = S.plan.birimler.find(x => x.ad === t.dataset.v);
         if (b) {
           const aciliyor = !t.checked && b.ekipOf, dis = aciliyor ? geriCagirmaAdaylari(b) : [];
+          S.ayar.ofIst = (Array.isArray(S.ayar.ofIst) ? S.ayar.ofIst : []).filter(x => x !== b.ad); if (t.checked) S.ayar.ofIst.push(b.ad); await ayarKaydet();
           mut(() => { b.ekipOf = t.checked; }, t.checked ? 'Ekip OF işaretlendi' : 'Ekip OF kaldırıldı (ekip açıldı)', b.ad);
           if (aciliyor && dis.length && confirm(`${b.ad} yeniden açılıyor. Başka birimlere görevli ${dis.length} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`)) toast(`${geriCagir(b)} personel geri çağrıldı.`);
         }

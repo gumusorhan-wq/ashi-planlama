@@ -901,8 +901,15 @@ function mount(root, opts = {}) {
     S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, otoGeriCek: true, panoMod: 'fazla', azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 15, kapsam: [], ...a, ...(opts.ayarlar || {})};
     Object.keys(C.DURUM_VARSAYILAN).forEach(k => { if (!S.ayar.durumlar[k]) S.ayar.durumlar[k] = C.DURUM_VARSAYILAN[k]; });
   }
+  // Ekip OF (kapalı istasyon) bilgisi aylar arasında kalıcıdır: kullanıcı açana kadar her ayın planında kapalı gelir
+  function ofUygula(plan) {
+    if (!plan || !S.ayar) return;
+    if (!Array.isArray(S.ayar.ofIst)) S.ayar.ofIst = plan.birimler.filter(b => b.ekipOf).map(b => b.ad);
+    plan.birimler.forEach(b => { if (b.tur === 'istasyon') b.ekipOf = S.ayar.ofIst.includes(b.ad); });
+  }
   async function planYukle() {
     S.plan = (await depo.get(anahtar(S.y, S.m))) || null;
+    if (S.plan && guncelAy()) ofUygula(S.plan);
     S.planAnahtarlari = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort();
     if (S.plan && !S.ist) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     if (S.plan && S.ist && !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
@@ -949,6 +956,8 @@ function mount(root, opts = {}) {
   }
   // Aile hekimliğine geçen personel listede görünür ama hiçbir hesaba girmez; kendi isteği olmadan görevlendirilmez ya da geri çağrılmaz (durumu ancak elle değiştirilebilir)
   const aileHek = k => !!k && k.durum === 'AİLE HEKİMLİĞİNDE';
+  // Aile hekimliği ve uzmanlık eğitimindekiler: yalnız planlama yapanlara (yönetici/planlayıcı) ve listelerin en altında görünür; istasyon planlama görünümünde yer almaz
+  const gizliKisi = k => !!k && (k.durum === 'AİLE HEKİMLİĞİNDE' || k.durum === 'UZMANLIK EĞİTİMİ'), planlamaRol = () => S.rol === 'yonetici' || S.rol === 'planlayici';
   const izinTarihli = k => (k.izin || []).some(i => i.bas && i.bit);
   const izinMetin = k => (k.izin || []).filter(i => sayi(i.gun) > 0).map(i => `${fmt(sayi(i.gun))} ${i.tur || ''}`.trim()).join(', ');
   const izinGun = k => (k.izin || []).reduce((a, i) => a + sayi(i.gun), 0);
@@ -962,7 +971,7 @@ function mount(root, opts = {}) {
   // İstasyon listesi sırası: ekip şefi (doktor, AABT) üstte, YSP (ATT) ortada, sürücü (işçi) en altta
   const NB_SIRA = {dok: 0, ke: 1, ka: 1, ysp: 2, sy: 3, isci: 4};
   const nbSira = (k, satirMap) => { const s = satirMap && satirMap.get(k.id); return s ? NB_SIRA[s.grup] : k.sinif === 'doktor' ? 0 : k.sinif === 'isci' ? 4 : (C.kadroTip(k) === 'AABT' ? 1 : 2); };
-  const nobetSirala = satirMap => (a, b) => (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
+  const nobetSirala = satirMap => (a, b) => (gizliKisi(a) - gizliKisi(b)) || (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
   function personelSirala(a, b) {
     const sg = {doktor: 0, memur: 1, isci: 2};
     return (sg[a.sinif] - sg[b.sinif]) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad, b.ad);
@@ -1131,7 +1140,7 @@ function mount(root, opts = {}) {
     if (!b) return '<div class="ap-card ap-empty">Birim yok.</div>';
     S.ist = b.ad;
     const D = durumlar(), duz = !salt();
-    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida));
+    const kis = S.plan.kayitlar.filter(k => (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)) && (planlamaRol() || !gizliKisi(k)));
     const istas = b.tur === 'istasyon', h = istas ? hesapla(b) : null;
     const disSay = S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef).length;
     const satirMap = new Map(); if (h) h.satir.forEach(s => satirMap.set(s.k.id, s));
@@ -1225,7 +1234,8 @@ function mount(root, opts = {}) {
   }
   function personelHtml() {
     const D = durumlar(), f = S.filtre, q = C.TR(f.q);
-    let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)));
+    let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)) && (planlamaRol() || !gizliKisi(k)));
+    liste = [...liste.filter(k => !gizliKisi(k)), ...liste.filter(gizliKisi)];
     const boyut = S.pBoyut || 50, sayfaSay = Math.max(1, Math.ceil(liste.length / boyut)); if (S.pSayfa >= sayfaSay) S.pSayfa = sayfaSay - 1; if (S.pSayfa < 0) S.pSayfa = 0;
     const bas = S.pSayfa * boyut, gos = liste.slice(bas, bas + boyut);
     const rows = gos.map(k => {
@@ -1435,7 +1445,7 @@ function mount(root, opts = {}) {
     const yil = y => {
       const aylar = [...kume].filter(a => +a.slice(0, 4) === y).sort().reverse(), ac = S.arsivYilAc && S.arsivYilAc[y] != null ? S.arsivYilAc[y] : y === GUNCEL_Y;
       return `<div class="ap-yil"><div class="ap-yilbas"><button class="ap-yilbtn" data-act="arsiv-yil" data-v="${y}"><span>${ac ? '▼' : '▶'}</span> <b>${y}</b> <span class="ap-note">${aylar.length} ay</span></button></div>
-        ${ac ? tabloHtml(['Ay', 'Plan', 'Arşiv kaydı', 'Gerçekleşen nöbet', 'Yüklenen dosya', ''], aylar.map(a => [ayAd(a) + (a === guncel ? ' <span class="ap-tag ap-t-ok">güncel</span>' : '') + (a === simdi ? ' <span class="ap-tag ap-t-ih">açık</span>' : ''), planVar(a) ? '✓' : '—', S.arsivVeri && S.arsivVeri[a] ? new Date(S.arsivVeri[a].zaman).toLocaleDateString('tr-TR') : '—', S.gercekVeri && S.gercekVeri[a] ? '✓' : '—', say(a) || '—', a === simdi ? '' : `<button class="ap-btn sm" data-act="arsiv-ac" data-v="${a}">${a >= `${BUGUN.getFullYear()}-${C.pad(BUGUN.getMonth() + 1)}` ? 'Aç' : 'Aç (salt okunur)'}</button>`])) : ''}</div>`;
+        ${ac ? tabloHtml(['Ay', 'Plan', 'Arşiv kaydı', 'Gerçekleşen nöbet', 'Yüklenen dosya', ''], aylar.map(a => [ayAd(a) + (a === guncel ? ' <span class="ap-tag ap-t-ok">güncel</span>' : '') + (a === simdi ? ' <span class="ap-tag ap-t-ih">açık</span>' : ''), planVar(a) ? '✓' : '—', S.arsivVeri && S.arsivVeri[a] ? new Date(S.arsivVeri[a].zaman).toLocaleDateString('tr-TR') : '—', S.gercekVeri && S.gercekVeri[a] ? '✓' : '—', say(a) || '—', a === simdi ? '' : `<button class="ap-btn sm" data-act="arsiv-ac" data-v="${a}">${a >= `${BUGUN.getFullYear()}-${C.pad(BUGUN.getMonth() + 1)}` ? 'Aç' : 'Aç (salt okunur)'}</button>` + ((S.arsivVeri && S.arsivVeri[a]) || (S.gercekVeri && S.gercekVeri[a]) ? (S.rol === 'yonetici' ? ` <button class="ap-btn sm dng" data-act="arsiv-ay-sil" data-v="${a}" title="Bu ayın arşiv kaydını ve gerçekleşen nöbet verisini siler (plan silinmez)">Arşivi sil</button>` : '') : '')])) : ''}</div>`;
     };
     return `<div class="ap-card"><h2>Aylara göre arşiv</h2><p class="ap-note">Geçmiş bir ayı açarak o ayın planını, personelini ve istatistiklerini görebilirsiniz. <b>Bu ay (${AYLAR[BUGUN.getMonth() + 1]}) ve sonraki aylar düzenlenebilir; daha önceki aylar salt okunurdur</b>: değiştirilemez, dosya yüklenemez.</p>${yillar.map(yil).join('') || '<span class="ap-note">Kayıt yok</span>'}</div>`;
   }
@@ -1624,7 +1634,7 @@ function mount(root, opts = {}) {
   // Bir istasyonun teklif değerleri ve uyarıları
   function n2TeklifOzet(b) {
     const h = hesapla(b), o = n2OnayOku(b.ad), D = durumlar();
-    const satir = h.satir.map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
+    const satir = h.satir.filter(s => !gizliKisi(s.k)).map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
       return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => (NB_SIRA[x.s.grup] - NB_SIRA[y.s.grup]) || personelSirala(x.k, y.k));
     const toplam = satir.reduce((a, x) => a + x.tek, 0), mevcutT = satir.reduce((a, x) => a + (x.tutar ? x.mevcut : 0), 0);
     return {h, o, satir, toplam, mevcutT, fark: Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
@@ -1835,6 +1845,7 @@ function mount(root, opts = {}) {
         toast(`${n} ay arşive eklendi.`); break;
       }
       case 'arsiv-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} arşivi silinsin mi?`)) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
+      case 'arsiv-ay-sil': if (S.rol === 'yonetici' && confirm(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`)) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;
       case 'arsiv-ay': { const l = [...new Set(S.arsivSecili || [])]; S.arsivSecili = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
@@ -2515,7 +2526,7 @@ function mount(root, opts = {}) {
         case 'plan-bos': S.plan = bosPlan(); logla('Boş plan oluşturuldu'); kaydet(); S.sayfa = 'ist'; break;
         case 'plan-kopya': {
           const pk = S.m === 1 ? `plan:${S.y - 1}-12` : `plan:${S.y}-${C.pad(S.m - 1)}`, onceki = await depo.get(pk); if (!onceki) { toast('Önceki ay planı yok.'); break; }
-          S.plan = bosPlan(); S.plan.birimler = JSON.parse(JSON.stringify(onceki.birimler));
+          S.plan = bosPlan(); S.plan.birimler = JSON.parse(JSON.stringify(onceki.birimler)); ofUygula(S.plan);
           const ofBirim = new Set((onceki.birimler || []).filter(b => b.ekipOf).map(b => b.ad));
           S.plan.kayitlar = JSON.parse(JSON.stringify(onceki.kayitlar)).map(k => {
             const y = {...k, izin: [], planlanan: null, kilit: false};
@@ -2533,7 +2544,7 @@ function mount(root, opts = {}) {
           if (S.plan && salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
           const pasif = root.querySelector('#ap-asos-pasif') && root.querySelector('#ap-asos-pasif').checked, eksik = (A.raporlar.find(r => r.tur === 'A') || {eksik: []}).eksik;
           const yeni = A.plan; if (pasif) yeni.kayitlar.forEach(k => { if (eksik.some(e => e.id === k.id)) k.durum = 'PASİF'; });
-          S.plan = yeni; otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
+          S.plan = yeni; ofUygula(S.plan); otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | '));
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
@@ -2603,6 +2614,7 @@ function mount(root, opts = {}) {
         const b = S.plan.birimler.find(x => x.ad === t.dataset.v);
         if (b) {
           const aciliyor = !t.checked && b.ekipOf, dis = aciliyor ? geriCagirmaAdaylari(b) : [];
+          S.ayar.ofIst = (Array.isArray(S.ayar.ofIst) ? S.ayar.ofIst : []).filter(x => x !== b.ad); if (t.checked) S.ayar.ofIst.push(b.ad); await ayarKaydet();
           mut(() => { b.ekipOf = t.checked; }, t.checked ? 'Ekip OF işaretlendi' : 'Ekip OF kaldırıldı (ekip açıldı)', b.ad);
           if (aciliyor && dis.length && confirm(`${b.ad} yeniden açılıyor. Başka birimlere görevli ${dis.length} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`)) toast(`${geriCagir(b)} personel geri çağrıldı.`);
         }

@@ -63,8 +63,15 @@ function mount(root, opts = {}) {
     S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, otoGeriCek: true, panoMod: 'fazla', azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 15, kapsam: [], ...a, ...(opts.ayarlar || {})};
     Object.keys(C.DURUM_VARSAYILAN).forEach(k => { if (!S.ayar.durumlar[k]) S.ayar.durumlar[k] = C.DURUM_VARSAYILAN[k]; });
   }
+  // Ekip OF (kapalı istasyon) bilgisi aylar arasında kalıcıdır: kullanıcı açana kadar her ayın planında kapalı gelir
+  function ofUygula(plan) {
+    if (!plan || !S.ayar) return;
+    if (!Array.isArray(S.ayar.ofIst)) S.ayar.ofIst = plan.birimler.filter(b => b.ekipOf).map(b => b.ad);
+    plan.birimler.forEach(b => { if (b.tur === 'istasyon') b.ekipOf = S.ayar.ofIst.includes(b.ad); });
+  }
   async function planYukle() {
     S.plan = (await depo.get(anahtar(S.y, S.m))) || null;
+    if (S.plan && guncelAy()) ofUygula(S.plan);
     S.planAnahtarlari = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort();
     if (S.plan && !S.ist) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     if (S.plan && S.ist && !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
@@ -111,6 +118,8 @@ function mount(root, opts = {}) {
   }
   // Aile hekimliğine geçen personel listede görünür ama hiçbir hesaba girmez; kendi isteği olmadan görevlendirilmez ya da geri çağrılmaz (durumu ancak elle değiştirilebilir)
   const aileHek = k => !!k && k.durum === 'AİLE HEKİMLİĞİNDE';
+  // Aile hekimliği ve uzmanlık eğitimindekiler: yalnız planlama yapanlara (yönetici/planlayıcı) ve listelerin en altında görünür; istasyon planlama görünümünde yer almaz
+  const gizliKisi = k => !!k && (k.durum === 'AİLE HEKİMLİĞİNDE' || k.durum === 'UZMANLIK EĞİTİMİ'), planlamaRol = () => S.rol === 'yonetici' || S.rol === 'planlayici';
   const izinTarihli = k => (k.izin || []).some(i => i.bas && i.bit);
   const izinMetin = k => (k.izin || []).filter(i => sayi(i.gun) > 0).map(i => `${fmt(sayi(i.gun))} ${i.tur || ''}`.trim()).join(', ');
   const izinGun = k => (k.izin || []).reduce((a, i) => a + sayi(i.gun), 0);
@@ -124,7 +133,7 @@ function mount(root, opts = {}) {
   // İstasyon listesi sırası: ekip şefi (doktor, AABT) üstte, YSP (ATT) ortada, sürücü (işçi) en altta
   const NB_SIRA = {dok: 0, ke: 1, ka: 1, ysp: 2, sy: 3, isci: 4};
   const nbSira = (k, satirMap) => { const s = satirMap && satirMap.get(k.id); return s ? NB_SIRA[s.grup] : k.sinif === 'doktor' ? 0 : k.sinif === 'isci' ? 4 : (C.kadroTip(k) === 'AABT' ? 1 : 2); };
-  const nobetSirala = satirMap => (a, b) => (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
+  const nobetSirala = satirMap => (a, b) => (gizliKisi(a) - gizliKisi(b)) || (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
   function personelSirala(a, b) {
     const sg = {doktor: 0, memur: 1, isci: 2};
     return (sg[a.sinif] - sg[b.sinif]) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad, b.ad);
