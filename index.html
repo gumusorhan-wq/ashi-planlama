@@ -69,7 +69,7 @@ table.ap-t{border-collapse:collapse;width:100%;font-size:13px;background:var(--a
 
 /* İstasyon tablosu: sabit sütun genişlikleri, yana taşma yok */
 .ap-tw-ist{overflow-x:auto}
-table.ap-ist{table-layout:fixed;width:100%;min-width:1040px;font-size:12.5px}
+table.ap-ist{table-layout:fixed;width:100%;min-width:1240px;font-size:12.5px}
 .ap-ist th{padding:6px 4px;font-size:11px;white-space:normal;line-height:1.2}
 .ap-ist td{padding:3px 4px;overflow-wrap:anywhere;vertical-align:middle}
 .ap-ist .ap-in,.ap-ist .ap-sel{width:100%;min-width:0;max-width:100%;font-size:12.5px;padding:4px 5px;text-overflow:ellipsis}
@@ -110,7 +110,7 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-ayno:hover{background:rgba(14,116,144,.1)}
 .ap-ayliste{margin-top:4px;font-size:12px;opacity:.85;white-space:normal;max-width:260px}
 .ap-t.dar{width:auto;min-width:55%}.ap-t.dar td,.ap-t.dar th{padding-right:28px}
-.ap-gh{min-width:230px}.ap-gh .ap-sel,.ap-gh .ap-in{width:100%;margin-top:4px}.ap-gh .ap-sel{margin-top:0}
+.ap-gh{min-width:0}.ap-gh .ap-sel,.ap-gh .ap-in{width:100%;margin-top:4px}.ap-gh .ap-sel{margin-top:0}
 .ap-t tr.c td .ap-note{color:inherit;opacity:.85}
 .ap-ist input[data-f=planlanan]{-moz-appearance:auto;appearance:auto;width:78px}
 .ap-ist input[data-f=planlanan]::-webkit-inner-spin-button,.ap-ist input[data-f=planlanan]::-webkit-outer-spin-button{-webkit-appearance:inner-spin-button;opacity:1;margin-left:2px}
@@ -1205,7 +1205,7 @@ function mount(root, opts = {}) {
       ${istas ? `<label class="ap-note" title="Kapalı ekip: ihtiyaç 0 sayılır; işareti kaldırınca ekip açılır ve personel geri çağrılabilir"><input type="checkbox" data-act="ekip-of" data-v="${esc(b.ad)}" ${b.ekipOf ? 'checked' : ''} ${duz ? '' : 'disabled'}> <b>Ekip OF (kapalı)</b></label>` : ''}
       <label class="ap-note"><input type="checkbox" data-act="tahmini" ${S.ayar.tahminiGoster ? 'checked' : ''}> Çıktıda tahmini nöbeti göster</label></div>
       ${durumBar}${lejant()}
-      <div class="ap-tw ap-tw-ist"><table class="ap-t ap-ist"><colgroup><col style="width:14.5%"><col style="width:8.5%"><col style="width:6%"><col style="width:10.5%"><col style="width:10.3%"><col style="width:4%"><col style="width:5.8%"><col style="width:3.6%"><col style="width:3.1%"><col style="width:3.3%"><col style="width:4.8%"><col style="width:3.1%"><col style="width:2.2%"><col style="width:9.2%"><col style="width:6%"><col style="width:5.1%"></colgroup><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>SINIF</th><th>NÖBET ROLÜ</th><th>G.GÖREV DURUMU</th><th>İZİN GÜN</th><th>İZİN TÜRÜ</th><th>MESAİ</th><th>HEDEF</th><th>AZAMİ</th><th>PLAN</th><th>FARK</th><th>🔒</th><th>GEÇİCİ GÖREV</th><th>YOLLUK</th><th>İŞLEM</th></tr></thead><tbody>${rows || '<tr><td colspan="16" class="ap-empty">Bu birimde kayıt yok</td></tr>'}</tbody></table></div>${silinenHtml(b, duz)}`;
+      <div class="ap-tw ap-tw-ist"><table class="ap-t ap-ist"><colgroup><col style="width:11.5%"><col style="width:7.5%"><col style="width:6%"><col style="width:9.5%"><col style="width:9.5%"><col style="width:4%"><col style="width:5.8%"><col style="width:3.6%"><col style="width:3.1%"><col style="width:3.3%"><col style="width:4.8%"><col style="width:3.1%"><col style="width:2.2%"><col style="width:14%"><col style="width:5.5%"><col style="width:6.6%"></colgroup><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>SINIF</th><th>NÖBET ROLÜ</th><th>G.GÖREV DURUMU</th><th>İZİN GÜN</th><th>İZİN TÜRÜ</th><th>MESAİ</th><th>HEDEF</th><th>AZAMİ</th><th>PLAN</th><th>FARK</th><th>🔒</th><th>GEÇİCİ GÖREV</th><th>YOLLUK</th><th>İŞLEM</th></tr></thead><tbody>${rows || '<tr><td colspan="16" class="ap-empty">Bu birimde kayıt yok</td></tr>'}</tbody></table></div>${silinenHtml(b, duz)}`;
   }
 
   function gorevHtml() {
@@ -2443,6 +2443,11 @@ function mount(root, opts = {}) {
       out.push({id: k.id, ad: k.ad, sinif: k.sinif, rol: C.GRUP_AD[grup], kaynak: src.b.ad, uzun: !!src.b.ekipOf, kaynakDurum: src.h.durum, hedef, km, ayniIlce: t ? C.ilceAdi(t.ad) === ilce : false, neden: nedenMetin(k)});
       if (t) { let kalan = hd > 0 ? hd : t.tam; yet.slice().sort((x, y) => t.acik[y] - t.acik[x]).forEach(y => { const u = Math.min(kalan, t.acik[y]); t.acik[y] -= u; kalan -= u; }); }
     }));
+    // İşçi kendi istasyonu dışında tek başına kalamaz: hedef istasyonda başka işçi yoksa ve oraya en az iki işçi gitmiyorsa tek işçi önerilmez
+    const D = durumlar(), isciVar = ad => { const x = ists.find(y => y.b.ad === ad); return !!x && x.h.satir.some(s => s.grup === 'isci' && !s.nobetYok && !(D[s.k.durum] || {}).disarida && s.k.birim === ad); };
+    const gelenIsci = {}; S.plan.kayitlar.forEach(k => { if (k.sinif === 'isci' && gorevAktif(k.gorev) && k.gorev.hedef) gelenIsci[k.gorev.hedef] = (gelenIsci[k.gorev.hedef] || 0) + 1; });
+    out.forEach(o => { if (o.sinif === 'isci' && o.hedef) gelenIsci[o.hedef] = (gelenIsci[o.hedef] || 0) + 1; });
+    out.forEach(o => { if (o.sinif === 'isci' && o.hedef && !isciVar(o.hedef) && gelenIsci[o.hedef] < 2) { gelenIsci[o.hedef]--; o.neden += ' · hedefte tek işçi kalacağı için önerilmedi'; o.hedef = ''; o.km = null; o.ayniIlce = false; } });
     return out;
   }
   function rotasyonHtml() {
