@@ -110,3 +110,4 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-t.ap-ferah td,.ap-t.ap-ferah th{padding-top:12px;padding-bottom:12px}.ap-t.ap-ferah td.num+td:not(.num),.ap-t.ap-ferah th.num+th:not(.num){padding-left:80px}
 .ap-tagbtn{border:0;font:inherit;font-weight:700;cursor:pointer}.ap-onerac td{background:rgba(220,38,38,.05);padding:10px 14px}
 .ap-stp{display:flex;align-items:center;gap:2px}.ap-stp .ap-in{flex:1;min-width:0;width:auto!important}.ap-stb{display:flex;flex-direction:column;gap:1px}.ap-stb button{width:17px;height:14px;line-height:12px;padding:0;font-size:8px;border:1px solid #cbd5e1;border-radius:3px;background:#fff;color:#334155;cursor:pointer}.ap-stb button:hover:not(:disabled){background:#e2e8f0}.ap-stb button:disabled{opacity:.4;cursor:default}
+.ap-ist tr.mes-eksik td:first-child input{color:#b91c1c;font-weight:700}.ap-ist tr.mes-eksik td.fk{color:#b91c1c !important;font-weight:800}

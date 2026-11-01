@@ -185,14 +185,16 @@
     kis.sort(nobetSirala(satirMap));
     const p = h ? planlananToplam(h) : 0;
     let son = '', rows = '';
+    const mesEksik = [];
     kis.forEach(k => {
       const gelen = k.birim !== b.ad, s = satirMap.get(k.id), dt = D[k.durum] || {};
       if (!gelen && son && k.sinif !== son) rows += '<tr class="sep"><td colspan="16"></td></tr>';
       if (!gelen) son = k.sinif;
       const renk = gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), eng = C.gorevlendirmeEngeli(k, ayIlk());
       const dis = duz ? '' : 'disabled';
-      const fark = s ? sayi(k.planlanan) - s.hedef : 0;
-      rows += `<tr class="c" style="${renk ? 'background:' + renk : ''}">
+      const fark = s ? sayi(k.planlanan) - s.hedef : 0, eksikMesai = !!s && !s.nobetYok && !gelen && k.planlanan != null && fark < -0.01;
+      if (eksikMesai) mesEksik.push(`${k.ad} (${fmt(fark)})`);
+      rows += `<tr class="c${eksikMesai ? ' mes-eksik' : ''}" title="${eksikMesai ? 'Planlanan nöbet hedefin altında: mesaisi eksik kalıyor' : ''}" style="${renk ? 'background:' + renk : ''}">
         <td><input class="ap-in w" data-id="${k.id}" data-f="ad" value="${esc(k.ad)}" ${dis}></td>
         <td><input class="ap-in w" data-id="${k.id}" data-f="unvan" value="${esc(k.unvan)}" ${dis} title="${esc(k.dortB ? '4/B' : '')}">${k.dortB ? '<span class="ap-tag ap-t-fz" title="4/B personel">4/B</span>' : ''}</td>
         <td><select class="ap-sel" data-id="${k.id}" data-f="sinif" ${dis}>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === k.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
@@ -202,7 +204,7 @@
         <td><select class="ap-sel" data-id="${k.id}" data-f="izinTur" ${dis}><option value="">—</option>${IZIN_TURLERI.map(a => `<option ${a === ((k.izin || [])[0] || {}).tur ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
         <td class="num">${s ? fmt(s.mesai) : ''}</td><td class="num">${s ? fmt(s.hedef) : ''}</td><td class="num">${s && !s.nobetYok ? fmt(s.azami) : ''}</td>
         <td>${istas && !(s && s.nobetYok) ? `<div class="ap-stp"><input class="ap-in n" type="number" min="0" step="0.5" data-id="${k.id}" data-f="planlanan" value="${k.planlanan ?? ''}" ${dis}><span class="ap-stb"><button type="button" data-act="plan-art" data-id="${k.id}" data-v="1" ${dis} title="0,5 artır">▲</button><button type="button" data-act="plan-art" data-id="${k.id}" data-v="-1" ${dis} title="0,5 azalt">▼</button></span></div>` : ''}</td>
-        <td class="num ${fark > 0 ? 'ap-pos' : fark < 0 ? 'ap-neg' : ''}">${s && !s.nobetYok && k.planlanan != null ? (fark > 0 ? '+' : '') + fmt(fark) : ''}</td>
+        <td class="num fk ${fark > 0 ? 'ap-pos' : fark < 0 ? 'ap-neg' : ''}">${s && !s.nobetYok && k.planlanan != null ? (fark > 0 ? '+' : '') + fmt(fark) : ''}</td>
         <td>${istas && !(s && s.nobetYok) ? `<input type="checkbox" data-id="${k.id}" data-f="kilit" ${k.kilit ? 'checked' : ''} ${dis} title="Kilitli değer otomatik hesapta değişmez. Elle girilen planlanan değer kendiliğinden kilitlenir; kilidi açınca yeniden hesaplanır.">` : ''}</td>
         <td>${gelen ? esc(k.birim + ' kadrosundan') : gorevHucre(k, birimler, b, dt, dis)}${eng ? `<div class="ap-note" style="color:var(--ap-bad)">${esc(eng)}</div>` : ''}</td>
         <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${dis}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === ((k.gorev || {}).yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
@@ -222,7 +224,7 @@
       ${disSay ? `<button class="ap-btn" data-act="geri-cagir" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'} title="Bu ekibin başka birimlere görevli personelini geri çağırır">Personeli geri çağır (${disSay})</button>` : ''}<button class="ap-btn" data-act="png" data-v="${esc(b.ad)}">Görüntü (PNG)</button><button class="ap-btn" data-act="excel-ist" data-v="${esc(b.ad)}">Excel</button>
       ${istas ? `<label class="ap-note" title="Kapalı ekip: ihtiyaç 0 sayılır; işareti kaldırınca ekip açılır ve personel geri çağrılabilir"><input type="checkbox" data-act="ekip-of" data-v="${esc(b.ad)}" ${b.ekipOf ? 'checked' : ''} ${duz ? '' : 'disabled'}> <b>Ekip OF (kapalı)</b></label>` : ''}
       <label class="ap-note"><input type="checkbox" data-act="tahmini" ${S.ayar.tahminiGoster ? 'checked' : ''}> Çıktıda tahmini nöbeti göster</label></div>
-      ${durumBar}${lejant()}
+      ${durumBar}${mesEksik.length && !b.ekipOf ? `<div class="ap-ek ap-ek-c" style="margin:8px 0;color:var(--ap-bad)"><b>Mesaisi eksik kalan personel (${mesEksik.length}):</b> ${mesEksik.map(esc).join(' · ')} <span class="ap-note">— planlanan nöbet hedeflerinin altında; satırları kırmızı gösterilir</span></div>` : ''}${lejant()}
       <div class="ap-tw ap-tw-ist"><table class="ap-t ap-ist"><colgroup><col style="width:10.3%"><col style="width:7%"><col style="width:6%"><col style="width:9.5%"><col style="width:9.5%"><col style="width:4%"><col style="width:5.8%"><col style="width:3.6%"><col style="width:3.1%"><col style="width:3.3%"><col style="width:6.5%"><col style="width:3.1%"><col style="width:2.2%"><col style="width:14%"><col style="width:5.5%"><col style="width:6.6%"></colgroup><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>SINIF</th><th>NÖBET ROLÜ</th><th>G.GÖREV DURUMU</th><th>İZİN GÜN</th><th>İZİN TÜRÜ</th><th>MESAİ</th><th>HEDEF</th><th>AZAMİ</th><th>PLAN</th><th>FARK</th><th>🔒</th><th>GEÇİCİ GÖREV</th><th>YOLLUK</th><th>İŞLEM</th></tr></thead><tbody>${rows || '<tr><td colspan="16" class="ap-empty">Bu birimde kayıt yok</td></tr>'}</tbody></table></div>${silinenHtml(b, duz)}`;
   }
 
