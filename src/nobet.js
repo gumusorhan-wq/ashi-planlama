@@ -202,7 +202,7 @@ const NobetCore = (() => {
   // 1) Nöbet adetleri (24 saatlik: es/ysp/sur; işçi 12 saatlik: surG/surA) akış ile nöbet branşlarına dağıtılır → her kişi tam adedini alır
   // 2) Kişinin nöbetleri ay boyunca eşit aralıklı günlere yerleştirilir
   // 3) Yalnızca iki yuvanın içeriğini takas eden hamlelerle (adetler değişmez) kural ihlalleri tavlama ile giderilir
-  function uret2(H, seed, sureMs) {
+  function uret2(H, seed, sureMs, basla) {
     const {N, P, K} = H, R = rng(seed), m = P.length, t0 = Date.now();
     // işçi yarım vardiyaları aynı gün iki farklı kişi tarafından tutulabilir; bir işçinin yarımları gün sayısını aşıyorsa (tek işçi gibi) fazlası 2 yarım = 1 tam (24 saat) nöbete çevrilir
     const u24 = P.map(p => p.isci ? 0 : p.hedef24), uh = P.map(p => p.isci ? p.hedefYarim : 0);
@@ -214,7 +214,17 @@ const NobetCore = (() => {
       if (!degisti) break;
     }
     const elig = (i, t) => { const p = P[i]; if (t === 'surG' || t === 'surA') return p.isci && uh[i] > 0; if (p.isci) return t === 'sur' && u24[i] > 0; return t === 'es' ? p.yet.includes('es') : t === 'ysp' ? p.yet.includes('ysp') : t === 'sur' ? p.yet.includes('sur') : false; };
-    const isciGun = new Set(); for (let j = 0; j < gunIsci; j++) isciGun.add(1 + Math.floor((j + 0.5) * N / gunIsci));
+    // işçi gündüz/gece vardiyası olan günler ay boyunca eşit aralıklı seçilir (art arda üç işçi günü olmaz: iki işçiyle gece kuralı tutmaz);
+    // aralıklı düzenin kayması, hafta sonu / tatil günü payı oranına en yakın olanı seçilerek ayarlanır (24 saatlik sürücü günleri de dengeli kalsın)
+    let isciGun = new Set();
+    { let enFark = Infinity;
+      for (let dn = 0; dn < 12 && gunIsci > 0; dn++) {
+        const off = dn === 0 ? 0.5 : R(), set = new Set(); for (let j = 0; j < gunIsci; j++) set.add(Math.min(N, 1 + Math.floor((j + off) * N / gunIsci)));
+        if (set.size !== gunIsci) continue;
+        let oz = 0; set.forEach(d => { if (H.ozel[d]) oz++; });
+        const fark = Math.abs(oz - gunIsci * H.ozelOran) + (dn === 0 ? 0 : 0.01); if (fark < enFark) { enFark = fark; isciGun = set; }
+      }
+      if (!isciGun.size) for (let j = 0; j < gunIsci; j++) isciGun.add(1 + Math.floor((j + 0.5) * N / gunIsci)); }
     const slotD = [], slotT = [], gunSlot = Array.from({length: N + 1}, () => []);
     const ekle = (d, t) => { gunSlot[d].push(slotD.length); slotD.push(d); slotT.push(t); };
     for (let d = 1; d <= N; d++) { ekle(d, 'es'); ekle(d, 'ysp'); if (isciGun.has(d)) { ekle(d, 'surG'); ekle(d, 'surA'); } else ekle(d, 'sur'); }
@@ -237,6 +247,11 @@ const NobetCore = (() => {
       items.sort((x, y) => x.z - y.z); const sl = tipSlot[t], Rn = items.length;
       items.forEach((it, r) => { let c = Math.min(sl.length - 1, Math.floor((r + 0.5) * sl.length / Rn)); const c0 = c; while (c < sl.length && cont[sl[c]] >= 0) c++; if (c >= sl.length) { c = c0; while (c >= 0 && cont[sl[c]] >= 0) c--; } if (c < 0) return; cont[sl[c]] = it.i; place[it.i].push(sl[c]); });
     });
+    // başlangıç listesi verilmişse (önceki en iyi sonuç) oradan düşük sıcaklıkla iyileştirilir; yuva düzeni aynıysa uygulanır
+    let T0x = 160;
+    if (basla) { const idx = new Map(P.map((p, i) => [p.id, i])); let uyum = true; const yeni = new Int16Array(S).fill(-1);
+      for (let s2 = 0; s2 < S && uyum; s2++) { const id = basla[slotD[s2]] && basla[slotD[s2]][slotT[s2]]; if (id == null) { continue; } if (!idx.has(id)) { uyum = false; break; } yeni[s2] = idx.get(id); }
+      if (uyum) { cont.set(yeni); place.forEach((_, i) => { place[i] = []; }); for (let s2 = 0; s2 < S; s2++) if (cont[s2] >= 0) place[cont[s2]].push(s2); T0x = 45; } }
     const hasDay = P.map(() => new Uint8Array(N + 2)); place.forEach((pl, i) => pl.forEach(s => { hasDay[i][slotD[s]]++; }));
     // maliyet
     const pcost = i => {
@@ -258,7 +273,7 @@ const NobetCore = (() => {
     const pc = P.map((_, i) => pcost(i)); let toplam = pc.reduce((x, v) => x + v, 0), en = toplam, enCont = Int16Array.from(cont);
     // 3) tavlama: iki slotun içeriğini takas et
     const dolu = []; for (let s = 0; s < S; s++) if (cont[s] >= 0) dolu.push(s);
-    const sure = Math.max(50, sureMs - (Date.now() - t0)), T0 = 160, T1 = 6; let it = 0;
+    const sure = Math.max(50, sureMs - (Date.now() - t0)), T0 = T0x, T1 = 6; let it = 0;
     while (toplam > 0) {
       const el = Date.now() - t0; if (el >= sureMs) break;
       const frac = (el) / sureMs, T = T0 * Math.pow(T1 / T0, frac);
@@ -307,8 +322,8 @@ const NobetCore = (() => {
     return {toplam, bos};
   }
 
-  // Kural ihlalleri: boş yuva, yetenek dışı, izinli kişiye nöbet, aynı gün çift görev, dinlenme, izin öncesi boşluk, gün aşırı sürücü, 3 gece, azami aralık. Bunlar kalmamalıdır (istek, nöbet sayısı farkı ve hafta sonu dengesi tercihtir).
-  const SERT = new Set(['eksik', 'yetenek', 'izin', 'cakisma', 'dinlenme', 'izinOnce', 'surGunAsiri', 'isciGece', 'aralik']);
+  // Kural ihlalleri: boş yuva, yetenek dışı, izinli kişiye nöbet, aynı gün çift görev, dinlenme, izin öncesi boşluk, gün aşırı sürücü, 3 gece, azami aralık. Bunlar kalmamalıdır (istek ve nöbet sayısı farkı tercihtir; hafta sonu dengesi de kural gibi zorlanır).
+  const SERT = new Set(['eksik', 'yetenek', 'izin', 'cakisma', 'dinlenme', 'izinOnce', 'surGunAsiri', 'isciGece', 'aralik', 'ozelGun']);
   const sertSay = ihlal => ihlal.filter(i => SERT.has(i.tur)).length;
   const kalite = (son) => sertSay(son.ihlal) * 1e7 + son.toplam;
 
@@ -347,14 +362,14 @@ const NobetCore = (() => {
     if (kal >= 1e7) {
       zorlandi = true; const t1 = Date.now(); let n = 0;
       // kadro bu ayın yuvalarını yetenek/adet olarak doldurmaya yetmiyorsa (boş yuva kaçınılmaz) uzun deneme boşunadır: kısa tutulur, sonra boşlar uygun kişilerle doldurulur
-      if (kapasiteAnalizi(girdi, o.kural).toplam > 0) o.zorlaMs = Math.min(o.zorlaMs, 3500);
+      if (kapasiteAnalizi(girdi, o.kural).toplam > 0) o.zorlaMs = Math.min(o.zorlaMs, 4500);
       while (kal >= 1e7 && Date.now() - t1 < o.zorlaMs) {
-        dene(H, o.seed + 5000 + 131 * (n++), Math.min(2500 + 500 * n, Math.max(300, o.zorlaMs - (Date.now() - t1))));      // kurallar gevşetilmez: aynı kurallarla daha uzun / farklı tohumlu denemeler
+        { const ms = Math.min(2500 + 500 * n, Math.max(300, o.zorlaMs - (Date.now() - t1))), sd = o.seed + 5000 + 131 * (n++); denendi++; const r = uret2(H, sd, ms, n % 2 === 0 ? null : eniyi), son = denetle(r.liste, H), k = kalite(son); if (k < kal) { kal = k; eniyi = r.liste; } }      // dönüşümlü: sıfırdan yeni deneme / en iyiden düşük sıcaklıkla iyileştirme      // kurallar gevşetilmez: aynı kurallarla daha uzun / farklı tohumlu denemeler
       }
       if (kal >= 1e7) {
         const d = doldur(eniyi.map(x => ({...x})), H); const son = denetle(d.liste, H);
         if (kalite(son) < kal) { eniyi = d.liste; kal = kalite(son); }
-        if (kal >= 1e7) { const it = iyilestir(eniyi, H, o.seed + 91, Math.min(4000, o.zorlaMs)); const s2 = denetle(it.liste, H); if (kalite(s2) < kal) { eniyi = it.liste; kal = kalite(s2); } }
+        if (kal >= 1e7) { const it = iyilestir(eniyi, H, o.seed + 91, 7000); const s2 = denetle(it.liste, H); if (kalite(s2) < kal) { eniyi = it.liste; kal = kalite(s2); } }
       }
     }
     const son = denetle(eniyi, H);
