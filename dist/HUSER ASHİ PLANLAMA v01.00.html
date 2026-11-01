@@ -2565,7 +2565,7 @@ function mount(root, opts = {}) {
       case 'durum': mut(() => { k.durum = v; k.durumMetin = ''; k.durumManuel = true; }, 'Durum değişti', `${k.ad}: ${v || '—'}`); break;
       case 'izinGun': { const n = sayi(v); mut(() => { k.izin = k.izin || []; if (n > 0) { if (k.izin[0]) k.izin[0].gun = n; else k.izin.push({gun: n, tur: 'YILLIK İZİN'}); } else k.izin = []; }, 'İzin değişti', `${k.ad}: ${n} gün`); break; }
       case 'izinTur': mut(() => { if (!k.izin || !k.izin[0]) k.izin = [{gun: 0, tur: v}]; else k.izin[0].tur = v; }, 'İzin türü', `${k.ad}: ${v}`); break;
-      case 'planlanan': mut(() => { k.planlanan = v === '' ? null : sayi(v); k.kilit = v !== ''; }, 'Planlanan nöbet (elle)', `${k.ad}: ${v}`); break;
+      case 'planlanan': S.toplu = true; try { mut(() => { k.planlanan = v === '' ? null : sayi(v); k.kilit = v !== ''; }, 'Planlanan nöbet (elle)', `${k.ad}: ${v}`); } finally { S.toplu = false; } break;      // elle değişiklikte diğer kişilerin değerleri yeniden hesaplanmaz
       case 'kilit': mut(() => { k.kilit = !!v; }, v ? 'Kilitlendi' : 'Kilit açıldı', k.ad); break;
       case 'yolluk': mut(() => { k.gorev = k.gorev || {yer: '', hedef: null, kaynak: 'manuel', yolluk: '', tarih: '', gerekce: ''}; k.gorev.yolluk = v; }, 'Yolluk durumu', `${k.ad}: ${v}`); break;
       case 'gTarih': mut(() => { k.gorev.tarih = v; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${v}`); break;
@@ -2634,7 +2634,7 @@ function mount(root, opts = {}) {
         case 'liste-surucu': S.filtre = {q: '', durum: '', birim: '', sinif: 'memur', surucu: 'dogrulanmadi'}; S.pSayfa = 0; S.sayfa = 'personel'; break;
         case 'gorev-sekme': S.gorevSekme = v; break;
         case 'oner-ac': S.onerAc = S.onerAc === v ? '' : v; break;
-        case 'plan-art': { const k = kayit(t.dataset.id); if (!k) break; const yeni = Math.max(0, Math.round((sayi(k.planlanan) + 0.5 * (+v)) * 2) / 2); mut(() => { k.planlanan = yeni; k.kilit = true; }, 'Planlanan nöbet (elle)', `${k.ad}: ${yeni}`); break; }
+        case 'plan-art': { const k = kayit(t.dataset.id); if (!k) break; const yeni = Math.max(0, Math.round((sayi(k.planlanan) + 0.5 * (+v)) * 2) / 2); S.toplu = true; try { mut(() => { k.planlanan = yeni; k.kilit = true; }, 'Planlanan nöbet (elle)', `${k.ad}: ${yeni}`); } finally { S.toplu = false; } break; }
         case 'asos-kaynak': {      // ASHİ bağlantısı: Nöbet Listesi ve İzin-Muafiyet raporları güncel olarak kaynaktan alınır (opts.veriKaynagi)
           if (typeof opts.veriKaynagi !== 'function') { toast('ASHİ bağlantısı tanımlı değil.'); break; }
           if (salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
