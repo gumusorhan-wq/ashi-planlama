@@ -1245,9 +1245,11 @@ function mount(root, opts = {}) {
       if (!gelen) son = k.sinif;
       const renk = gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), eng = C.gorevlendirmeEngeli(k, ayIlk());
       const dis = duz ? '' : 'disabled';
-      const fark = s ? sayi(k.planlanan) - s.hedef : 0, eksikMesai = !!s && !s.nobetYok && !gelen && k.planlanan != null && fark < -0.01;
-      if (eksikMesai) mesEksik.push(`${k.ad} (${fmt(fark)})`);
-      rows += `<tr class="c${eksikMesai ? ' mes-eksik' : ''}" title="${eksikMesai ? 'Planlanan nöbet hedefin altında: mesaisi eksik kalıyor' : ''}" style="${renk ? 'background:' + renk : ''}">
+      const fark = s ? sayi(k.planlanan) - s.hedef : 0;
+      // mesai saatini tamamlayamama: memur/doktor planlanan×24 saat < mesai; işçi 12 saatlik nöbet başına sistemden düşülen saat (hedefin altında kalan nöbet sayısı × düşülen saat)
+      const saatEksik = s && !s.nobetYok && !gelen && k.planlanan != null ? (k.sinif === 'isci' ? Math.max(0, (s.hedef - sayi(k.planlanan)) / C.ADIM * (S.ayar.isciDusulen || 11)) : Math.max(0, s.mesai - sayi(k.planlanan) * 24)) : 0, eksikMesai = saatEksik > 0.01;
+      if (eksikMesai) mesEksik.push(`${k.ad} (−${fmt(Math.round(saatEksik * 10) / 10)} saat)`);
+      rows += `<tr class="c${eksikMesai ? ' mes-eksik' : ''}" title="${eksikMesai ? 'Mesai saatini tamamlayamıyor: planlanan nöbet mesai saatinin altında kalıyor' : ''}" style="${renk ? 'background:' + renk : ''}">
         <td><input class="ap-in w" data-id="${k.id}" data-f="ad" value="${esc(k.ad)}" ${dis}></td>
         <td><input class="ap-in w" data-id="${k.id}" data-f="unvan" value="${esc(k.unvan)}" ${dis} title="${esc(k.dortB ? '4/B' : '')}">${k.dortB ? '<span class="ap-tag ap-t-fz" title="4/B personel">4/B</span>' : ''}</td>
         <td><select class="ap-sel" data-id="${k.id}" data-f="sinif" ${dis}>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === k.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
@@ -1277,7 +1279,7 @@ function mount(root, opts = {}) {
       ${disSay ? `<button class="ap-btn" data-act="geri-cagir" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'} title="Bu ekibin başka birimlere görevli personelini geri çağırır">Personeli geri çağır (${disSay})</button>` : ''}<button class="ap-btn" data-act="png" data-v="${esc(b.ad)}">Görüntü (PNG)</button><button class="ap-btn" data-act="excel-ist" data-v="${esc(b.ad)}">Excel</button>
       ${istas ? `<label class="ap-note" title="Kapalı ekip: ihtiyaç 0 sayılır; işareti kaldırınca ekip açılır ve personel geri çağrılabilir"><input type="checkbox" data-act="ekip-of" data-v="${esc(b.ad)}" ${b.ekipOf ? 'checked' : ''} ${duz ? '' : 'disabled'}> <b>Ekip OF (kapalı)</b></label>` : ''}
       <label class="ap-note"><input type="checkbox" data-act="tahmini" ${S.ayar.tahminiGoster ? 'checked' : ''}> Çıktıda tahmini nöbeti göster</label></div>
-      ${durumBar}${mesEksik.length && !b.ekipOf ? `<div class="ap-ek ap-ek-c" style="margin:8px 0;color:var(--ap-bad)"><b>Mesaisi eksik kalan personel (${mesEksik.length}):</b> ${mesEksik.map(esc).join(' · ')} <span class="ap-note">— planlanan nöbet hedeflerinin altında; satırları kırmızı gösterilir</span></div>` : ''}${lejant()}
+      ${durumBar}${mesEksik.length && !b.ekipOf ? `<div class="ap-ek ap-ek-c" style="margin:8px 0;color:var(--ap-bad)"><b>Mesaisi eksik kalan personel (${mesEksik.length}):</b> ${mesEksik.map(esc).join(' · ')} <span class="ap-note">— planlanan nöbetler "Mesai" sütunundaki saati karşılamıyor; satırları kırmızı gösterilir</span></div>` : ''}${lejant()}
       <div class="ap-tw ap-tw-ist"><table class="ap-t ap-ist"><colgroup><col style="width:10.3%"><col style="width:7%"><col style="width:6%"><col style="width:9.5%"><col style="width:9.5%"><col style="width:4%"><col style="width:5.8%"><col style="width:3.6%"><col style="width:3.1%"><col style="width:3.3%"><col style="width:6.5%"><col style="width:3.1%"><col style="width:2.2%"><col style="width:14%"><col style="width:5.5%"><col style="width:6.6%"></colgroup><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>SINIF</th><th>NÖBET ROLÜ</th><th>G.GÖREV DURUMU</th><th>İZİN GÜN</th><th>İZİN TÜRÜ</th><th>MESAİ</th><th>HEDEF</th><th>AZAMİ</th><th>PLAN</th><th>FARK</th><th>🔒</th><th>GEÇİCİ GÖREV</th><th>YOLLUK</th><th>İŞLEM</th></tr></thead><tbody>${rows || '<tr><td colspan="16" class="ap-empty">Bu birimde kayıt yok</td></tr>'}</tbody></table></div>${silinenHtml(b, duz)}`;
   }
 
