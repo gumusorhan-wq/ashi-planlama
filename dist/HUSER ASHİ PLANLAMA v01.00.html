@@ -515,8 +515,14 @@ const NobetCore = (() => {
       (k.istek || []).forEach(x => { const d = gunNo(x); if (d) istek.add(d); });
       return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: YETENEK[k.grup] || ['ysp'], isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, izin, once, istek, baslar};
     });
-    return {N, K, P, byId: new Map(P.map(p => [p.id, p]))};
+    // hafta sonu (cumartesi/pazar) ve resmî tatil günleri: nöbetlerin bu günlere kişiler arasında dengeli dağılması için
+    const ozel = new Uint8Array(N + 2); let ozelSay = 0;
+    const tatil = new Set((g.tatil || []).map(x => typeof x === 'number' ? x : gunNo(x)).filter(Boolean));
+    for (let d = 1; d <= N; d++) { const w = new Date(Date.UTC(g.y, g.m - 1, d)).getUTCDay(); if (w === 0 || w === 6 || tatil.has(d)) { ozel[d] = 1; ozelSay++; } }
+    return {N, K, P, byId: new Map(P.map(p => [p.id, p])), ozel, ozelOran: N ? ozelSay / N : 0, ozelSay};
   }
+  // Kişinin hafta sonu / resmî tatil nöbet sayısının beklenenden sapması (±1 nöbet tolerans); ceza tam sayıdır
+  const ozelCeza = (say, toplam, oran) => { const dev = Math.abs(say - toplam * oran); return dev > 1 ? Math.round(30 * (dev - 1)) : 0; }
 
   // Bir listenin cezası ve ihlalleri
   function denetle(liste, H) {
@@ -562,6 +568,8 @@ const NobetCore = (() => {
         const a = tum[i - 1], b = tum[i], bosGun = b - a - 1;
         if (bosGun > K.maxAra) { let izinAra = false; for (let d = a + 1; d < b; d++) if (p.izin.has(d)) izinAra = true; if (!izinAra) ekle('aralik', 60 * (bosGun - K.maxAra), b, p.id, `${p.ad}: ${a}. ve ${b}. gün nöbetleri arası ${bosGun} gün (en fazla ${K.maxAra})`, {a, b}); }
       }
+      // hafta sonu / resmî tatil dengesi
+      if (H.ozelSay > 0 && L.length >= 2) { const oz = new Set(L.filter(x => H.ozel[x.gun]).map(x => x.gun)).size, c = ozelCeza(L.filter(x => H.ozel[x.gun]).length, L.length, H.ozelOran); if (c > 0) ekle('ozelGun', c, 0, p.id, `${p.ad}: ${L.filter(x => H.ozel[x.gun]).length} hafta sonu / resmî tatil nöbeti (dengeli dağılımda ≈ ${(L.length * H.ozelOran).toFixed(1)})`); }
       // nöbet sayısı: planlanan ile yazılan
       const birim = L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).length + 0.5 * L.filter(x => x.tip === 'surG' || x.tip === 'surA').length, hedef = p.hedef24 + p.hedefYarim / 2;
       if (Math.abs(birim - hedef) > 0.01) ekle('adet', 40 * Math.abs(birim - hedef), 0, p.id, `${p.ad}: planlanan ${hedef} nöbet, listede ${birim}`, {fark: birim - hedef});
@@ -731,6 +739,7 @@ const NobetCore = (() => {
       if (p.isci) { if (K.isciGece) A.forEach(d => { if (A.has(d + 1) && A.has(d + 2)) c += 300; }); G.forEach(d => { if (A.has(d - 1)) c += 700; }); }
       const tum = [...new Set(all)].sort((a, b) => a - b);
       for (let k = 1; k < tum.length; k++) { const bos = tum[k] - tum[k - 1] - 1; if (bos > K.maxAra) { let iz = false; for (let d = tum[k - 1] + 1; d < tum[k]; d++) if (p.izin.has(d)) { iz = true; break; } if (!iz) c += 60 * (bos - K.maxAra); } }
+      if (H.ozelSay > 0 && pl.length >= 2) { let oz = 0; for (const s of pl) if (H.ozel[slotD[s]]) oz++; c += ozelCeza(oz, pl.length, H.ozelOran); }
       return c;
     };
     const pc = P.map((_, i) => pcost(i)); let toplam = pc.reduce((x, v) => x + v, 0), en = toplam, enCont = Int16Array.from(cont);
@@ -785,19 +794,60 @@ const NobetCore = (() => {
     return {toplam, bos};
   }
 
-  // Otomatik nöbet listesi. girdi: {y, m, kisiler:[...]}. seçenekler: {kural, sureMs, deneme, seed}
-  function uret(girdi, sec) {
-    const o = {sureMs: 1200, deneme: 4, seed: 1, ...(sec || {})}, H = hazirla(girdi, o.kural), t0 = Date.now();
-    let eniyi = null, ceza = Infinity, denendi = 0; const pay = Math.max(200, Math.floor(o.sureMs / o.deneme));
-    for (let i = 0; i < o.deneme && Date.now() - t0 < o.sureMs; i++) {
-      denendi++; const r = uret2(H, o.seed + i * 977, Math.min(pay, o.sureMs - (Date.now() - t0))), c = denetle(r.liste, H).toplam;
-      if (c < ceza) { ceza = c; eniyi = r.liste; } if (ceza === 0) break;
+  // Kural ihlalleri: boş yuva, yetenek dışı, izinli kişiye nöbet, aynı gün çift görev, dinlenme, izin öncesi boşluk, gün aşırı sürücü, 3 gece, azami aralık. Bunlar kalmamalıdır (istek, nöbet sayısı farkı ve hafta sonu dengesi tercihtir).
+  const SERT = new Set(['eksik', 'yetenek', 'izin', 'cakisma', 'dinlenme', 'izinOnce', 'surGunAsiri', 'isciGece', 'aralik']);
+  const sertSay = ihlal => ihlal.filter(i => SERT.has(i.tur)).length;
+  const kalite = (son) => sertSay(son.ihlal) * 1e7 + son.toplam;
+
+  // Zorlama: boş kalan yuvaları uygun kişilerle doldurur (nöbet adedi hedefin üstüne çıksa bile); izinli, yeteneksiz, aynı gün çift görev ve art arda nöbet vermemeye çalışır
+  function doldur(liste, H) {
+    const {N, P, K} = H, d0 = denetle(liste, H); let eklenen = 0;
+    const say = new Map(P.map(p => [p.id, 0])); for (let d = 1; d <= N; d++) ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { const id = liste[d][t]; if (id != null && say.has(id)) say.set(id, say.get(id) + (t === 'surG' || t === 'surA' ? 0.5 : 1)); });
+    const gorevli = (id, d) => !!liste[d] && ['es', 'ysp', 'sur', 'surG', 'surA'].some(t => liste[d][t] === id);
+    const yakin = (id, d) => { for (let k = 1; k <= K.minAra; k++) if (gorevli(id, d - k) || gorevli(id, d + k)) return true; return false; };
+    for (let d = 1; d <= N; d++) {
+      const L = liste[d], bosYuva = [];
+      if (L.es == null) bosYuva.push(['es', 'es']); if (L.ysp == null) bosYuva.push(['ysp', 'ysp']);
+      if (L.sur == null && L.surG == null && L.surA == null) bosYuva.push(['sur', 'sur']);
+      else if (L.sur == null) { if (L.surG == null) bosYuva.push(['surG', 'sur']); if (L.surA == null) bosYuva.push(['surA', 'sur']); }
+      for (const [slot, yuva] of bosYuva) {
+        const yari = slot === 'surG' || slot === 'surA';
+        const adaylar = P.filter(p => p.yet.includes(yuva) && (yari ? p.isci : slot === 'sur' ? true : !p.isci) && !p.izin.has(d) && !gorevli(p.id, d));
+        if (!adaylar.length) continue;
+        const puan = p => { const hedef = p.hedef24 + p.hedefYarim / 2, fazla = (say.get(p.id) || 0) - hedef; return (yakin(p.id, d) && !yari ? 1000 : 0) + (p.istek.has(d) ? 120 : 0) + (p.once.has(d) ? 150 : 0) + 25 * fazla + (H.ozel[d] ? 3 * fazla : 0); };
+        const en = adaylar.reduce((a, b) => puan(b) < puan(a) ? b : a);
+        L[slot] = en.id; say.set(en.id, (say.get(en.id) || 0) + (yari ? 0.5 : 1)); eklenen++;
+      }
     }
-    const son = denetle(eniyi, H);
-    return {liste: eniyi, ihlal: son.ihlal, ceza: son.toplam, say: son.say, deneme: denendi, sureMs: Date.now() - t0};
+    return {liste, eklenen, once: d0.ihlal.filter(i => i.tur === 'eksik').length};
   }
 
-  // Öneri: her ihlal için, ilgili atamayı başka kişiyle değiştirmenin cezayı en çok düşürdüğü seçenekler
+  // Otomatik nöbet listesi. girdi: {y, m, kisiler:[...], tatil:[gün/iso]}. seçenekler: {kural, sureMs, deneme, seed, zorlaMs}
+  // Önce normal üretim; sert ihlal kalırsa süre dolana (zorlaMs) kadar yeni denemeler (kurallar gevşetilmez);
+  // hâlâ boş yuva kalırsa uygun kişilerle doldurulur ve yerel iyileştirme çalıştırılır. Dönüş: {liste, ihlal, ceza, say, deneme, sureMs, zorlandi, sert}
+  function uret(girdi, sec) {
+    const o = {sureMs: 1200, deneme: 4, seed: 1, zorlaMs: 8000, ...(sec || {})}, H = hazirla(girdi, o.kural), t0 = Date.now();
+    let eniyi = null, kal = Infinity, denendi = 0; const pay = Math.max(200, Math.floor(o.sureMs / o.deneme));
+    const dene = (Hx, seed, ms) => { denendi++; const r = uret2(Hx, seed, ms), son = denetle(r.liste, H), k = kalite(son); if (k < kal) { kal = k; eniyi = r.liste; return true; } return false; };
+    for (let i = 0; i < o.deneme && Date.now() - t0 < o.sureMs; i++) { dene(H, o.seed + i * 977, Math.min(pay, o.sureMs - (Date.now() - t0))); if (kal === 0) break; }
+    let zorlandi = false;
+    if (kal >= 1e7) {
+      zorlandi = true; const t1 = Date.now(); let n = 0;
+      // kadro bu ayın yuvalarını yetenek/adet olarak doldurmaya yetmiyorsa (boş yuva kaçınılmaz) uzun deneme boşunadır: kısa tutulur, sonra boşlar uygun kişilerle doldurulur
+      if (kapasiteAnalizi(girdi, o.kural).toplam > 0) o.zorlaMs = Math.min(o.zorlaMs, 3500);
+      while (kal >= 1e7 && Date.now() - t1 < o.zorlaMs) {
+        dene(H, o.seed + 5000 + 131 * (n++), Math.min(2500 + 500 * n, Math.max(300, o.zorlaMs - (Date.now() - t1))));      // kurallar gevşetilmez: aynı kurallarla daha uzun / farklı tohumlu denemeler
+      }
+      if (kal >= 1e7) {
+        const d = doldur(eniyi.map(x => ({...x})), H); const son = denetle(d.liste, H);
+        if (kalite(son) < kal) { eniyi = d.liste; kal = kalite(son); }
+        if (kal >= 1e7) { const it = iyilestir(eniyi, H, o.seed + 91, Math.min(4000, o.zorlaMs)); const s2 = denetle(it.liste, H); if (kalite(s2) < kal) { eniyi = it.liste; kal = kalite(s2); } }
+      }
+    }
+    const son = denetle(eniyi, H);
+    return {liste: eniyi, ihlal: son.ihlal, ceza: son.toplam, say: son.say, deneme: denendi, sureMs: Date.now() - t0, zorlandi, sert: sertSay(son.ihlal)};
+  }
+
   function oneriler(liste, girdi, kural, enFazla) {
     const H = hazirla(girdi, kural), ilk = denetle(liste, H), oner = [], yuvalar = ['es', 'ysp', 'sur', 'surG', 'surA'];
     const kopya = liste.map(x => ({...x}));
@@ -1612,7 +1662,7 @@ function mount(root, opts = {}) {
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
   const N2_SEKME = [['plan', 'Planlama'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
-  const IHLAL_AD = {eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı'};
+  const IHLAL_AD = {eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
   // İstasyon sorumlusu, planlama onaylanmadan (Kesinleştir / Ayı kilitle) kendi istasyonunun planlamasını ve nöbet listesi araçlarını göremez
   const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
@@ -1638,7 +1688,8 @@ function mount(root, opts = {}) {
   function n2Girdi(b) {
     const dp = n2Depo(b.ad), ks = n2Kisiler(b).map(k => ({...k, izin: [...(k.izin || []), ...(dp.izin[k.id] || [])], istek: dp.istek[k.id] || []}));
     const ozet = NC.adetHazirla(ks, NC.gunSayisi(S.y, S.m));
-    return {girdi: {y: S.y, m: S.m, kisiler: ks}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
+    const oz = ozel(), tatil = []; for (let d = 1; d <= NC.gunSayisi(S.y, S.m); d++) { const i = C.iso(S.y, S.m, d), og = oz[i]; if (C.RESMI[i] === 0 || (og && (og.tur === 'bayram' || og.tur === 'resmi'))) tatil.push(d); }      // resmî tatil / bayram günleri (hafta sonu gibi dengeli dağıtılır)
+    return {girdi: {y: S.y, m: S.m, kisiler: ks, tatil}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
   }
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
@@ -1860,7 +1911,7 @@ function mount(root, opts = {}) {
         const dp = n2Depo(b.ad); if (dp.liste && !confirm('Mevcut liste yeni oluşturulan listeyle değiştirilecek. Devam edilsin mi?')) break;
         if (!n2Duz()) { toast('Düzenleme yetkiniz yok / ay kilitli.'); break; }
         S.n2.calisiyor = true; render(); await new Promise(r => setTimeout(r, 40));
-        try { const G = n2Girdi(b), r = NC.uret(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, seed: (Date.now() % 100000) + 1}); mut2(() => { dp.liste = r.liste; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${r.ceza}`); toast(r.ceza === 0 ? 'Liste oluşturuldu: kural ihlali yok.' : `Liste oluşturuldu; ${r.ihlal.length} ihlal kaldı. Denetim sekmesine bakın.`); }
+        try { const G = n2Girdi(b), r = NC.uret(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 12000, seed: (Date.now() % 100000) + 1}); mut2(() => { dp.liste = r.liste; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${r.ceza}${r.zorlandi ? ' (zorlandı)' : ''}`); toast(r.ceza === 0 ? 'Liste oluşturuldu: kural ihlali yok.' : r.sert === 0 ? `Liste oluşturuldu: boş yuva ve sert kural ihlali yok${r.zorlandi ? ' (zorlanarak)' : ''}; ${r.ihlal.length} küçük sapma (nöbet sayısı vb.) kaldı. Denetim sekmesine bakın.` : `Liste oluşturuldu; ${r.sert} sert ihlal kaldı (kadro bu kuralları sağlamaya yetmiyor olabilir). Denetim sekmesine bakın.`); }
         finally { S.n2.calisiyor = false; }
         break;
       }

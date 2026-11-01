@@ -2,7 +2,7 @@
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
   const N2_SEKME = [['plan', 'Planlama'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
-  const IHLAL_AD = {eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı'};
+  const IHLAL_AD = {eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
   // İstasyon sorumlusu, planlama onaylanmadan (Kesinleştir / Ayı kilitle) kendi istasyonunun planlamasını ve nöbet listesi araçlarını göremez
   const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
@@ -28,7 +28,8 @@
   function n2Girdi(b) {
     const dp = n2Depo(b.ad), ks = n2Kisiler(b).map(k => ({...k, izin: [...(k.izin || []), ...(dp.izin[k.id] || [])], istek: dp.istek[k.id] || []}));
     const ozet = NC.adetHazirla(ks, NC.gunSayisi(S.y, S.m));
-    return {girdi: {y: S.y, m: S.m, kisiler: ks}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
+    const oz = ozel(), tatil = []; for (let d = 1; d <= NC.gunSayisi(S.y, S.m); d++) { const i = C.iso(S.y, S.m, d), og = oz[i]; if (C.RESMI[i] === 0 || (og && (og.tur === 'bayram' || og.tur === 'resmi'))) tatil.push(d); }      // resmî tatil / bayram günleri (hafta sonu gibi dengeli dağıtılır)
+    return {girdi: {y: S.y, m: S.m, kisiler: ks, tatil}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
   }
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
@@ -250,7 +251,7 @@
         const dp = n2Depo(b.ad); if (dp.liste && !confirm('Mevcut liste yeni oluşturulan listeyle değiştirilecek. Devam edilsin mi?')) break;
         if (!n2Duz()) { toast('Düzenleme yetkiniz yok / ay kilitli.'); break; }
         S.n2.calisiyor = true; render(); await new Promise(r => setTimeout(r, 40));
-        try { const G = n2Girdi(b), r = NC.uret(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, seed: (Date.now() % 100000) + 1}); mut2(() => { dp.liste = r.liste; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${r.ceza}`); toast(r.ceza === 0 ? 'Liste oluşturuldu: kural ihlali yok.' : `Liste oluşturuldu; ${r.ihlal.length} ihlal kaldı. Denetim sekmesine bakın.`); }
+        try { const G = n2Girdi(b), r = NC.uret(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 12000, seed: (Date.now() % 100000) + 1}); mut2(() => { dp.liste = r.liste; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${r.ceza}${r.zorlandi ? ' (zorlandı)' : ''}`); toast(r.ceza === 0 ? 'Liste oluşturuldu: kural ihlali yok.' : r.sert === 0 ? `Liste oluşturuldu: boş yuva ve sert kural ihlali yok${r.zorlandi ? ' (zorlanarak)' : ''}; ${r.ihlal.length} küçük sapma (nöbet sayısı vb.) kaldı. Denetim sekmesine bakın.` : `Liste oluşturuldu; ${r.sert} sert ihlal kaldı (kadro bu kuralları sağlamaya yetmiyor olabilir). Denetim sekmesine bakın.`); }
         finally { S.n2.calisiyor = false; }
         break;
       }
