@@ -142,12 +142,16 @@
   }
 
   // Yuva bazlı özet: üç yuva (ekip şefi, YSP, sürücü) için dolan/açık ve hangi grubun doldurduğu; gruplara göre fazlalar
+  // Listedeki planlanan nöbetlerle yuva akışı (kişi bazlı değerler değiştikçe güncellenir)
+  function planAkis(h) {
+    const sup = {}; C.GRUPLAR.forEach(g => { sup[g] = 0; });
+    h.satir.forEach(s => { if (!s.nobetYok) sup[s.grup] = (sup[s.grup] || 0) + sayi(s.k.planlanan); });
+    return C.akis(sup, h.slot.dem);
+  }
   function slotOzet(h) {
     // dolan / açık / dolu etiketleri listedeki kişi bazlı planlanan nöbetlerle hesaplanır (nöbet girildikçe değişir); azami notu yalnız açık kalan yuvada gösterilir
     const d = h.slot, A = d.azami, SL = [['es', 'Ekip şefi nöbet branşı'], ['ysp', 'YSP nöbet branşı'], ['sur', 'Sürücü nöbet branşı']];
-    const sup = {}; C.GRUPLAR.forEach(g => { sup[g] = 0; });
-    h.satir.forEach(s => { if (!s.nobetYok) sup[s.grup] = (sup[s.grup] || 0) + sayi(s.k.planlanan); });
-    const H = C.akis(sup, d.dem);
+    const H = planAkis(h);
     const katki = sl => C.GRUPLAR.filter(g => H.fill[g][sl] > 0.001).map(g => `${C.GRUP_AD[g]} ${fmt(H.fill[g][sl])}`).join(' + ') || '—';
     const satir = SL.map(([sl, ad]) => `<div class="r" style="margin:3px 0"><b style="min-width:150px;display:inline-block">${ad}</b> ${fmt(d.dem[sl])} nöbet · dolan <b>${fmt(d.dem[sl] - H.rem[sl])}</b> <span class="ap-note">(${katki(sl)})</span> ${H.rem[sl] > 0.001 ? `<span class="ap-tag ap-t-ih">${fmt(H.rem[sl])} açık</span> <span class="ap-note">${A.rem[sl] > 0.001 ? 'azamiyle de ' + fmt(A.rem[sl]) + ' açık kalır' : 'azami nöbetle kapanır'}</span>` : '<span class="ap-tag ap-t-ok">dolu</span>'}</div>`).join('');
     const fazla = C.GRUPLAR.filter(g => H.fazla[g] > 0.001).map(g => `<span class="ap-tag ap-t-fz">${C.GRUP_AD[g]}: ${fmt(H.fazla[g])} nöbet fazla</span>`).join(' ');
@@ -204,10 +208,11 @@
         <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${dis}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === ((k.gorev || {}).yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
         <td>${gelen ? `<button class="ap-btn sm" data-act="gorev-bitir" data-id="${k.id}" ${duz ? '' : 'disabled'} title="Geri gönder: görevlendirmeyi bitirir, kişi ${esc(k.birim)} istasyonuna geri döner">↩ Geri</button>` : (gorevAktif(k.gorev) ? `<button class="ap-btn sm" data-act="gorev-bitir" data-id="${k.id}" ${duz ? '' : 'disabled'} title="Geri çağır: görevlendirmeyi bitirir, kişi bu istasyona geri döner">↩ Geri</button> ` : '')}${duz && !gelen ? `<button class="ap-btn sm dng" data-act="kisi-sil" data-id="${k.id}" title="Kaydı sil">✕</button>` : ''}</td></tr>`;
     });
+    const pAk = h && !b.ekipOf ? planAkis(h) : null, planTam = !!pAk && Math.abs(p - h.ihtiyac) < 1e-9 && ['es', 'ysp', 'sur'].every(y => pAk.rem[y] <= 0.001);      // plan ihtiyaca eşit ve üç nöbet branşı da dolu: hesap uyarıları gösterilmez
     const durumBar = h && b.ekipOf ? `<div class="ap-card"><b>EKİP OF — bu ekip kapalı.</b> İhtiyaç 0 sayılır. Personeli diğer istasyonlara <b>uzun süreli</b> görevlendirilir (Görevlendirme sayfasındaki rotasyon önerisi açık uçlu görev yazar) ve ekip yeniden açılırken <b>geri çağrılır</b>: kutunun işaretini kaldırdığınızda ya da "Personeli geri çağır" düğmesiyle. Kapalı ekibe görevlendirme yapılamaz.</div>` : h ? `<div class="ap-card"><div class="ap-row"><b>Plan: ${fmt(p)} / ${h.ihtiyac}</b>
       <span class="ap-tag ${Math.abs(p - h.ihtiyac) < 1e-9 ? 'ap-t-ok' : 'ap-t-ih'}">${Math.abs(p - h.ihtiyac) < 1e-9 ? 'İhtiyaçla eşit' : (p < h.ihtiyac ? fmt(h.ihtiyac - p) + ' nöbet planlanamadı' : fmt(p - h.ihtiyac) + ' nöbet fazla')}</span>
       <label class="ap-note" title="Boş bırakırsanız Pano'daki mod geçerli olur (Mesai karşılığı: fazla nöbet yazılmaz; Fazla mesaili: genel ${fmt(S.ayar.azamiMemur)} nöbet). Bir sayı yazarsanız bu istasyon, Pano modundan bağımsız olarak o sayıyla fazla mesaili hesaplanır.">Bu istasyonda azami nöbet (DOKTOR-AABT-ATT) <input class="ap-in n" type="number" step="0.5" min="0" data-ib="${esc(b.ad)}" value="${b.azamiMemur != null ? b.azamiMemur : ''}" placeholder="${fmt(S.ayar.azamiMemur)}" ${duz ? '' : 'disabled'}></label>
-      ${h.ihtiyacTur === 'oner' ? `<span class="ap-tag ap-t-ih">Personel öner: ${h.ihtiyacKisi} kişi (hedefle ${fmt(h.hedefAcik)} nöbet açık${h.kalanAcik > 0 ? ', ' + fmt(h.kalanAcik) + ' nöbet fazla nöbetle' : ''})</span>` : h.ihtiyacTur === 'icerde' ? `<span class="ap-tag ap-t-fz">Fazla nöbetle kendi içinde döner: hedefin ${fmt(h.hedefAcik)} nöbet üstü yazılıyor, personel önerilmez</span>` : h.ihtiyacTur === 'elle' ? `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Elle karar: ${fmt(-h.farkAzami)} nöbet açık kalıyor; gelen kişi mesaisini tamamlayamaz</span>` : ''}${h.durum === 'fazla' ? `<span class="ap-tag ap-t-fz">Mesai tamamlayamama ${fmt(h.fazlaH)}</span>` : ''}
+      ${planTam ? '<span class="ap-tag ap-t-ok">İstasyon tam: ihtiyaç karşılandı</span>' : `${h.ihtiyacTur === 'oner' ? `<span class="ap-tag ap-t-ih">Personel öner: ${h.ihtiyacKisi} kişi (hedefle ${fmt(h.hedefAcik)} nöbet açık${h.kalanAcik > 0 ? ', ' + fmt(h.kalanAcik) + ' nöbet fazla nöbetle' : ''})</span>` : h.ihtiyacTur === 'icerde' ? `<span class="ap-tag ap-t-fz">Fazla nöbetle kendi içinde döner: hedefin ${fmt(h.hedefAcik)} nöbet üstü yazılıyor, personel önerilmez</span>` : h.ihtiyacTur === 'elle' ? `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Elle karar: ${fmt(-h.farkAzami)} nöbet açık kalıyor; gelen kişi mesaisini tamamlayamaz</span>` : ''}${h.durum === 'fazla' ? `<span class="ap-tag ap-t-fz">Mesai tamamlayamama ${fmt(h.fazlaH)}</span>` : ''}`}
       </div>${slotOzet(h)}<div class="ap-note">İhtiyaç = ${h.gun} gün × ${b.yuva || 3} nöbet branşı${b.tip ? ` · İstasyon tipi ${esc(b.tip)}${b.tip === 'A1' ? ' (doktorlu)' : ''}` : ''}. Doktor yalnızca ekip şefi nöbet branşını (${h.gun}) doldurur; işçi sürücü nöbet branşında 12 saatlik nöbet tutar (en çok ${h.gun}); kalanı memur karşılar. DOKTOR-AABT-ATT hedefin üstünde en çok ${fmt(b.azamiMemur != null ? b.azamiMemur : S.ayar.azamiMemur)} nöbet yazılır; işçi hedefin üstünde nöbet tutmaz.</div></div>` : '';
     return `<div class="ap-row ap-noprint"><select class="ap-sel" data-act="ist-sec">${birimler.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select>
       <button class="ap-btn" data-act="ist-onceki">‹</button><button class="ap-btn" data-act="ist-sonraki">›</button>
