@@ -229,11 +229,12 @@ const APCore = (() => {
     return {fill, rem, fazla};
   }
   // Önerilen planlanan nöbet: önce hedef nöbetlerle yuvalar doldurulur (fazla gruplar orantılı azalır), açık kalırsa azami sınıra kadar ek nöbet yazılır
-  // Fazlalık (hedefin üstüne yazılan) nöbetlerin dağıtımı: önce ATT sürücüler (sy), sonra AABT sürücüler (ka); kalan açık yuvalar diğer branşlar arasında eşit paylaştırılır (tur tur 0,25'lik dilimlerle)
+  // Fazlalık (hedefin üstüne yazılan) nöbetlerin dağıtımı: sırayla 1 nöbet ATT sürücülere (sy), 1 nöbet AABT sürücülere (ka); ikisinin de payı bitince kalan açık yuvalar diğer branşlar arasında eşit paylaştırılır (tur tur 0,25'lik dilimlerle). Ekip şefi yuvasına ATT giremez (yeteneği yok), yalnız AABT / doktor
   function akisEk(ek, rem) {
     const dem = {...rem}, fill = {}, kalan = {...ek}, fazla = {}; GRUPLAR.forEach(g => { fill[g] = {es: 0, ysp: 0, sur: 0}; });
     const ver = (g, miktar) => { let k = miktar; for (const s of YETENEK[g]) { if (k <= 1e-9) break; const u = Math.min(k, Math.max(0, dem[s])); fill[g][s] += u; dem[s] -= u; k -= u; } return miktar - k; };
-    ['sy', 'ka'].forEach(g => { kalan[g] -= ver(g, Math.max(0, kalan[g] || 0)); });
+    // 1 nöbet ATT sürücülere, 1 nöbet AABT sürücülere (sırayla); grup içinde kişilere eşit dağıtım oneri'de yapılır
+    for (let tur = 0; tur < 20000; tur++) { let verildi = false; for (const g of ['sy', 'ka']) { if ((kalan[g] || 0) <= 1e-9) continue; const al = ver(g, Math.min(kalan[g], 1)); if (al > 1e-9) { kalan[g] -= al; verildi = true; } } if (!verildi) break; }
     const digerleri = GRUPLAR.filter(g => g !== 'sy' && g !== 'ka');
     for (let tur = 0; tur < 20000; tur++) { let verildi = false; for (const g of digerleri) { if ((kalan[g] || 0) <= 1e-9) continue; const al = ver(g, Math.min(kalan[g], 0.25)); if (al > 1e-9) { kalan[g] -= al; verildi = true; } } if (!verildi) break; }
     GRUPLAR.forEach(g => { fazla[g] = Math.max(0, kalan[g] || 0); });

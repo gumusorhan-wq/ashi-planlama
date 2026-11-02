@@ -137,7 +137,11 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   assert.strictEqual(gm(12, 'mesai').ihtiyacTur, 'icerde'); }
 // kadro değişikliği: 1 yıl görevlendirme engeli
 { const k = {kadroTarih: '2026-10-01'}; assert.ok(C.gorevlendirmeEngeli(k, '2027-09-30').includes('Kadro değişikliği'), '1 yıl dolmadan engel'); assert.strictEqual(C.gorevlendirmeEngeli(k, '2027-10-01'), '', '1 yıl dolunca engel yok'); assert.strictEqual(C.gorevlendirmeEngeli({}, '2026-11-01'), ''); }
-// fazlalık dağıtımı: önce ATT sürücü (sy) azamisine kadar, sonra AABT sürücü (ka); kalan diğer branşlar arasında eşit
-{ const kisi = (id, hedef, azami) => ({k: {id}, hedef, azami}), gr = {dok: [], isci: [], ke: [kisi('ke', 7, 8)], ka: [kisi('ka', 3, 10)], ysp: [kisi('ysp', 7, 8)], sy: [kisi('sy', 3, 10)]};
-  const o = C.oneri({ihtiyac: 28.5, gruplar: gr}, null); assert.ok(Math.abs(o.get('sy') - 10) < 0.011, 'ATT sürücü fazlalığı önce alır: ' + o.get('sy')); assert.ok(Math.abs(o.get('ka') - 4.5) < 0.011, 'AABT sürücü sonra: ' + o.get('ka')); }
+// fazlalık dağıtımı: sırayla 1 nöbet ATT sürücülere, 1 nöbet AABT sürücülere; grup içinde eşit; ekip şefi yuvasına ATT girmez
+{ const kisi = (id, hedef, azami) => ({k: {id}, hedef, azami});
+  const gr2 = {dok: [], isci: [], ke: [kisi('ke', 7, 8)], ka: [kisi('ka1', 3, 10), kisi('ka2', 3, 10)], ysp: [kisi('ysp', 7, 8)], sy: [kisi('sy1', 3, 10), kisi('sy2', 3, 10)]};
+  const o = C.oneri({ihtiyac: 40, gruplar: gr2}, null), ka = o.get('ka1') + o.get('ka2'), sy = o.get('sy1') + o.get('sy2');
+  assert.ok(Math.abs(ka - sy) <= 1.01, 'ATT sürücü ve AABT sürücüye sırayla eşit fazlalık: ' + ka + ' / ' + sy); assert.ok(Math.abs(o.get('ka1') - o.get('ka2')) <= 0.02 && Math.abs(o.get('sy1') - o.get('sy2')) <= 0.02, 'grup içinde eşit');
+  const gr3 = {dok: [], isci: [], ke: [kisi('ke', 3, 8)], ka: [], ysp: [kisi('ysp', 7, 8)], sy: [kisi('sy', 10, 10)]};
+  const o3 = C.oneri({ihtiyac: 30, gruplar: gr3}, null); assert.ok(Math.abs(o3.get('ke') - 8) < 0.011 && Math.abs(o3.get('sy') - 10) < 0.011, 'ekip şefi fazlalığı yalnız AABT\'ye: ' + o3.get('ke') + ' / ' + o3.get('sy')); }
 console.log('çekirdek testleri geçti');

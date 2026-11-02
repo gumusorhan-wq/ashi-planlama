@@ -358,11 +358,12 @@ const APCore = (() => {
     return {fill, rem, fazla};
   }
   // Önerilen planlanan nöbet: önce hedef nöbetlerle yuvalar doldurulur (fazla gruplar orantılı azalır), açık kalırsa azami sınıra kadar ek nöbet yazılır
-  // Fazlalık (hedefin üstüne yazılan) nöbetlerin dağıtımı: önce ATT sürücüler (sy), sonra AABT sürücüler (ka); kalan açık yuvalar diğer branşlar arasında eşit paylaştırılır (tur tur 0,25'lik dilimlerle)
+  // Fazlalık (hedefin üstüne yazılan) nöbetlerin dağıtımı: sırayla 1 nöbet ATT sürücülere (sy), 1 nöbet AABT sürücülere (ka); ikisinin de payı bitince kalan açık yuvalar diğer branşlar arasında eşit paylaştırılır (tur tur 0,25'lik dilimlerle). Ekip şefi yuvasına ATT giremez (yeteneği yok), yalnız AABT / doktor
   function akisEk(ek, rem) {
     const dem = {...rem}, fill = {}, kalan = {...ek}, fazla = {}; GRUPLAR.forEach(g => { fill[g] = {es: 0, ysp: 0, sur: 0}; });
     const ver = (g, miktar) => { let k = miktar; for (const s of YETENEK[g]) { if (k <= 1e-9) break; const u = Math.min(k, Math.max(0, dem[s])); fill[g][s] += u; dem[s] -= u; k -= u; } return miktar - k; };
-    ['sy', 'ka'].forEach(g => { kalan[g] -= ver(g, Math.max(0, kalan[g] || 0)); });
+    // 1 nöbet ATT sürücülere, 1 nöbet AABT sürücülere (sırayla); grup içinde kişilere eşit dağıtım oneri'de yapılır
+    for (let tur = 0; tur < 20000; tur++) { let verildi = false; for (const g of ['sy', 'ka']) { if ((kalan[g] || 0) <= 1e-9) continue; const al = ver(g, Math.min(kalan[g], 1)); if (al > 1e-9) { kalan[g] -= al; verildi = true; } } if (!verildi) break; }
     const digerleri = GRUPLAR.filter(g => g !== 'sy' && g !== 'ka');
     for (let tur = 0; tur < 20000; tur++) { let verildi = false; for (const g of digerleri) { if ((kalan[g] || 0) <= 1e-9) continue; const al = ver(g, Math.min(kalan[g], 0.25)); if (al > 1e-9) { kalan[g] -= al; verildi = true; } } if (!verildi) break; }
     GRUPLAR.forEach(g => { fazla[g] = Math.max(0, kalan[g] || 0); });
@@ -2017,7 +2018,7 @@ function mount(root, opts = {}) {
       ${b('4. İstasyon sayfası', `<ul><li>Üstte istasyonun <b>Plan: yazılan / gereken</b> durumu, <b>Nöbet branşı dengesi</b> (ekip şefi, YSP, sürücü; listedeki planlanan nöbetlere göre dolu / açık) ve uyarılar yer alır. Plan ihtiyaca eşit ve üç nöbet branşı doluysa "İstasyon tam" görünür.</li>
         <li>Tablo: <b>Mesai</b> (izinler düşülmüş saat), <b>Hedef</b> (memur/doktorda mesai ÷ 24 tam oran, ör. 160 saat = 6,67 nöbet; işçide mesai ÷ 11 aşağı tam 12 saatlik nöbete yuvarlanır ve altında tam oran görünür; yuvarlamayı siz yaparsınız, Ayarlar'dan eski 0,5 adım yuvarlama açılabilir), <b>Azami</b>, <b>Plan</b> (elle yazılır ya da ▲▼ ile 0,5 artırılır), <b>Fark</b>.</li>
         <li><b>Elle değiştirdiğiniz değer kilitlenir</b> (🔒) ve diğer kişilerin değerleri değişmez. Kilidi kaldırırsanız otomatik hesap o kişiyi yeniden hesaplar. <i>Planı onayla (kilitle)</i> tüm değerleri kilitler, <i>Kilitleri aç</i> hepsini serbest bırakır.</li>
-        <li><b>Kırmızı satır / "Mesaisi eksik kalan personel" kutusu:</b> planlanan nöbet, Mesai sütunundaki saati karşılamıyor (eksik saat yazılır).</li>
+        <li><b>Fazlalık nöbet sırası</b> (hedefin üstüne yazılan, açığı kapatan nöbetler): sırayla 1 nöbet ATT sürücülere, 1 nöbet AABT sürücülere (kendi aralarında eşit); ikisinin payı dolduktan sonra kalan diğer branşlara. Ekip şefi yuvasına ATT giremez, yalnızca AABT ve doktor.</li><li><b>Kırmızı satır / "Mesaisi eksik kalan personel" kutusu:</b> planlanan nöbet, Mesai sütunundaki saati karşılamıyor (eksik saat yazılır).</li>
         <li><b>Geçici görev</b> sütunu: istasyon, Başhekimlik ve KKM listeden seçilir; ilçe sağlık müdürlüğü, hastane gibi yerler için <i>Diğer (yaz)…</i> seçilip yazılır.</li>
         <li><b>Açıklama</b> kutusu: istasyon için not; PNG ve Excel çıktısının altında görünür.</li><li><b>Ekip OF (kapalı):</b> işaretlenen istasyon kapalı sayılır; ihtiyaç 0'dır ve bu bilgi aylar arasında kalıcıdır. Açana kadar kapalı gelir.</li>
         <li><b>Görüntü (PNG)</b> ve <b>Excel</b> çıktılarında nöbet sayıları gösterilmez; aile hekimliği ve uzmanlık eğitimindeki personel yer almaz.</li></ul>`)}
