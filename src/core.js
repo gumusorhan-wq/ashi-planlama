@@ -140,32 +140,33 @@ const APCore = (() => {
   }
 
   // En büyük kalan yöntemiyle havuzu 0,5 adımlarla ağırlıklara böler
-  function dagit(havuz, agirliklar) {
+  function dagit(havuz, agirliklar, adim) {
+    adim = adim || ADIM;
     const n = agirliklar.length, out = new Array(n).fill(0);
     const top = agirliklar.reduce((a, b) => a + b, 0);
-    let birim = Math.round(havuz / ADIM);
+    let birim = Math.round(havuz / adim);
     if (!n || top <= 0 || birim <= 0) return out;
     const pay = agirliklar.map(w => birim * w / top);
     const taban = pay.map(Math.floor);
     let kalan = birim - taban.reduce((a, b) => a + b, 0);
     const sira = pay.map((p, i) => [p - Math.floor(p), i]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
     for (let i = 0; i < sira.length && kalan > 0; i++, kalan--) taban[sira[i][1]]++;
-    return taban.map(u => u * ADIM);
+    return taban.map(u => Math.round(u * adim * 1e6) / 1e6);
   }
-
-  // Hedefin üstüne azami sınıra kadar ek nöbet dağıtır: havuz hedef toplamından küçükse hedefe orantılı azaltır; büyükse herkese hedefi verip fazlayı (azami sınırı aşmadan) en az ek alana ekler
-  function dagitSinirli(havuz, hedefler, azamiler) {
+  // adim: dağıtım kesinliği. İşçi 0,5 (12 saatlik nöbet); memur/doktor 0,01 (tam oran; yuvarlamayı kullanıcı yapar)
+  function dagitSinirli(havuz, hedefler, azamiler, adim) {
+    adim = adim || ADIM;
     const toplam = hedefler.reduce((a, b) => a + b, 0);
-    if (havuz <= toplam + 1e-9) return dagit(havuz, hedefler);
-    const out = hedefler.slice(); let kalan = Math.round((havuz - toplam) / ADIM);
+    if (havuz <= toplam + 1e-9) return dagit(havuz, hedefler, adim);
+    const out = dagit(toplam, hedefler, adim); let kalan = Math.round((havuz - out.reduce((a, b) => a + b, 0)) / adim);
     while (kalan > 0) {
       let en = -1;
       for (let i = 0; i < out.length; i++) {
-        if (out[i] + ADIM > azamiler[i] + 1e-9) continue;
+        if (out[i] + adim > azamiler[i] + 1e-9) continue;
         if (en < 0 || (out[i] - hedefler[i]) < (out[en] - hedefler[en]) - 1e-9) en = i;
       }
       if (en < 0) break;
-      out[en] += ADIM; kalan--;
+      out[en] = Math.round((out[en] + adim) * 1e6) / 1e6; kalan--;
     }
     return out;
   }
@@ -237,7 +238,7 @@ const APCore = (() => {
     const f0 = akis(kilitSup, {es: D3, ysp: D3, sur: D3}), f1 = akis(sup1, f0.rem), f2 = akis(ek, f1.rem);
     GRUPLAR.forEach(g => {
       const L = ser(g), t = x => x.es + x.ysp + x.sur, total = t(f1.fill[g]) + t(f2.fill[g]);
-      dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami)).forEach((v, i) => sonuc.set(L[i].k.id, v));
+      dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), g === 'isci' ? ADIM : 0.01).forEach((v, i) => sonuc.set(L[i].k.id, v));
     });
     return sonuc;
   }

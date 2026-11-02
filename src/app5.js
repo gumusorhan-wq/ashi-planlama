@@ -59,7 +59,7 @@
     const satir = h.satir.filter(s => !gizliKisi(s.k)).map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
       return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => (NB_SIRA[x.s.grup] - NB_SIRA[y.s.grup]) || personelSirala(x.k, y.k));
     const toplam = satir.reduce((a, x) => a + x.tek, 0), mevcutT = satir.reduce((a, x) => a + (x.tutar ? x.mevcut : 0), 0);
-    return {h, o, satir, toplam, mevcutT, fark: Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
+    return {h, o, satir, toplam, mevcutT, fark: Math.abs(toplam - h.ihtiyac) < 0.05 ? 0 : Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
   }
   function n2PlanHtml(b) {
     const ist = S.rol === 'istasyon';
@@ -73,7 +73,7 @@
       if (s.nobetYok) return 'Nöbet tutmaz';
       return 'Nöbet tutar'; };
     const sat = T.satir.map(x => `<tr><td>${esc(x.k.ad)}</td><td>${esc(bransAd(x.k))}</td><td>${durumMetin(x.s)}</td><td>${x.tutar ? esc(NB_AD[x.s.grup] || '') : ''}</td><td class="num">${x.tutar ? fmt(x.mevcut) : ''}</td>
-      <td class="num">${!x.tutar ? '' : duz ? `<input class="ap-in n ${x.asim ? 'n2e' : ''}" type="number" min="0" step="0.5" data-n2="teklif" data-id="${x.k.id}" value="${x.tek}" title="${x.asim ? 'Üst sınır ' + fmt(x.ust) + ' nöbet' : ''}">` : `<b class="${x.degisti ? 'n2d' : ''}">${fmt(x.tek)}</b>`}</td><td class="num">${x.tutar && x.degisti ? `<span class="${x.tek > x.mevcut ? 'n2art' : 'n2eks'}">${x.tek > x.mevcut ? '+' : ''}${fmt(x.tek - x.mevcut)}</span>` : ''}</td></tr>`).join('');
+      <td class="num">${!x.tutar ? '' : duz ? `<input class="ap-in n ${x.asim ? 'n2e' : ''}" type="number" min="0" step="0.01" data-n2="teklif" data-id="${x.k.id}" value="${x.tek}" title="${x.asim ? 'Üst sınır ' + fmt(x.ust) + ' nöbet' : ''}">` : `<b class="${x.degisti ? 'n2d' : ''}">${fmt(x.tek)}</b>`}</td><td class="num">${x.tutar && x.degisti ? `<span class="${x.tek > x.mevcut ? 'n2art' : 'n2eks'}">${x.tek > x.mevcut ? '+' : ''}${fmt(x.tek - x.mevcut)}</span>` : ''}</td></tr>`).join('');
     const durumRozet = `<span class="ap-badge ${o.durum === 'onaylandi' ? 'ap-b-kesin' : o.durum === 'reddedildi' ? 'ap-b-taslak' : ''}">${ONAY_AD[o.durum]}</span>`;
     const uyari = [T.fark ? `Toplam ${fmt(T.toplam)}, gereken ${h.ihtiyac} (${T.fark > 0 ? '+' : ''}${fmt(T.fark)})` : '', T.asimSay ? `${T.asimSay} kişide üst sınır aşıldı` : ''].filter(Boolean);
     return `${!ist ? `<div class="ap-card" style="border-color:var(--ap-warn);background:var(--ap-warnbg)"><span class="ap-note">Planlama birimi görünümü. İstasyon sorumlusu bu bölümü yalnızca plan <b>Kesinleştirildiğinde</b> görür (şu an: <b>${S.plan.durum === 'taslak' ? 'Taslak' : S.plan.durum === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</b>), nöbet sayılarını düzenleyip size geri gönderir; onayınızı <b>İstasyon talepleri</b> sayfasından verirsiniz. Sağlık nedenleri (rapor, doğum, muafiyet) istasyon sorumlusuna gösterilmez.</span></div>` : ''}

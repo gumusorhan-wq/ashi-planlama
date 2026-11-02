@@ -29,7 +29,7 @@ for (let i = 0; i < 8; i++) kisiler.push({id: 'm' + i, sinif: 'memur', durum: ''
 for (let i = 0; i < 3; i++) kisiler.push({id: 'i' + i, sinif: 'isci', durum: '', izin: []});
 const h = C.istasyonHesap(kisiler, 2026, 8, {}, D, {azamiMemur: 8}, 3), o = C.oneri(h);
 const topl = (p) => kisiler.filter(x => x.id[0] === p).reduce((a, x) => a + o.get(x.id), 0);
-assert.strictEqual(topl('d'), 28); assert.strictEqual(topl('i'), 25.5); assert.strictEqual(topl('m'), 39.5);   // doktorlar hedeflerinde kalır; ES'nin kalan 3 nöbetini AABT hedef nöbetiyle tutar
+const yk = (x, y) => assert.ok(Math.abs(x - y) < 1e-6, x + ' ≠ ' + y); yk(topl('d'), 28); yk(topl('i'), 25.5); yk(topl('m'), 39.5);   // doktorlar hedeflerinde kalır; ES'nin kalan 3 nöbetini AABT hedef nöbetiyle tutar
 assert.strictEqual(h.ihtiyac, 93);
 assert.strictEqual(C.istAnahtar('ŞEHZADELER 8 NOLU ASHİ AĞUSTOS'), 'SEHZADELER 8');
 assert.strictEqual(C.istAnahtar('MANİSA AHMETLİ 1 NOLU ACİL SAĞLIK HİZMETLERİ İSTASYONU'), 'AHMETLI 1');
