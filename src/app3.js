@@ -440,15 +440,26 @@
     if (h.ihtiyacTur === 'elle') return `Elle karar: azamiyle de ${fmt(-h.farkAzami)} nöbet açık, gelen kişi mesaisini tamamlayamaz`;
     return '';
   }
-  function excelToplu() {
-    const wb = XLSX.utils.book_new(), kul = new Set(), ozet = [['BİRİM', 'KİŞİ', 'İHTİYAÇ', 'KAPASİTE (HEDEF)', 'KAPASİTE (AZAMİ)', 'PLANLANAN', 'DURUM', 'PERSONEL DEĞERLENDİRMESİ']];
-    S.plan.birimler.forEach(b => {
-      XLSX.utils.book_append_sheet(wb, excelBirimSheet(b), sheetAd(b.ad, kul));
-      if (b.tur === 'istasyon') { const h = hesapla(b); ozet.push([b.ad, h.satir.length, h.ihtiyac, h.kapasite, h.azamiKap, planlananToplam(h), h.durum === 'ihtiyac' ? 'Personel ihtiyacı' : h.durum === 'fazla' ? 'Mesai tamamlayamama' : h.durum === 'fazlaMesai' ? 'Fazla mesaiyle dolar' : 'Dengede', personelDegerlendirme(b, h)]); }
+  // Tüm istasyonlar tek Excel: her istasyon ayrı sayfa; sütunlar planlama biriminin kullandığı düzende (AD SOYAD … AÇIKLAMA).
+  // TAHMİNİ NÖBET = personelin mesai saatinden: memur/doktor "7 Nöbet + 8 Saat" (24 saatlik nöbet + kalan saat), işçi "16 Nöbet" (12 saatlik nöbet). Planlanan nöbet sayısı yazılmaz.
+  function excelIstasyonSayfa(b) {
+    const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
+    const kis = S.plan.kayitlar.filter(k => (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)) && !gizliKisi(k)).sort((x, y) => trCollator.compare(x.ad, y.ad));
+    const tahmini = k => { const s = sm.get(k.id); if (!s || s.nobetYok || !(s.mesai > 0)) return ''; if (k.sinif === 'isci') return `${Math.floor(s.mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(s.mesai / 24 + 1e-9), sa = Math.round((s.mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
+    const brans = k => { const s = sm.get(k.id), g = s ? s.grup : ''; return k.sinif === 'isci' || g === 'sy' ? 'Sürücü' : g === 'ysp' ? 'ATT / Yrd. Sağlık Personeli' : 'Ekip Şefi'; };
+    const kalanAy = k => { const bit = k.gorev && k.gorev.bit; if (!bit) return ''; const x = (+bit.slice(0, 4)) * 12 + (+bit.slice(5, 7)) - (S.y * 12 + S.m); return x > 0 ? x : 0; };
+    const aoa = [['AD SOYAD', 'UNVAN', 'SRC YETKİSİ', 'KADRO TÜRÜ', 'BRANŞ', 'İZİN (GÜN)', 'TAHMİNİ NÖBET', 'G.GÖREV DURUMU', 'GELDİĞİ/GİTTİĞİ İSTASYON', 'NEDEN', 'KALAN AY', 'YOLLUK DURUMU', 'AÇIKLAMA']];
+    kis.forEach((k, i) => {
+      const gelen = k.birim !== b.ad, giden = !gelen && ((D[k.durum] || {}).disarida) && k.gorev && (k.gorev.hedef || k.gorev.yer), u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
+      aoa.push([k.ad, (k.unvan || '').trim(), /\bSRC\b/.test(u) ? 'EVET' : '', k.sinif === 'isci' ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, giden ? '' : tahmini(k),
+        gelen ? 'GEÇİCİ GÖREVLİ' : giden ? 'GEÇİCİ GÖREVDE' : '', gelen ? `Geldiği istasyon: ${k.birim || 'Tanımsız İstasyon'}` : giden ? `Gittiği istasyon: ${k.gorev.hedef || k.gorev.yer}` : '',
+        (gelen || giden) && k.gorev ? (k.gorev.gerekce || '') : '', gelen || giden ? kalanAy(k) : '', (k.gorev && k.gorev.yolluk) || '', i === 0 ? (b.aciklama || '') : '']);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ozet), sheetAd('Plan özeti', kul));
-    const {say} = istatistik(); const ist = [['GÖSTERGE', 'DEĞER']]; Object.keys(say).sort().forEach(k => ist.push([k, say[k]]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ist), sheetAd('İstatistik', kul));
+    const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [22.8, 14.8, 10.8, 12.8, 22.8, 9.8, 16.8, 16.8, 28, 18.8, 9.8, 12.8, 36].map(wch => ({wch})); return ws;
+  }
+  function excelToplu() {
+    const wb = XLSX.utils.book_new(), kul = new Set();
+    S.plan.birimler.filter(b => b.tur === 'istasyon').forEach(b => { XLSX.utils.book_append_sheet(wb, excelIstasyonSayfa(b), sheetAd(b.ad, kul)); });
     return wb;
   }
   const xlsxIndir = (wb, ad) => indir(new Blob([XLSX.write(wb, {bookType: 'xlsx', type: 'array'})], {type: 'application/octet-stream'}), ad);

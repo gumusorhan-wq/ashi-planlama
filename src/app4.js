@@ -226,6 +226,7 @@
     const ara = C.TR(T.ara || '').trim(), kisiler = new Map();
     aylar.forEach(ay => veri[ay].forEach(r => {
       if (T.ist.length && !T.ist.includes(r.birim)) return;
+      if (r.durum === 'AİLE HEKİMLİĞİNDE' || r.durum === 'UZMANLIK EĞİTİMİ') return;      // aile hekimliği sözleşmelileri ve uzmanlık eğitimindekiler izin / görev takibinde yer almaz
       if (ara && !C.TR(r.ad).includes(ara)) return;
       const e = kisiler.get(r.a) || {ad: r.ad, unvan: r.unvan, ekip: r.birim, h: {}}; e.ekip = r.birim; e.unvan = r.unvan || e.unvan;
       // izin: tarihli izinlerin ay içine düşen günleri + tarihsiz gün sayısı; izin sayılan durumlar (rapor, doğum, ücretsiz izin vb.)

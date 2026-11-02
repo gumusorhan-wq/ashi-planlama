@@ -1209,7 +1209,7 @@ function mount(root, opts = {}) {
       <div><b>${fmt(pl)}</b><span>Planlanan</span></div>${tk('oner', acik, 'var(--ap-bad)', 'Personel önerilen istasyon', ` (toplam ${kisiOner} kişi)`)}${S.ayar.panoMod === 'mesai' ? '' : tk('icerde', fm, 'var(--ap-warn)', 'Fazla nöbetle kendi içinde dönen')}${tk('elle', elle, '#9a3412', S.ayar.panoMod === 'mesai' ? 'Açık kalan (kişiye yetmeyen)' : 'Elle karar gerektiren')}${tk('fazla', fazla, 'var(--ap-warn)', S.ayar.panoMod === 'mesai' ? 'Mesai tamamlayamayan' : 'Fazlalığı olan (fazla mesaili)')}</div>
       ${f ? `<div class="ap-row"><b>${FILTRE_AD[f]}: ${gosterilen.length}</b><button class="ap-btn sm" data-act="pano-filtre" data-v="">✕ Filtreyi kaldır</button><span class="ap-note">Kartlara tıklayarak istasyonu açabilirsiniz.</span></div>` : ''}
       <div class="ap-toolbar ap-noprint"><button class="ap-btn pri" data-act="tum-plan" ${salt() ? 'disabled' : ''} title="Geri çağırma, nöbet hesabı ve rotasyon görevlendirmelerini tek seferde yapar">Tüm planlamayı oluştur</button><button class="ap-btn" data-act="oner-hepsi" title="Tüm istasyonlarda planlanan nöbetleri yeniden hesaplar">Planlananı yeniden hesapla</button>
-      <button class="ap-btn" data-act="excel-toplu" title="Tüm istasyonlar, her biri ayrı sayfada, tek Excel dosyasında (sonunda Plan özeti ve İstatistik sayfaları)">Tüm istasyonlar Excel (tek dosya)</button>
+      <button class="ap-btn" data-act="excel-toplu" title="Tüm istasyonlar, her biri ayrı sayfada, tek Excel dosyasında (planlama biriminin Excel düzeni; tahmini nöbet mesai saatinden)">Tüm istasyonlar Excel (tek dosya)</button>
       <span class="ap-seg" title="Mesai karşılığı: herkes yalnız mesaisini tamamlayacak kadar nöbet tutar. Fazla mesaili: DOKTOR-AABT-ATT'ye yazdığınız nöbet sayısına kadar fazla nöbet yazılabilir."><button class="${S.ayar.panoMod === 'mesai' ? 'on' : ''}" data-act="pano-mod" data-v="mesai">Mesai karşılığı</button><button class="${S.ayar.panoMod !== 'mesai' ? 'on' : ''}" data-act="pano-mod" data-v="fazla">Fazla mesaili</button></span>
       <label class="ap-note ap-azami ${S.ayar.panoMod === 'mesai' ? 'off' : ''}" title="DOKTOR-AABT-ATT'ye bir ayda yazılabilecek en çok 24 saatlik nöbet sayısı. Yazdığınız sayıya göre pano yeniden hesaplanır (istasyon sayfasından istasyona özel değiştirilebilir).">DOKTOR-AABT-ATT en çok <input class="ap-in n" type="number" min="0" step="0.5" data-pano-azami value="${S.ayar.azamiMemur}" ${S.ayar.panoMod === 'mesai' || salt() ? 'disabled' : ''}> nöbet</label>
       <span class="ap-note">${AYLAR[S.m]}: ${C.gunSayisi(S.y, S.m)} gün × ${C.YUVA_VARSAYILAN} nöbet branşı = ${C.gunSayisi(S.y, S.m) * C.YUVA_VARSAYILAN} nöbet/istasyon · memur ${fmt(C.ayMesai(S.y, S.m, false, ozel()))} sa., işçi ${fmt(C.ayMesai(S.y, S.m, true, ozel()))} sa.</span></div>
@@ -1708,6 +1708,7 @@ function mount(root, opts = {}) {
     const ara = C.TR(T.ara || '').trim(), kisiler = new Map();
     aylar.forEach(ay => veri[ay].forEach(r => {
       if (T.ist.length && !T.ist.includes(r.birim)) return;
+      if (r.durum === 'AİLE HEKİMLİĞİNDE' || r.durum === 'UZMANLIK EĞİTİMİ') return;      // aile hekimliği sözleşmelileri ve uzmanlık eğitimindekiler izin / görev takibinde yer almaz
       if (ara && !C.TR(r.ad).includes(ara)) return;
       const e = kisiler.get(r.a) || {ad: r.ad, unvan: r.unvan, ekip: r.birim, h: {}}; e.ekip = r.birim; e.unvan = r.unvan || e.unvan;
       // izin: tarihli izinlerin ay içine düşen günleri + tarihsiz gün sayısı; izin sayılan durumlar (rapor, doğum, ücretsiz izin vb.)
@@ -2016,7 +2017,7 @@ function mount(root, opts = {}) {
         <li>Ay bitince <b>Arşiv</b> sayfasından ayı arşive kaydedin; <b>Arşiv istatistikleri</b> geçmiş aylardan raporlar üretir.</li></ol>`, true)}
       ${b('2. Roller ve yetkiler', `<ul><li><b>Yönetici:</b> her şeyi yapar; ayarlar, arşiv silme, yedek ve kilit.</li><li><b>Planlayıcı:</b> planlama birimi; Modül 1'in tamamı ve sağlık bilgileri, arşiv silme.</li><li><b>İstasyon sorumlusu:</b> yalnızca kendi istasyonu; Modül 2 ve plan "kesin" olduktan sonra kendi istasyonunun planı. Sağlık bilgisi göremez.</li><li><b>Salt okur:</b> görüntüler, değiştiremez.</li></ul>
         <p>Bu ay ve sonraki aylar düzenlenebilir; <b>önceki aylar salt okunurdur</b> (arşiv görünümü). Aylar arası geçiş üst çubuktaki ‹ › düğmeleriyle yapılır.</p>`)}
-      ${b('3. Pano', `<ul><li>Kartlar: açık istasyon, ekip OF (kapalı), aktif kayıt, ihtiyaç, kapasite, planlanan, personel önerilen, fazla nöbetle dönen, elle karar gereken istasyonlar. Karta tıklayınca istasyonlar süzülür.</li><li><b>Tüm planlamayı oluştur:</b> tek tuşla geri çağırma + nöbet hesabı + rotasyon görevlendirmesi. Kilitli değerler korunur.</li><li><b>Planlananı yeniden hesapla:</b> yalnız nöbet sayılarını yeniden hesaplar.</li><li><b>Tüm istasyonlar Excel (tek dosya):</b> her istasyon ayrı sayfada; sonda Plan özeti ve İstatistik sayfaları.</li><li><b>Mod:</b> <i>Mesai karşılığı</i> (kişi yalnız mesai saatini tamamlayacak kadar nöbet tutar) veya <i>Fazla mesaili</i> (DOKTOR-AABT-ATT için kişi başı en çok N nöbet yazılabilir).</li></ul>`)}
+      ${b('3. Pano', `<ul><li>Kartlar: açık istasyon, ekip OF (kapalı), aktif kayıt, ihtiyaç, kapasite, planlanan, personel önerilen, fazla nöbetle dönen, elle karar gereken istasyonlar. Karta tıklayınca istasyonlar süzülür.</li><li><b>Tüm planlamayı oluştur:</b> tek tuşla geri çağırma + nöbet hesabı + rotasyon görevlendirmesi. Kilitli değerler korunur.</li><li><b>Planlananı yeniden hesapla:</b> yalnız nöbet sayılarını yeniden hesaplar.</li><li><b>Tüm istasyonlar Excel (tek dosya):</b> her istasyon ayrı sayfada; sütunlar planlama biriminin Excel düzenindedir (AD SOYAD, ÜNVAN, SRC YETKİSİ, KADRO TÜRÜ, BRANŞ, İZİN (GÜN), TAHMİNİ NÖBET, G.GÖREV DURUMU, GELDİĞİ/GİTTİĞİ İSTASYON, NEDEN, KALAN AY, YOLLUK DURUMU, AÇIKLAMA). Tahmini nöbet kişinin mesai saatinden hesaplanır (memur/doktor "7 Nöbet + 8 Saat", işçi "16 Nöbet"); planlanan nöbet sayısı yazılmaz.</li><li><b>Mod:</b> <i>Mesai karşılığı</i> (kişi yalnız mesai saatini tamamlayacak kadar nöbet tutar) veya <i>Fazla mesaili</i> (DOKTOR-AABT-ATT için kişi başı en çok N nöbet yazılabilir).</li></ul>`)}
       ${b('4. İstasyon sayfası', `<ul><li>Üstte istasyonun <b>Plan: yazılan / gereken</b> durumu, <b>Nöbet branşı dengesi</b> (ekip şefi, YSP, sürücü; listedeki planlanan nöbetlere göre dolu / açık) ve uyarılar yer alır. Plan ihtiyaca eşit ve üç nöbet branşı doluysa "İstasyon tam" görünür.</li>
         <li>Tablo: <b>Mesai</b> (izinler düşülmüş saat), <b>Hedef</b> (memur/doktorda mesai ÷ 24 tam oran, ör. 160 saat = 6,67 nöbet; işçide mesai ÷ 11 aşağı tam 12 saatlik nöbete yuvarlanır ve altında tam oran görünür; yuvarlamayı siz yaparsınız, Ayarlar'dan eski 0,5 adım yuvarlama açılabilir), <b>Azami</b>, <b>Plan</b> (elle yazılır ya da ▲▼ ile 0,5 artırılır), <b>Fark</b>.</li>
         <li><b>Elle değiştirdiğiniz değer kilitlenir</b> (🔒) ve diğer kişilerin değerleri değişmez. Kilidi kaldırırsanız otomatik hesap o kişiyi yeniden hesaplar. <i>Planı onayla (kilitle)</i> tüm değerleri kilitler, <i>Kilitleri aç</i> hepsini serbest bırakır.</li>
@@ -2593,15 +2594,26 @@ function mount(root, opts = {}) {
     if (h.ihtiyacTur === 'elle') return `Elle karar: azamiyle de ${fmt(-h.farkAzami)} nöbet açık, gelen kişi mesaisini tamamlayamaz`;
     return '';
   }
-  function excelToplu() {
-    const wb = XLSX.utils.book_new(), kul = new Set(), ozet = [['BİRİM', 'KİŞİ', 'İHTİYAÇ', 'KAPASİTE (HEDEF)', 'KAPASİTE (AZAMİ)', 'PLANLANAN', 'DURUM', 'PERSONEL DEĞERLENDİRMESİ']];
-    S.plan.birimler.forEach(b => {
-      XLSX.utils.book_append_sheet(wb, excelBirimSheet(b), sheetAd(b.ad, kul));
-      if (b.tur === 'istasyon') { const h = hesapla(b); ozet.push([b.ad, h.satir.length, h.ihtiyac, h.kapasite, h.azamiKap, planlananToplam(h), h.durum === 'ihtiyac' ? 'Personel ihtiyacı' : h.durum === 'fazla' ? 'Mesai tamamlayamama' : h.durum === 'fazlaMesai' ? 'Fazla mesaiyle dolar' : 'Dengede', personelDegerlendirme(b, h)]); }
+  // Tüm istasyonlar tek Excel: her istasyon ayrı sayfa; sütunlar planlama biriminin kullandığı düzende (AD SOYAD … AÇIKLAMA).
+  // TAHMİNİ NÖBET = personelin mesai saatinden: memur/doktor "7 Nöbet + 8 Saat" (24 saatlik nöbet + kalan saat), işçi "16 Nöbet" (12 saatlik nöbet). Planlanan nöbet sayısı yazılmaz.
+  function excelIstasyonSayfa(b) {
+    const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
+    const kis = S.plan.kayitlar.filter(k => (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)) && !gizliKisi(k)).sort((x, y) => trCollator.compare(x.ad, y.ad));
+    const tahmini = k => { const s = sm.get(k.id); if (!s || s.nobetYok || !(s.mesai > 0)) return ''; if (k.sinif === 'isci') return `${Math.floor(s.mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(s.mesai / 24 + 1e-9), sa = Math.round((s.mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
+    const brans = k => { const s = sm.get(k.id), g = s ? s.grup : ''; return k.sinif === 'isci' || g === 'sy' ? 'Sürücü' : g === 'ysp' ? 'ATT / Yrd. Sağlık Personeli' : 'Ekip Şefi'; };
+    const kalanAy = k => { const bit = k.gorev && k.gorev.bit; if (!bit) return ''; const x = (+bit.slice(0, 4)) * 12 + (+bit.slice(5, 7)) - (S.y * 12 + S.m); return x > 0 ? x : 0; };
+    const aoa = [['AD SOYAD', 'UNVAN', 'SRC YETKİSİ', 'KADRO TÜRÜ', 'BRANŞ', 'İZİN (GÜN)', 'TAHMİNİ NÖBET', 'G.GÖREV DURUMU', 'GELDİĞİ/GİTTİĞİ İSTASYON', 'NEDEN', 'KALAN AY', 'YOLLUK DURUMU', 'AÇIKLAMA']];
+    kis.forEach((k, i) => {
+      const gelen = k.birim !== b.ad, giden = !gelen && ((D[k.durum] || {}).disarida) && k.gorev && (k.gorev.hedef || k.gorev.yer), u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
+      aoa.push([k.ad, (k.unvan || '').trim(), /\bSRC\b/.test(u) ? 'EVET' : '', k.sinif === 'isci' ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, giden ? '' : tahmini(k),
+        gelen ? 'GEÇİCİ GÖREVLİ' : giden ? 'GEÇİCİ GÖREVDE' : '', gelen ? `Geldiği istasyon: ${k.birim || 'Tanımsız İstasyon'}` : giden ? `Gittiği istasyon: ${k.gorev.hedef || k.gorev.yer}` : '',
+        (gelen || giden) && k.gorev ? (k.gorev.gerekce || '') : '', gelen || giden ? kalanAy(k) : '', (k.gorev && k.gorev.yolluk) || '', i === 0 ? (b.aciklama || '') : '']);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ozet), sheetAd('Plan özeti', kul));
-    const {say} = istatistik(); const ist = [['GÖSTERGE', 'DEĞER']]; Object.keys(say).sort().forEach(k => ist.push([k, say[k]]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ist), sheetAd('İstatistik', kul));
+    const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [22.8, 14.8, 10.8, 12.8, 22.8, 9.8, 16.8, 16.8, 28, 18.8, 9.8, 12.8, 36].map(wch => ({wch})); return ws;
+  }
+  function excelToplu() {
+    const wb = XLSX.utils.book_new(), kul = new Set();
+    S.plan.birimler.filter(b => b.tur === 'istasyon').forEach(b => { XLSX.utils.book_append_sheet(wb, excelIstasyonSayfa(b), sheetAd(b.ad, kul)); });
     return wb;
   }
   const xlsxIndir = (wb, ad) => indir(new Blob([XLSX.write(wb, {bookType: 'xlsx', type: 'array'})], {type: 'application/octet-stream'}), ad);
