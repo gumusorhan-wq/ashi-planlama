@@ -69,7 +69,7 @@ table.ap-t{border-collapse:collapse;width:100%;font-size:13px;background:var(--a
 
 /* İstasyon tablosu: sabit sütun genişlikleri, yana taşma yok */
 .ap-tw-ist{overflow-x:auto}
-table.ap-ist{table-layout:fixed;width:100%;min-width:1240px;font-size:12.5px}
+table.ap-ist{table-layout:fixed;width:100%;min-width:1380px;font-size:12.5px}
 .ap-ist th{padding:6px 4px;font-size:11px;white-space:normal;line-height:1.2}
 .ap-ist td{padding:3px 4px;overflow-wrap:anywhere;vertical-align:middle}
 .ap-ist .ap-in,.ap-ist .ap-sel{width:100%;min-width:0;max-width:100%;font-size:12.5px;padding:4px 5px;text-overflow:ellipsis}
@@ -1269,7 +1269,7 @@ function mount(root, opts = {}) {
     const mesEksik = [];
     kis.forEach(k => {
       const gelen = k.birim !== b.ad, s = satirMap.get(k.id), dt = D[k.durum] || {};
-      if (!gelen && son && k.sinif !== son) rows += '<tr class="sep"><td colspan="16"></td></tr>';
+      if (!gelen && son && k.sinif !== son) rows += '<tr class="sep"><td colspan="17"></td></tr>';
       if (!gelen) son = k.sinif;
       const renk = gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), eng = C.gorevlendirmeEngeli(k, ayIlk());
       const dis = duz ? '' : 'disabled';
@@ -1291,6 +1291,7 @@ function mount(root, opts = {}) {
         <td>${istas && !(s && s.nobetYok) ? `<input type="checkbox" data-id="${k.id}" data-f="kilit" ${k.kilit ? 'checked' : ''} ${dis} title="Kilitli değer otomatik hesapta değişmez. Elle girilen planlanan değer kendiliğinden kilitlenir; kilidi açınca yeniden hesaplanır.">` : ''}</td>
         <td>${gelen ? esc(k.birim + ' kadrosundan') : gorevHucre(k, birimler, b, dt, dis)}${eng ? `<div class="ap-note" style="color:var(--ap-bad)">${esc(eng)}</div>` : ''}</td>
         <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${dis}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === ((k.gorev || {}).yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
+        <td><input class="ap-in w" data-id="${k.id}" data-f="aciklama" value="${esc(k.aciklama || '')}" ${dis} placeholder="Açıklama" title="Kişiye özel not; PNG ve Excel çıktısındaki AÇIKLAMA sütununda yer alır"></td>
         <td>${gelen ? `<button class="ap-btn sm" data-act="gorev-bitir" data-id="${k.id}" ${duz ? '' : 'disabled'} title="Geri gönder: görevlendirmeyi bitirir, kişi ${esc(k.birim)} istasyonuna geri döner">↩ Geri</button>` : (gorevAktif(k.gorev) ? `<button class="ap-btn sm" data-act="gorev-bitir" data-id="${k.id}" ${duz ? '' : 'disabled'} title="Geri çağır: görevlendirmeyi bitirir, kişi bu istasyona geri döner">↩ Geri</button> ` : '')}${duz && !gelen ? `<button class="ap-btn sm dng" data-act="kisi-sil" data-id="${k.id}" title="Kaydı sil">✕</button>` : ''}</td></tr>`;
     });
     const pAk = h && !b.ekipOf ? planAkis(h) : null, planTam = !!pAk && Math.abs(p - h.ihtiyac) < 0.05 && ['es', 'ysp', 'sur'].every(y => pAk.rem[y] <= 0.05);      // plan ihtiyaca eşit ve üç nöbet branşı da dolu: hesap uyarıları gösterilmez
@@ -1307,8 +1308,8 @@ function mount(root, opts = {}) {
       ${disSay ? `<button class="ap-btn" data-act="geri-cagir" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'} title="Bu ekibin başka birimlere görevli personelini geri çağırır">Personeli geri çağır (${disSay})</button>` : ''}<button class="ap-btn" data-act="png" data-v="${esc(b.ad)}">Görüntü (PNG)</button><button class="ap-btn" data-act="excel-ist" data-v="${esc(b.ad)}">Excel</button>
       ${istas ? `<label class="ap-note" title="Kapalı ekip: ihtiyaç 0 sayılır; işareti kaldırınca ekip açılır ve personel geri çağrılabilir"><input type="checkbox" data-act="ekip-of" data-v="${esc(b.ad)}" ${b.ekipOf ? 'checked' : ''} ${duz ? '' : 'disabled'}> <b>Ekip OF (kapalı)</b></label>` : ''}
       </div>
-      ${durumBar}<div class="ap-card ap-noprint" style="margin:8px 0"><label class="ap-note" style="display:block"><b>Açıklama</b> — PNG ve Excel çıktısının altında yer alır (ör. "Ali Veli 15-20 Kasım izinli, yerine X gelecek")<textarea class="ap-in w" rows="2" style="width:100%;margin-top:4px" data-iac="${esc(b.ad)}" ${duz ? '' : 'disabled'} placeholder="İstasyon için not...">${esc(b.aciklama || '')}</textarea></label></div>${mesEksik.length && !b.ekipOf ? `<div class="ap-ek ap-ek-c" style="margin:8px 0;color:var(--ap-bad)"><b>Mesaisi eksik kalan personel (${mesEksik.length}):</b> ${mesEksik.map(esc).join(' · ')} <span class="ap-note">— planlanan nöbetler "Mesai" sütunundaki saati karşılamıyor; satırları kırmızı gösterilir</span></div>` : ''}${lejant()}
-      <div class="ap-tw ap-tw-ist"><table class="ap-t ap-ist"><colgroup><col style="width:10.3%"><col style="width:7%"><col style="width:6%"><col style="width:9.5%"><col style="width:9.5%"><col style="width:4%"><col style="width:5.8%"><col style="width:3.6%"><col style="width:3.1%"><col style="width:3.3%"><col style="width:6.5%"><col style="width:3.1%"><col style="width:2.2%"><col style="width:14%"><col style="width:5.5%"><col style="width:6.6%"></colgroup><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>SINIF</th><th>NÖBET ROLÜ</th><th>G.GÖREV DURUMU</th><th>İZİN GÜN</th><th>İZİN TÜRÜ</th><th>MESAİ</th><th>HEDEF</th><th>AZAMİ</th><th>PLAN</th><th>FARK</th><th>🔒</th><th>GEÇİCİ GÖREV</th><th>YOLLUK</th><th>İŞLEM</th></tr></thead><tbody>${rows || '<tr><td colspan="16" class="ap-empty">Bu birimde kayıt yok</td></tr>'}</tbody></table></div>${silinenHtml(b, duz)}`;
+      ${durumBar}${mesEksik.length && !b.ekipOf ? `<div class="ap-ek ap-ek-c" style="margin:8px 0;color:var(--ap-bad)"><b>Mesaisi eksik kalan personel (${mesEksik.length}):</b> ${mesEksik.map(esc).join(' · ')} <span class="ap-note">— planlanan nöbetler "Mesai" sütunundaki saati karşılamıyor; satırları kırmızı gösterilir</span></div>` : ''}${lejant()}
+      <div class="ap-tw ap-tw-ist"><table class="ap-t ap-ist"><colgroup><col style="width:10%"><col style="width:6.2%"><col style="width:5.2%"><col style="width:8.3%"><col style="width:8.3%"><col style="width:3.6%"><col style="width:5.2%"><col style="width:3.2%"><col style="width:2.9%"><col style="width:3%"><col style="width:6%"><col style="width:2.9%"><col style="width:2%"><col style="width:11.6%"><col style="width:5%"><col style="width:10.5%"><col style="width:6.1%"></colgroup><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>SINIF</th><th>NÖBET ROLÜ</th><th>G.GÖREV DURUMU</th><th>İZİN GÜN</th><th>İZİN TÜRÜ</th><th>MESAİ</th><th>HEDEF</th><th>AZAMİ</th><th>PLAN</th><th>FARK</th><th>🔒</th><th>GEÇİCİ GÖREV</th><th>YOLLUK</th><th>AÇIKLAMA</th><th>İŞLEM</th></tr></thead><tbody>${rows || '<tr><td colspan="17" class="ap-empty">Bu birimde kayıt yok</td></tr>'}</tbody></table></div>${silinenHtml(b, duz)}`;
   }
 
   function gorevHtml() {
@@ -1344,8 +1345,11 @@ function mount(root, opts = {}) {
     const sekme = S.gorevSekme || 'deg';
     const istAd = new Set(birimler.filter(b => b.tur === 'istasyon').map(b => b.ad));
     const disK = S.plan.kayitlar.filter(k => !gizliKisi(k) && ((D[k.durum] || {}).disarida || (k.gorev && (k.gorev.hedef || k.gorev.yer))) && !(k.gorev && k.gorev.hedef && istAd.has(k.gorev.hedef))).sort((a, b) => trCollator.compare(a.birim, b.birim) || trCollator.compare(a.ad, b.ad));
-    const disSat = disK.map(k => { const g = k.gorev || {}, bk = birimler.find(x => x.ad === k.birim) || {ad: k.birim}, dt = D[k.durum] || {}; return `<tr><td>${esc(k.ad)}</td><td>${esc(k.unvan)}</td><td>${esc(k.birim)}</td><td>${esc(k.durum || '')}</td><td>${gorevHucre(k, birimler, bk, {disarida: true}, duz ? '' : 'disabled')}</td></tr>`; }).join('');
-    const dis = `<div class="ap-card"><h2>İstasyon dışı görevliler (${disK.length})</h2><p class="ap-note">Geçici görevde olup başka bir <b>istasyona</b> atanmamış personel (Başhekimlik, KKM, ilçe sağlık müdürlüğü, hastane vb. ya da yeri henüz seçilmemiş). Bu kişilere kendi istasyonlarında nöbet yazılmaz. Yeri "Görev yeri" sütunundan seçebilir ya da yazabilirsiniz.</p>
+    const dq = C.TR(S.disAra || '').trim(), dist = S.disIst || '';
+    const disSat = disK.map(k => { const g = k.gorev || {}, bk = birimler.find(x => x.ad === k.birim) || {ad: k.birim}, dt = D[k.durum] || {}, ara = C.TR([k.ad, k.birim, g.hedef || '', g.yer || '', k.durumMetin || ''].join(' ')), gor = (!dq || ara.includes(dq)) && (!dist || k.birim === dist); return `<tr data-ara="${esc(ara)}" data-kay="${esc(k.birim)}" style="${gor ? '' : 'display:none'}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}</td><td>${esc(k.birim)}</td><td>${esc(k.durum || '')}</td><td>${gorevHucre(k, birimler, bk, {disarida: true}, duz ? '' : 'disabled')}</td></tr>`; }).join('');
+    const dis = `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">İstasyon dışı görevliler (${disK.length})</h2>
+      <input class="ap-in" id="ap-d-kisi" placeholder="Kişi / yer ara (listeyi süzer)…" value="${esc(S.disAra || '')}" autocomplete="off">
+      <label class="ap-note" title="Yalnız seçilen kadro istasyonunun personeli listelenir">Kadro istasyonu süz <select class="ap-sel" id="ap-d-ist"><option value="">Tümü</option>${[...new Set(disK.map(k => k.birim))].sort(trCollator.compare).map(a => `<option ${a === dist ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></label></div><p class="ap-note">Geçici görevde olup başka bir <b>istasyona</b> atanmamış personel (Başhekimlik, KKM, ilçe sağlık müdürlüğü, hastane vb. ya da yeri henüz seçilmemiş). Bu kişilere kendi istasyonlarında nöbet yazılmaz. Yeri "Görev yeri" sütunundan seçebilir ya da yazabilirsiniz.</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Ünvan</th><th>Kadro istasyonu</th><th>Durum</th><th style="min-width:230px">Görev yeri / tarih</th></tr></thead><tbody>${disSat || '<tr><td colspan="5" class="ap-empty">İstasyon dışında görevli personel yok</td></tr>'}</tbody></table></div></div>`;
     const sekmeler = [['deg', 'Personel ihtiyacı değerlendirmesi'], ['rot', 'Aylık rotasyon'], ['list', `Görevlendirmeler (${gk.length})`], ['dis', `İstasyon dışı görevliler (${disK.length})`], ['ozet', 'Açık / fazla istasyonlar']];
     const nav = `<div class="ap-subnav ap-noprint">${sekmeler.map(([v, t]) => `<button class="${sekme === v ? 'on' : ''}" data-act="gorev-sekme" data-v="${v}">${t}</button>`).join('')}<button class="ap-btn" style="margin-left:auto" data-act="gorev-excel" title="Personel ihtiyacı, rotasyon, görevlendirmeler ve açık/fazla istasyonlar tek Excel dosyasında">Excel'e aktar</button></div>`;
@@ -1532,7 +1536,7 @@ function mount(root, opts = {}) {
     finally { S.arsivCalisiyor = false; if (S.arsivTekrar) { S.arsivTekrar = false; setTimeout(() => arsivArkaPlan(), 300); } }
   }
   // Yüklenen dosya günlüğü (Arşiv sayfasında gösterilir): hangi dosya, hangi tür, kaç satır, hangi aya uygulandı
-  const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', I: 'Personel İzin-Muafiyet Raporu', N: 'Nöbet Listesi / Hareket Raporu'};
+  const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', I: 'Personel İzin-Muafiyet Raporu', N: 'Nöbet Listesi / Hareket Raporu', T: 'İzin Talepleri Raporu'};
   async function yuklemeKaydet(dosyalar) {
     const l = (await depo.get('yuklemeler')) || [], t = Date.now();
     dosyalar.forEach(d => {
@@ -2017,13 +2021,13 @@ function mount(root, opts = {}) {
         <li>Ay bitince <b>Arşiv</b> sayfasından ayı arşive kaydedin; <b>Arşiv istatistikleri</b> geçmiş aylardan raporlar üretir.</li></ol>`, true)}
       ${b('2. Roller ve yetkiler', `<ul><li><b>Yönetici:</b> her şeyi yapar; ayarlar, arşiv silme, yedek ve kilit.</li><li><b>Planlayıcı:</b> planlama birimi; Modül 1'in tamamı ve sağlık bilgileri, arşiv silme.</li><li><b>İstasyon sorumlusu:</b> yalnızca kendi istasyonu; Modül 2 ve plan "kesin" olduktan sonra kendi istasyonunun planı. Sağlık bilgisi göremez.</li><li><b>Salt okur:</b> görüntüler, değiştiremez.</li></ul>
         <p>Bu ay ve sonraki aylar düzenlenebilir; <b>önceki aylar salt okunurdur</b> (arşiv görünümü). Aylar arası geçiş üst çubuktaki ‹ › düğmeleriyle yapılır.</p>`)}
-      ${b('3. Pano', `<ul><li>Kartlar: açık istasyon, ekip OF (kapalı), aktif kayıt, ihtiyaç, kapasite, planlanan, personel önerilen, fazla nöbetle dönen, elle karar gereken istasyonlar. Karta tıklayınca istasyonlar süzülür.</li><li><b>Tüm planlamayı oluştur:</b> tek tuşla geri çağırma + nöbet hesabı + rotasyon görevlendirmesi. Kilitli değerler korunur.</li><li><b>Planlananı yeniden hesapla:</b> yalnız nöbet sayılarını yeniden hesaplar.</li><li><b>Bu ayın planını sıfırla:</b> bu ayın planını (kişiler, nöbetler, görevlendirmeler, onaylar, Modül 2 listeleri) tamamen siler; arşiv ve diğer aylar kalır. Kilitli ya da geçmiş ayda yapılamaz. Tüm aylar ve arşiv için Ayarlar › Yedek ve sıfırlama bölümündeki <i>Tüm planları ve arşivi sıfırla</i> (yalnız yönetici, SIFIRLA yazılarak onaylanır).</li><li><b>Tüm istasyonlar Excel (tek dosya):</b> her istasyon ayrı sayfada; sütunlar planlama biriminin Excel düzenindedir (AD SOYAD, ÜNVAN, SRC YETKİSİ, KADRO TÜRÜ, BRANŞ, İZİN (GÜN), TAHMİNİ NÖBET, G.GÖREV DURUMU, GELDİĞİ/GİTTİĞİ İSTASYON, NEDEN, KALAN AY, YOLLUK DURUMU, AÇIKLAMA). Tahmini nöbet kişinin mesai saatinden hesaplanır (memur/doktor "7 Nöbet + 8 Saat", işçi "16 Nöbet"); planlanan nöbet sayısı yazılmaz.</li><li><b>Mod:</b> <i>Mesai karşılığı</i> (kişi yalnız mesai saatini tamamlayacak kadar nöbet tutar) veya <i>Fazla mesaili</i> (DOKTOR-AABT-ATT için kişi başı en çok N nöbet yazılabilir).</li></ul>`)}
+      ${b('3. Pano', `<ul><li>Kartlar: açık istasyon, ekip OF (kapalı), aktif kayıt, ihtiyaç, kapasite, planlanan, personel önerilen, fazla nöbetle dönen, elle karar gereken istasyonlar. Karta tıklayınca istasyonlar süzülür.</li><li><b>Tüm planlamayı oluştur:</b> tek tuşla geri çağırma + nöbet hesabı + rotasyon görevlendirmesi. Kilitli değerler korunur.</li><li><b>Planlananı yeniden hesapla:</b> yalnız nöbet sayılarını yeniden hesaplar.</li><li><b>Bu ayın planını sıfırla:</b> bu ayın planını (kişiler, nöbetler, görevlendirmeler, onaylar, Modül 2 listeleri) tamamen siler; arşiv ve diğer aylar kalır. Kilitli ya da geçmiş ayda yapılamaz. Tüm aylar ve arşiv için Ayarlar › Yedek ve sıfırlama bölümündeki <i>Tüm planları ve arşivi sıfırla</i> (yalnız yönetici, SIFIRLA yazılarak onaylanır).</li><li><b>Tüm istasyonlar Excel (tek dosya):</b> her istasyon ayrı sayfada; sütunlar yüklenen örnek dosyayla aynıdır (Başhekimlik, KKM ve Tanımsız İstasyon sayfaları dahil, sayfalar alfabetik; geçici görevde dışarıdakiler listelenmez, NEDEN ve KALAN AY boş bırakılır) (AD SOYAD, ÜNVAN, SRC YETKİSİ, KADRO TÜRÜ, BRANŞ, İZİN (GÜN), TAHMİNİ NÖBET, G.GÖREV DURUMU, GELDİĞİ/GİTTİĞİ İSTASYON, NEDEN, KALAN AY, YOLLUK DURUMU, AÇIKLAMA). Tahmini nöbet kişinin mesai saatinden hesaplanır (memur/doktor "7 Nöbet + 8 Saat", işçi "16 Nöbet"); planlanan nöbet sayısı yazılmaz.</li><li><b>Mod:</b> <i>Mesai karşılığı</i> (kişi yalnız mesai saatini tamamlayacak kadar nöbet tutar) veya <i>Fazla mesaili</i> (DOKTOR-AABT-ATT için kişi başı en çok N nöbet yazılabilir).</li></ul>`)}
       ${b('4. İstasyon sayfası', `<ul><li>Üstte istasyonun <b>Plan: yazılan / gereken</b> durumu, <b>Nöbet branşı dengesi</b> (ekip şefi, YSP, sürücü; listedeki planlanan nöbetlere göre dolu / açık) ve uyarılar yer alır. Plan ihtiyaca eşit ve üç nöbet branşı doluysa "İstasyon tam" görünür.</li>
         <li>Tablo: <b>Mesai</b> (izinler düşülmüş saat), <b>Hedef</b> (memur/doktorda mesai ÷ 24 tam oran, ör. 160 saat = 6,67 nöbet; işçide mesai ÷ 11 aşağı tam 12 saatlik nöbete yuvarlanır ve altında tam oran görünür; yuvarlamayı siz yaparsınız, Ayarlar'dan eski 0,5 adım yuvarlama açılabilir), <b>Azami</b>, <b>Plan</b> (elle yazılır ya da ▲▼ ile 0,5 artırılır), <b>Fark</b>.</li>
         <li><b>Elle değiştirdiğiniz değer kilitlenir</b> (🔒) ve diğer kişilerin değerleri değişmez. Kilidi kaldırırsanız otomatik hesap o kişiyi yeniden hesaplar. <i>Planı onayla (kilitle)</i> tüm değerleri kilitler, <i>Kilitleri aç</i> hepsini serbest bırakır.</li>
         <li><b>Fazlalık nöbet sırası</b> (hedefin üstüne yazılan, açığı kapatan nöbetler): sırayla 1 nöbet ATT sürücülere, 1 nöbet AABT sürücülere (kendi aralarında eşit); ikisinin payı dolduktan sonra kalan diğer branşlara. Ekip şefi yuvasına ATT giremez, yalnızca AABT ve doktor.</li><li><b>Kırmızı satır / "Mesaisi eksik kalan personel" kutusu:</b> planlanan nöbet, Mesai sütunundaki saati karşılamıyor (eksik saat yazılır).</li>
         <li><b>Geçici görev</b> sütunu: istasyon, Başhekimlik ve KKM listeden seçilir; ilçe sağlık müdürlüğü, hastane gibi yerler için <i>Diğer (yaz)…</i> seçilip yazılır.</li>
-        <li><b>Açıklama</b> kutusu: istasyon için not; PNG ve Excel çıktısının altında görünür.</li><li><b>Ekip OF (kapalı):</b> işaretlenen istasyon kapalı sayılır; ihtiyaç 0'dır ve bu bilgi aylar arasında kalıcıdır. Açana kadar kapalı gelir.</li>
+        <li><b>Açıklama</b> sütunu: her kişinin yanında ona özel not yazılır; PNG ve Excel çıktılarındaki AÇIKLAMA sütununda yer alır.</li><li><b>Ekip OF (kapalı):</b> işaretlenen istasyon kapalı sayılır; ihtiyaç 0'dır ve bu bilgi aylar arasında kalıcıdır. Açana kadar kapalı gelir.</li>
         <li><b>Görüntü (PNG)</b> ve <b>Excel</b> çıktılarında nöbet sayıları gösterilmez; aile hekimliği ve uzmanlık eğitimindeki personel yer almaz.</li></ul>`)}
       ${b('5. Görevlendirme ve rotasyon', `<ul><li><b>Personel ihtiyacı değerlendirmesi:</b> hangi istasyon kaç kişiye ihtiyaç duyuyor. "Personel öner: N kişi" etiketine tıklayınca önerilen personel görünür.</li>
         <li><b>Aylık rotasyon:</b> her istasyondan ayda <i>kota</i> kadar kişi çıkar (varsayılan 1; mesaisi dolmayan istasyonda fazlalık kadar). Sıra: önce gitmek isteyenler, sonra en uzun süredir çıkmayanlar. Hedef: önce aynı ilçe, sonra yakından uzağa. <i>Önerilen çıkışlar</i> sekmesinde seçip <i>Seçilenleri görevlendir</i> deyin.</li>
@@ -2038,10 +2042,10 @@ function mount(root, opts = {}) {
         <li><b>Denetim:</b> ihlalleri listeler; <i>Öneriler</i> sekmesi her ihlal için en iyi değişiklikleri sunar, <i>Uygula</i> ile listeye işler.</li>
         <li><b>Kadro yetersizse</b> boş yuva kalmaması için bazı kişilerin nöbet sayısı Modül 1 hedefinden farklı çıkabilir ("Nöbet sayısı farkı" olarak görünür).</li>
         <li><b>Çıktı:</b> Excel'de gün listesi ve kişi listesi; <b>hafta sonları turuncu, resmî tatiller kırmızı</b> renklidir.</li></ul>`)}
-      ${b('9. Çıktılar', `<ul><li><b>İstasyon PNG / Excel:</b> ad soyad, ünvan, görev durumu, izinler, geçici görev tarihleri, yolluk durumu ve istasyon açıklaması. Nöbet sayıları yer almaz.</li><li><b>Tüm istasyonlar Excel:</b> her istasyon ayrı sayfa, tek dosya.</li><li><b>Görevlendirme Excel:</b> ihtiyaç, rotasyon, görevlendirmeler, istasyon dışı görevliler.</li><li><b>Arşiv istatistikleri Excel:</b> seçilen aylar ve istasyonlar için tüm tablolar.</li></ul>`)}
+      ${b('9. Çıktılar', `<ul><li><b>İstasyon PNG / Excel:</b> ad soyad, ünvan, görev durumu, izinler, geçici görev tarihleri, yolluk durumu ve kişi açıklamaları. Nöbet sayıları yer almaz.</li><li><b>Tüm istasyonlar Excel:</b> her istasyon ayrı sayfa, tek dosya.</li><li><b>Görevlendirme Excel:</b> ihtiyaç, rotasyon, görevlendirmeler, istasyon dışı görevliler.</li><li><b>Arşiv istatistikleri Excel:</b> seçilen aylar ve istasyonlar için tüm tablolar.</li></ul>`)}
       ${b('10. Arşiv ve istatistikler', `<ul><li><b>Arşiv › Yüklenen dosyalar:</b> yüklenen her dosyanın günlüğü (aynı ay için ikinci yükleme öncekini günceller). Dosyanın kendisi saklanmaz.</li><li><b>Aylara göre arşiv:</b> yıl yıl açılır liste; geçmiş ayı açarak o ayın planını salt okunur görürsünüz.</li><li><b>Aylık arşiv:</b> ayı arşive kaydeder (TC, telefon, sağlık bilgisi yazılmaz).</li>
         <li><b>Arşiv istatistikleri:</b> ay ve istasyon seçerek (açılır, çoklu seçim, ilçe bazlı toplu seçim) seyir, istasyon özeti, gelen/çıkan personel, fazla nöbet ve gerçekleşen nöbet raporları. Sayıdaki düğmeye tıklayınca hangi aylar olduğu görünür.</li></ul>`)}
-      ${b('11. Dosyalar: hangisi ne işe yarar', `<ul><li><b>EKİP Personel Listesi (zorunlu):</b> kişi, kadro birimi, unvan, çalışma durumu. Birimi değişen personel için 1 yıllık görevlendirme engeli buradan başlar.</li><li><b>Personel Listesi Raporu (zorunlu):</b> izin, muafiyet ve geçici görev tarihleri.</li><li><b>Nöbet Listesi Raporu (zorunlu):</b> ATT'lerin sürücü olup olmadığı ve gerçekleşen nöbetler. Rapordaki <b>İdari (Başhekimlik)</b> ve <b>Komuta (KKM)</b> nöbet satırları da okunur: son 6 ayda nöbet kaydı olan Başhekimlik / KKM personeli İstasyon sayfasında "nöbet tutar" etiketi alır, birimin PNG/Excel çıktısında NÖBET sütununda işaretlenir ve Arşiv istatistiklerindeki gerçekleşen nöbete BAŞHEKİMLİK ve KOMUTA KONTROL MERKEZİ satırı olarak girer. Yüklenmezse sürücüler "doğrulanmadı" kalır, sürücü nöbet branşı eksik hesaplanır.</li><li><b>İzin-Muafiyet Raporu (isteğe bağlı):</b> izin ve muafiyet tarihlerini kesinleştirir.</li></ul>`)}
+      ${b('11. Dosyalar: hangisi ne işe yarar', `<ul><li><b>EKİP Personel Listesi (zorunlu):</b> kişi, kadro birimi, unvan, çalışma durumu. Birimi değişen personel için 1 yıllık görevlendirme engeli buradan başlar.</li><li><b>Personel Listesi Raporu (zorunlu):</b> izin, muafiyet ve geçici görev tarihleri.</li><li><b>Nöbet Listesi Raporu (zorunlu):</b> ATT'lerin sürücü olup olmadığı ve gerçekleşen nöbetler. Rapordaki <b>İdari (Başhekimlik)</b> ve <b>Komuta (KKM)</b> nöbet satırları da okunur: son 6 ayda nöbet kaydı olan Başhekimlik / KKM personeli İstasyon sayfasında "nöbet tutar" etiketi alır, birimin PNG/Excel çıktısında NÖBET sütununda işaretlenir ve Arşiv istatistiklerindeki gerçekleşen nöbete BAŞHEKİMLİK ve KOMUTA KONTROL MERKEZİ satırı olarak girer. Yüklenmezse sürücüler "doğrulanmadı" kalır, sürücü nöbet branşı eksik hesaplanır.</li><li><b>İzin Talepleri Raporu (isteğe bağlı):</b> ASOS'taki yıllık izin talepleri (ad, kurum, bitiş tarihi, iş günü, durum). Aynı yükleme düğmesiyle seçilir; TC olmadığı için kişiler ad ve kuruma göre eşleşir. Onaylı talepler (isteğe bağlı: beklemede olanlar) plan ayına yakın tarihler için izin olarak eklenir; başlangıç, bitişten geriye iş günü sayılarak bulunur; mevcut izinle aynı günlere denk gelenler tekrar eklenmez. Rapor yeniden yüklenince önceki talep kaynaklı izinler yenilenir.</li><li><b>İzin-Muafiyet Raporu (isteğe bağlı):</b> izin ve muafiyet tarihlerini kesinleştirir.</li></ul>`)}
       ${b('12. Yedek, güvenlik ve ASHİ bağlantısı', `<ul><li>Veriler yalnızca bu tarayıcıda (IndexedDB) tutulur. <b>Ayarlar › Yedek</b> ile JSON yedeği alın; yedekte kişisel veri bulunur, güvenli saklayın.</li><li>Ayarlar sayfasında durum tablosu (nöbet/mesai etkisi), hesap ayarları (ATT sürücü eşiği, genel azami nöbet, işçi düşülen saat, otomatik hesap) bulunur; yalnızca yönetici değiştirebilir.</li><li><b>ASHİ bağlantısı hazırlığı:</b> Nöbet Listesi ve İzin-Muafiyet raporları ASHİ tarafından güncel okunabilecek şekilde hazırdır (<code>veriKaynagi</code> / <code>dosyaVer</code>); bağlantı kurulduğunda bu raporları elle yüklemek gerekmeyecek.</li></ul>`)}
       ${b('13. İpuçları', `<ul><li>Değişiklikler otomatik kaydedilir; ayrı bir kaydet düğmesi yoktur.</li><li>Her değişiklik <b>Değişiklik günlüğü</b>ne yazılır.</li><li>Renkler: kırmızı satır = geçici görevde, sarı = yıllık izin, mor = doğum/analık, gri = rapor/ücretsiz izin vb. (sayfanın üstündeki renk açıklamasına bakın).</li><li>Bir sorun varsa önce Denetim ve Pano'daki uyarılara bakın; çoğu zaman nedeni (eksik kadro, 4/B, kadro değişikliği, izin) orada yazar.</li></ul>`)}
     </div></div>`;
@@ -2231,6 +2235,10 @@ function mount(root, opts = {}) {
   const gunSon = () => C.iso(S.y, S.m, C.gunSayisi(S.y, S.m));
   function asosParse(wb) {
     let rows = [], hi = -1;
+    for (const ad of wb.SheetNames) {      // İzin Talepleri Raporu: TC yok; "Adı Soyadı", "Talep Edilen İzin Bitiş Tarihi", "Talep Durumu"
+      const r0 = sayfaSatir(wb.Sheets[ad]), h0 = r0.slice(0, 8).findIndex(r => r.some(c => /^TALEP DURUMU$/.test(C.TR(c))) && r.some(c => /^TALEP EDILEN IZIN BITIS/.test(C.TR(c))));
+      if (h0 >= 0) return {tur: 'T', satirlar: asosParseT(r0, h0)};
+    }
     for (const ad of wb.SheetNames) { rows = sayfaSatir(wb.Sheets[ad]); hi = rows.slice(0, 8).findIndex(r => r.some(c => /^(TC KIMLIK NO|TCKN|T\.C NO)$/.test(C.TR(c)))); if (hi >= 0) break; }
     if (hi < 0) throw new Error('"TC Kimlik No" başlığı bulunamadı. ASOS\'tan indirilen "Personel Listesi Raporu" veya EKİP "Başhekimlik Komuta İstasyon Personel Listesi Raporu" dosyasını seçin.');
     const H = rows[hi].map(C.TR);
@@ -2242,6 +2250,15 @@ function mount(root, opts = {}) {
     throw new Error('Başlıklar tanınmadı (' + H.filter(Boolean).slice(0, 6).join(', ') + '…). ' + 'Tanınmayan ASOS rapor biçimi. Beklenen: EKİP Personel Listesi Raporu ya da Personel Listesi Raporu.');
   }
   // Nöbet İçi Hareket Raporu / Nöbet Listesi Raporu (Nöbet Sayım uygulamasındaki dosya): kişinin ekip şefi / YSP / sürücü olarak tuttuğu nöbet saatleri
+  function asosParseT(rows, hi) {
+    const H = rows[hi].map(C.TR), ix = re => H.findIndex(h => re.test(h));
+    const adI = ix(/^ADI SOYADI$/), unI = ix(/^UNVAN$/), kuI = ix(/^CALISTIGI KURUM$/), tuI = ix(/^IZIN TURU$/), biI = ix(/^TALEP EDILEN IZIN BITIS/), guI = ix(/^TALEP EDILEN IZIN GUN/), duI = ix(/^TALEP DURUMU$/);
+    const out = []; rows.slice(hi + 1).forEach(r => {
+      const ad = String(r[adI] || '').trim(); const bit = C.tarihIso(r[biI]); if (!ad || !bit) return;
+      out.push({tur: 'T', ad: ad.toLocaleUpperCase('tr-TR').replace(/\s+/g, ' '), unvan: String(r[unI] || '').trim(), kurum: String(r[kuI] || '').trim(), izinTur: String(r[tuI] || '').trim() || 'Yıllık İzin', bit, gun: Math.max(1, Math.round(sayi(r[guI]) || 1)), durum: String(r[duI] || '').trim()});
+    });
+    return out;
+  }
   function asosParseN(rows, hi) {
     const H = rows[hi].map(C.TR), ix = re => H.findIndex(h => re.test(h));
     const adI = ix(/^AD$/), soyI = ix(/^SOYAD$/), ebI = ix(/^EKIBIN ISTASYON BILGISI$/), enI = ix(/^EKIP ADI$/), nlbI = ix(/^NOBET LISTESI BRANSI$/), ti = ix(/^(TCKN|TC KIMLIK NO)$/), gi = ix(/^NOBET GOREVI$/), si = ix(/^NOBET SURESI/), eti = ix(/^EKIP TURU$/), epi = ix(/^EKIP TIPI$/), bi = ix(/BASLANGIC TARIHI|NOBET TARIHI|^TARIH$/);
@@ -2406,6 +2423,30 @@ function mount(root, opts = {}) {
       rp.gercek = gercekHazirla(plan, tumSatir);
       return rp;
     }
+    if (tur === 'T') {
+      // İzin Talepleri Raporu (TC'siz): ad + kuruma göre eşleştirilir; "Onaylandı" talepler izin olarak plana eklenir (isteğe bağlı: Beklemede / Talep Aşamasında).
+      // Rapor yalnız bitiş tarihi ve iş günü verir: başlangıç, bitişten geriye iş günü sayılarak bulunur. Aynı günlere denk gelen mevcut izin (ASOS) varsa tekrar eklenmez; önceki talep kaynaklı izinler yenilenir.
+      const bekl = !!S.talepBekleyen, kabul = d => d === 'Onaylandı' || (bekl && (d === 'Beklemede' || d === 'Talep Aşamasında'));
+      const ilk = ayIlk(), son = gunSon(), gunEkle = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10), pencereBas = gunEkle(ilk, -35), pencereSon = gunEkle(son, 50);
+      const basBul = (bit, gun) => { let d = bit, n = 0; for (let g = 0; g < 400; g++) { const w = new Date(d + 'T00:00:00Z').getUTCDay(); if (w !== 0 && w !== 6) { n++; if (n >= gun) return d; } d = gunEkle(d, -1); } return d; };
+      const rp = {tur, yeni: [], degisen: 0, nakil: [], eksik: [], toplam: satirlar.length, kisi: 0, eslesen: 0, plan, talep: {onayli: 0, bekleyen: 0, atlanan: 0, pencereDisi: 0, eklenen: 0, tekrar: 0, kisiEklenen: 0, eslesmeyen: [], bekleyenKullanildi: bekl}};
+      plan.kayitlar.forEach(k => { if (k.izin && k.izin.some(i => i.talep)) k.izin = k.izin.filter(i => !i.talep); });
+      const adAnahtar = s => C.TR(s).replace(/\s+/g, ' ').trim(), adMap = new Map(); plan.kayitlar.forEach(k => { const a = adAnahtar(k.ad); (adMap.get(a) || adMap.set(a, []).get(a)).push(k); });
+      const kisiler = new Set(), eklenenKisi = new Set(), eslesmeyen = new Set();
+      satirlar.forEach(r => {
+        kisiler.add(r.ad); if (r.durum === 'Onaylandı') rp.talep.onayli++; else if (r.durum === 'Beklemede' || r.durum === 'Talep Aşamasında') rp.talep.bekleyen++; else { rp.talep.atlanan++; return; }
+        if (!kabul(r.durum)) return;
+        const adayl = adMap.get(adAnahtar(r.ad)) || []; const brm = birimBul(plan, r.kurum), k = adayl.find(x => brm && x.birim === brm) || adayl[0];
+        if (!k) { eslesmeyen.add(r.ad); return; }
+        rp.eslesen++;
+        const bas = basBul(r.bit, r.gun); if (r.bit < pencereBas || bas > pencereSon) { rp.talep.pencereDisi++; return; }
+        const cakisan = (k.izin || []).some(i => i.bas && i.bit && i.bas <= r.bit && C.izinSon(i) >= bas);
+        if (cakisan) { rp.talep.tekrar++; return; }
+        (k.izin = k.izin || []).push({tur: 'YILLIK İZİN', gun: r.gun, bas, bit: r.bit, talep: true, talepDurum: r.durum}); rp.talep.eklenen++; eklenenKisi.add(k.id);
+      });
+      rp.kisi = kisiler.size; rp.talep.kisiEklenen = eklenenKisi.size; rp.talep.eslesmeyen = [...eslesmeyen].sort(trCollator.compare);
+      return rp;
+    }
     if (tur === 'I') {
       // İzin-Muafiyet Raporu: raporda geçen kişilerin ASOS kaynaklı izin / durum / muafiyet bilgisi baştan kurulur (rapordaki kişiler dışındakilere dokunulmaz)
       const bk = new Map(); satirlar.forEach(r => { (bk.get(r.tc) || bk.set(r.tc, []).get(r.tc)).push(r); });
@@ -2505,27 +2546,35 @@ function mount(root, opts = {}) {
         sonuc.push({ad, tur: p.tur, p, boyut: f.size || (f.veri && f.veri.byteLength) || 0});
       } catch (er) { sonuc.push({ad, hata: er.message || String(er)}); }
     }
-    const gecerli = sonuc.filter(x => x.p).sort((x, y) => x.tur.localeCompare(y.tur));
+    asosHesapla(sonuc);
+  }
+  // Ayrıştırılmış dosyalardan önizleme: dosyalar türe göre sıralı işlenir (İzin Talepleri en sonda, personel kayıtları kurulduktan sonra)
+  function asosHesapla(sonuc) {
+    const sira = {A: 0, B: 1, I: 2, N: 3, T: 4}, gecerli = sonuc.filter(x => x.p).sort((x, y) => (sira[x.tur] ?? 9) - (sira[y.tur] ?? 9) || x.tur.localeCompare(y.tur));
     let taban = S.plan, raporlar = [];
-    for (const g of gecerli) { try { const r = asosOnizle(g.p, taban); taban = r.plan; g.rapor = r; raporlar.push(r); } catch (er) { g.hata = 'İşlenemedi: ' + (er.message || er); g.rapor = null; } }
+    for (const g of gecerli) { g.hata = null; try { const r = asosOnizle(g.p, taban); taban = r.plan; g.rapor = r; raporlar.push(r); } catch (er) { g.hata = 'İşlenemedi: ' + (er.message || er); g.rapor = null; } }
     S.asos = {dosyalar: sonuc, plan: raporlar.length ? taban : null, raporlar};
     S.modal = asosModalHtml; render();
   }
   function asosModalHtml() {
     const A = S.asos; if (!A) return '';
     const yenisi = !S.plan, ok = A.raporlar.length > 0;
-    const tur = t => t === 'I' ? 'Personel İzin-Muafiyet Raporu' : t === 'A' ? 'EKİP Personel Listesi' : t === 'N' ? 'Nöbet Listesi / Nöbet İçi Hareket Raporu' : 'Personel Listesi Raporu';
+    const tur = t => t === 'I' ? 'Personel İzin-Muafiyet Raporu' : t === 'A' ? 'EKİP Personel Listesi' : t === 'N' ? 'Nöbet Listesi / Nöbet İçi Hareket Raporu' : t === 'T' ? 'İzin Talepleri Raporu' : 'Personel Listesi Raporu';
     const dosyaSatir = A.dosyalar.map(d => d.hata ? `<div class="ap-err"><b>${esc(d.ad)}</b><br>${esc(d.hata)}</div>` : d.rapor ? `<div class="ap-ok"><b>${esc(d.ad)}</b> — ${tur(d.tur)}, ${d.rapor.toplam} satır okundu</div>` : '').join('');
     const topla = f => A.raporlar.reduce((x, r) => x + f(r), 0);
     const eksik = (A.raporlar.find(r => r.tur === 'A') || {eksik: []}).eksik;
     const yeniler = A.raporlar.flatMap(r => r.yeni), nakiller = A.raporlar.flatMap(r => r.nakil);
-    const B = A.raporlar.find(r => r.tur === 'B'), N = A.raporlar.find(r => r.tur === 'N'), Iz = A.raporlar.find(r => r.tur === 'I');
+    const B = A.raporlar.find(r => r.tur === 'B'), N = A.raporlar.find(r => r.tur === 'N'), Iz = A.raporlar.find(r => r.tur === 'I'), Tl = A.raporlar.find(r => r.tur === 'T');
     const nYok = ok && !N && !(S.plan && (S.plan.nobetAylari || []).length) ? '<div class="ap-warn" style="margin:8px 0;padding:8px 10px;border-radius:8px;background:#fff7ed;color:#9a3412"><b>Nöbet Listesi Raporu yüklenmedi.</b> ATT personelin sürücü olup olmadığı belirlenemez ("doğrulanmadı" kalır); sürücü nöbet branşı eksik hesaplanabilir. Raporu da ekleyip yeniden yüklemeniz önerilir.</div>' : '';
     return `<div class="ap-modal"><div><h2>Personel listeleri — önizleme</h2>${dosyaSatir}${nYok}
       ${ok ? `<div class="ap-sum"><div><b>${A.plan.kayitlar.length}</b><span>Plandaki kayıt</span></div><div><b>${yeniler.length}</b><span>Yeni kayıt</span></div><div><b>${topla(r => r.degisen)}</b><span>Güncellenen</span></div><div><b>${nakiller.length}</b><span>Birim değişen</span></div><div><b>${A.plan.kayitlar.filter(k => k.gorev && (k.gorev.hedef || k.gorev.yer)).length}</b><span>Geçici görevli</span></div>
       ${B ? `<div><b>${B.izinli}</b><span>Plan ayında izinli</span></div><div><b>${B.muafiyet}</b><span>Muafiyet / süt izni</span></div><div><b>${B.disKurum}</b><span>Dış kurum (alınmadı)</span></div><div><b>${B.gelen}</b><span>Kurum dışından gelen</span></div>` : ''}</div>
       <p>4/B personel: <b>${A.plan.kayitlar.filter(k => k.dortB).length}</b> kişi. ${A.plan.kayitlar.some(k => k.dortB && !k.memBas) ? `<span class="ap-tag ap-t-ih">${A.plan.kayitlar.filter(k => k.dortB && !k.memBas).length} kişide başlangıç tarihi yok</span> — "Personel Listesi Raporu" da yüklenirse 4 yıl kuralı denetlenir.` : '<span class="ap-tag ap-t-ok">Tümünde başlangıç tarihi var</span>'}</p>
       ${N ? `<p><b>Nöbet kayıtları (${N.aylar.join(', ')}):</b> ${N.kisi} kişinin nöbeti okundu, ${N.eslesen} kişi planda eşleşti. Memur (AABT+ATT, ${N.att} kişi): <b>${N.surucu}</b> sürücü olarak nöbet tutmuş, <b>${N.degil}</b> sürücü değil, <b>${N.dogrulanmadi}</b> kişinin nöbet kaydı yok (doğrulanmadı; sürücü sayılmaz). Başka aylara ait nöbet listelerini de yükleyerek doğrulamayı artırabilirsiniz.</p>${N.tani ? `<details ${N.eslesen < N.kisi * 0.8 || N.dogrulanmadi > N.att / 2 ? 'open' : ''}><summary>Nöbet dosyası tanılaması</summary><div class="ap-note" style="line-height:1.6">Okunan satır: <b>${N.tani.satir}</b> · kullanılan: <b>${N.tani.ok}</b> · TC'siz: ${N.tani.tcYok} · istasyon dışı ekip türü: ${N.tani.istasyonDisi} · ambulans dışı: ${N.tani.ambulansDisi}<br>Planda eşleşmeyen TC'li kişi: <b>${Math.max(0, N.kisi - N.eslesen)}</b><br>Başlıklar: ${esc(N.tani.baslik)}<br>Nöbet görevi değerleri: ${esc(Object.entries(N.tani.gorevler).slice(0, 12).map(([a, b]) => a + ' (' + b + ')').join(', '))}<br>${Object.keys(N.tani.rolYok).length ? '<b>Rolü tanınmayan görevler:</b> ' + esc(Object.entries(N.tani.rolYok).slice(0, 10).map(([a, b]) => a + ' (' + b + ')').join(', ')) + '<br>' : ''}${Object.keys(N.tani.sureYok).length ? '<b>Süresi okunamayan değerler:</b> ' + esc(Object.entries(N.tani.sureYok).slice(0, 10).map(([a, b]) => a + ' (' + b + ')').join(', ')) : ''}</div></details>` : ''}` : `<p class="ap-note"><b>ATT'lerin sürücülüğü nöbet listesinden doğrulanır.</b> "Nöbet Listesi / Nöbet İçi Hareket Raporu"nu (Nöbet Sayım uygulamasındaki dosya; son birkaç ayın dosyaları birlikte yüklenebilir) yüklemezseniz ATT'ler yalnız YSP sayılır.</p>`}
+      ${Tl ? `<div class="ap-card" style="margin:8px 0"><b>İzin Talepleri Raporu:</b> ${Tl.toplam} talep, ${Tl.kisi} kişi · onaylı ${Tl.talep.onayli}, beklemede ${Tl.talep.bekleyen}, diğer (vazgeçildi / reddedildi / iptal) ${Tl.talep.atlanan}.<br><b>${Tl.talep.kisiEklenen}</b> kişiye <b>${Tl.talep.eklenen}</b> izin eklenecek${Tl.talep.tekrar ? `, ${Tl.talep.tekrar} talep zaten kayıtlı izinle aynı günlere denk geldiği için eklenmedi` : ''}${Tl.talep.pencereDisi ? `, ${Tl.talep.pencereDisi} talep plan ayından uzak olduğu için atlandı` : ''}.
+        <label class="ap-row" style="margin-top:6px"><input type="checkbox" data-act="talep-bekleyen" ${Tl.talep.bekleyenKullanildi ? 'checked' : ''}> Beklemede / talep aşamasındaki izinleri de ekle</label>
+        ${Tl.talep.eslesmeyen.length ? `<details><summary>Planda bulunamayan ${Tl.talep.eslesmeyen.length} kişi</summary>${Tl.talep.eslesmeyen.slice(0, 60).map(esc).join('<br>')}</details>` : ''}
+        <div class="ap-note">Rapor yalnızca bitiş tarihi ve iş günü verir; başlangıç, bitişten geriye iş günü sayılarak hesaplanır. TC olmadığı için kişiler ad ve kuruma göre eşleştirilir.</div></div>` : ''}
       ${Iz ? `<p><b>İzin-Muafiyet Raporu:</b> ${Iz.kisi} kişi, ${Iz.eslesen} kişi planda eşleşti${Iz.eslesmeyen ? ' (' + Iz.eslesmeyen + ' kişi planda yok)' : ''}; bu ay için ${Iz.izinli} izin/rapor ve ${Iz.muafiyet} muafiyet kaydı işlendi. Rapordaki kişilerin önceki ASOS izin bilgisi bu raporla yenilenir.</p>` : ''}
       ${!B && !Iz ? '<p class="ap-note">İzin, rapor, muafiyet ve süt izni bilgisi için "Personel Listesi Raporu"nu da yükleyin (iki dosyayı birlikte seçebilirsiniz).</p>' : ''}
       ${A.raporlar.some(r => r.birlesen) ? `<p class="ap-note"><b>${A.raporlar.reduce((x, r) => x + (r.birlesen || 0), 0)}</b> elle eklenmiş kayıt, ASOS kaydıyla birleştirildi (ikinci kayıt oluşmadı).</p>` : ''}
@@ -2567,19 +2616,18 @@ function mount(root, opts = {}) {
       const gelen = k.birim !== b.ad;
       return {k, gelen, renk: gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), sinif: k.sinif,
         hucre: [k.ad, unvanKisa(k), gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), izinAyGun(k) ? fmt(izinAyGun(k)) : '', izinAyGun(k) ? izinTur(k) : '', gelen ? `${k.birim} NOLU ASHİ ${AYLAR[S.m].toLocaleUpperCase('tr-TR')}` : cikGorev(k), (k.gorev && k.gorev.yolluk) || ''],
-        tahmini: (sm.get(k.id) && !sm.get(k.id).nobetYok && k.planlanan != null) ? k.planlanan : '', idari: idariNobetVar(k) ? 'NÖBET TUTAR' : ''};
+        tahmini: (sm.get(k.id) && !sm.get(k.id).nobetYok && k.planlanan != null) ? k.planlanan : '', idari: idariNobetVar(k) ? 'NÖBET TUTAR' : '', aciklama: k.aciklama || ''};
     });
   }
   function excelBirimSheet(b) {
     const satirlar = birimSatirlari(b), tah = false;      // istasyona giden çıktıda nöbet sayıları gösterilmez
     const idB = b.tur === 'bashekimlik' || b.tur === 'kkm';      // Başhekimlik / KKM çıktısında nöbet tutanlar ayrıca işaretlenir (sayı gösterilmez)
-    const bas = ['AD SOYAD', 'ÜNVAN', 'G.GÖREV DURUMU', '', 'İZİNLER', 'GEÇİCİ GÖREV TARİHLERİ', 'YOLLUK DURUMU'].concat(tah ? ['TAHMİNİ NÖBET'] : []).concat(idB ? ['NÖBET'] : []);
+    const bas = ['AD SOYAD', 'ÜNVAN', 'G.GÖREV DURUMU', '', 'İZİNLER', 'GEÇİCİ GÖREV TARİHLERİ', 'YOLLUK DURUMU'].concat(tah ? ['TAHMİNİ NÖBET'] : []).concat(idB ? ['NÖBET'] : []).concat(['AÇIKLAMA']);
     const aoa = [[b.ad + (b.tur === 'istasyon' ? ' NOLU ASHİ' : '') + (b.ekipOf ? ' — EKİP OF' : '')], bas];
-    satirlar.forEach(s => aoa.push(s.hucre.concat(tah ? [s.tahmini] : []).concat(idB ? [s.idari] : [])));
+    satirlar.forEach(s => aoa.push(s.hucre.concat(tah ? [s.tahmini] : []).concat(idB ? [s.idari] : []).concat([s.aciklama])));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch: 32}, {wch: 16}, {wch: 30}, {wch: 6}, {wch: 14}, {wch: 42}, {wch: 16}, {wch: 14}];
+    ws['!cols'] = [{wch: 32}, {wch: 16}, {wch: 30}, {wch: 6}, {wch: 14}, {wch: 42}, {wch: 16}, {wch: 14}, {wch: 14}, {wch: 40}];
     ws['!merges'] = [{s: {r: 0, c: 0}, e: {r: 0, c: bas.length - 1}}];
-    if (b.aciklama) { const r0 = satirlar.length + 3; XLSX.utils.sheet_add_aoa(ws, [['Açıklama: ' + b.aciklama]], {origin: {r: r0, c: 0}}); ws['!merges'].push({s: {r: r0, c: 0}, e: {r: r0, c: bas.length - 1}}); }
     const sinir = {top: {style: 'thin'}, bottom: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'}};
     for (let c = 0; c < bas.length; c++) { const h = XLSX.utils.encode_cell({r: 1, c}); if (ws[h]) ws[h].s = {font: {bold: true}, border: sinir, fill: {patternType: 'solid', fgColor: {rgb: 'DCE6F1'}}}; }
     if (ws['A1']) ws['A1'].s = {font: {bold: true, sz: 14}, alignment: {horizontal: 'center'}};
@@ -2598,34 +2646,39 @@ function mount(root, opts = {}) {
   // TAHMİNİ NÖBET = personelin mesai saatinden: memur/doktor "7 Nöbet + 8 Saat" (24 saatlik nöbet + kalan saat), işçi "16 Nöbet" (12 saatlik nöbet). Planlanan nöbet sayısı yazılmaz.
   function excelIstasyonSayfa(b) {
     const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
-    const kis = S.plan.kayitlar.filter(k => (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)) && !gizliKisi(k)).sort((x, y) => trCollator.compare(x.ad, y.ad));
-    const tahmini = k => { const s = sm.get(k.id); if (!s || s.nobetYok || !(s.mesai > 0)) return ''; if (k.sinif === 'isci') return `${Math.floor(s.mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(s.mesai / 24 + 1e-9), sa = Math.round((s.mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
-    const brans = k => { const s = sm.get(k.id), g = s ? s.grup : ''; return k.sinif === 'isci' || g === 'sy' ? 'Sürücü' : g === 'ysp' ? 'ATT / Yrd. Sağlık Personeli' : 'Ekip Şefi'; };
-    const kalanAy = k => { const bit = k.gorev && k.gorev.bit; if (!bit) return ''; const x = (+bit.slice(0, 4)) * 12 + (+bit.slice(5, 7)) - (S.y * 12 + S.m); return x > 0 ? x : 0; };
+    // Yüklenen örnek dosyadaki gibi: kendi kadrosundaki (görevde dışarıda olanlar hariç) ve buraya geçici görevli gelen personel, soyadı sırasıyla
+    const kis = S.plan.kayitlar.filter(k => { if (gizliKisi(k)) return false; const giden = k.birim === b.ad && (D[k.durum] || {}).disarida && k.gorev && (k.gorev.hedef || k.gorev.yer) && k.gorev.hedef !== b.ad; return !giden && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)); }).sort((x, y) => trCollator.compare(x.ad, y.ad));
+    const mesaiK = k => { const s = sm.get(k.id); if (s) return s.nobetYok ? 0 : s.mesai; try { return C.kisiMesai(k, S.y, S.m, ozel(), D); } catch (e) { return 0; } };
+    const tahmini = k => { const mesai = mesaiK(k); if (!(mesai > 0)) return ''; if (isciK(k)) return `${Math.floor(mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
+    const isciK = k => /ISCI/.test(C.TR((k.kadroTur || '') + ' ' + (k.unvan || ''))) || k.sinif === 'isci';
+    const surucuK = k => isciK(k) || /SOFOR|SURUCU/.test(C.TR(k.unvan || ''));
+    const brans = k => {      // işçi / şoför: Sürücü; doktor ve AABT: Ekip Şefi; ATT: ATT / Yrd. Sağlık Personeli (örnek dosyadaki düzen)
+      if (surucuK(k) && !/HIZMETLI/.test(C.TR(k.unvan || ''))) return 'Sürücü';
+      return k.sinif === 'doktor' || C.kadroTip(k) === 'AABT' ? 'Ekip Şefi' : 'ATT / Yrd. Sağlık Personeli';
+    };
     const aoa = [['AD SOYAD', 'UNVAN', 'SRC YETKİSİ', 'KADRO TÜRÜ', 'BRANŞ', 'İZİN (GÜN)', 'TAHMİNİ NÖBET', 'G.GÖREV DURUMU', 'GELDİĞİ/GİTTİĞİ İSTASYON', 'NEDEN', 'KALAN AY', 'YOLLUK DURUMU', 'AÇIKLAMA']];
-    kis.forEach((k, i) => {
-      const gelen = k.birim !== b.ad, giden = !gelen && ((D[k.durum] || {}).disarida) && k.gorev && (k.gorev.hedef || k.gorev.yer), u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
-      aoa.push([k.ad, (k.unvan || '').trim(), /\bSRC\b/.test(u) ? 'EVET' : '', k.sinif === 'isci' ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, giden ? '' : tahmini(k),
-        gelen ? 'GEÇİCİ GÖREVLİ' : giden ? 'GEÇİCİ GÖREVDE' : '', gelen ? `Geldiği istasyon: ${k.birim || 'Tanımsız İstasyon'}` : giden ? `Gittiği istasyon: ${k.gorev.hedef || k.gorev.yer}` : '',
-        (gelen || giden) && k.gorev ? (k.gorev.gerekce || '') : '', gelen || giden ? kalanAy(k) : '', (k.gorev && k.gorev.yolluk) || '', i === 0 ? (b.aciklama || '') : '']);
+    kis.forEach(k => {
+      const gelen = k.birim !== b.ad, u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
+      aoa.push([k.ad, (k.unvan || '').trim(), /\bSRC\b/.test(u) ? 'EVET' : '', /ISCI/.test(C.TR(k.kadroTur || '')) ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, tahmini(k),
+        gelen ? 'GEÇİCİ GÖREVLİ' : '', gelen ? `Geldiği istasyon: ${k.birim || 'Tanımsız İstasyon'}` : '', '', '', (k.gorev && k.gorev.yolluk) || '', k.aciklama || '']);      // NEDEN ve KALAN AY örnek dosyada boştur; planlama birimi elle doldurur
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [22.8, 14.8, 10.8, 12.8, 22.8, 9.8, 16.8, 16.8, 28, 18.8, 9.8, 12.8, 36].map(wch => ({wch})); return ws;
   }
   function excelToplu() {
-    const wb = XLSX.utils.book_new(), kul = new Set();
-    S.plan.birimler.filter(b => b.tur === 'istasyon').forEach(b => { XLSX.utils.book_append_sheet(wb, excelIstasyonSayfa(b), sheetAd(b.ad, kul)); });
+    const wb = XLSX.utils.book_new(), kul = new Set(), sayfalar = [];
+    S.plan.birimler.forEach(b => { if (b.tur === 'istasyon' || b.tur === 'kkm' || b.tur === 'bashekimlik') sayfalar.push({ad: b.tur === 'bashekimlik' ? 'İL AMBULANS SERVİSİ BAŞHEKİMLİĞİ' : b.ad, ws: excelIstasyonSayfa(b)}); });
+    sayfalar.push({ad: 'Tanımsız İstasyon', ws: XLSX.utils.aoa_to_sheet([['AD SOYAD', 'UNVAN', 'SRC YETKİSİ', 'KADRO TÜRÜ', 'BRANŞ', 'İZİN (GÜN)', 'TAHMİNİ NÖBET', 'G.GÖREV DURUMU', 'GELDİĞİ/GİTTİĞİ İSTASYON', 'NEDEN', 'KALAN AY', 'YOLLUK DURUMU', 'AÇIKLAMA']])});
+    sayfalar.sort((x, y) => trCollator.compare(x.ad, y.ad)).forEach(x => XLSX.utils.book_append_sheet(wb, x.ws, sheetAd(x.ad, kul)));      // sayfa sırası: alfabetik (örnek dosyadaki gibi)
     return wb;
   }
   const xlsxIndir = (wb, ad) => indir(new Blob([XLSX.write(wb, {bookType: 'xlsx', type: 'array'})], {type: 'application/octet-stream'}), ad);
 
   function pngCiz(b) {
     const satirlar = birimSatirlari(b), tah = false, idB = b.tur === 'bashekimlik' || b.tur === 'kkm';      // istasyona giden çıktıda nöbet sayıları gösterilmez
-    const kol = [['AD SOYAD', 290], ['UNVAN', 140], ['G.GÖREV DURUMU', 300], ['', 50], ['İZİNLER', 130], ['GEÇİCİ GÖREV TARİHLERİ', 330], ['YOLLUK DURUMU', 160]].concat(tah ? [['TAHMİNİ NÖBET', 150]] : []).concat(idB ? [['NÖBET', 170]] : []);
+    const kol = [['AD SOYAD', 290], ['UNVAN', 140], ['G.GÖREV DURUMU', 300], ['', 50], ['İZİNLER', 130], ['GEÇİCİ GÖREV TARİHLERİ', 330], ['YOLLUK DURUMU', 160]].concat(tah ? [['TAHMİNİ NÖBET', 150]] : []).concat(idB ? [['NÖBET', 170]] : []).concat([['AÇIKLAMA', 300]]);
     const W = kol.reduce((a, c) => a + c[1], 0), RH = 32, TH = 56, HH = 52;
     const sepSay = satirlar.filter((s, i) => i > 0 && s.sinif !== satirlar[i - 1].sinif && !s.gelen && !satirlar[i - 1].gelen).length;
-    const tmp = document.createElement('canvas').getContext('2d'); tmp.font = '17px "Times New Roman", serif';
-    const acik = []; if (b.aciklama) { String(b.aciklama).split(/\n/).forEach(par => { let satir = ''; par.split(/\s+/).forEach(w => { const dene = satir ? satir + ' ' + w : w; if (tmp.measureText('Açıklama: ' + dene).width > W - 24 && satir) { acik.push(satir); satir = w; } else satir = dene; }); acik.push(satir); }); acik[0] = 'Açıklama: ' + acik[0]; }
-    const AH = acik.length ? acik.length * 26 + 18 : 0;
+    const AH = 0;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = TH + HH + satirlar.length * RH + sepSay * 8 + 4 + AH;
     const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height);
     x.strokeStyle = '#000'; x.lineWidth = 1; x.textBaseline = 'middle';
@@ -2639,11 +2692,10 @@ function mount(root, opts = {}) {
       if (i > 0 && s.sinif !== satirlar[i - 1].sinif && !s.gelen && !satirlar[i - 1].gelen) { x.fillStyle = '#0b2a5b'; x.fillRect(0, y, W, 8); y += 8; }
       if (s.renk) { x.fillStyle = s.renk; x.fillRect(0, y, W, RH); }
       x.fillStyle = '#000'; x.font = '17px "Times New Roman", serif'; cx = 0;
-      const cells = s.hucre.concat(tah ? [s.tahmini === '' ? '' : fmt(s.tahmini)] : []).concat(idB ? [s.idari] : []);
+      const cells = s.hucre.concat(tah ? [s.tahmini === '' ? '' : fmt(s.tahmini)] : []).concat(idB ? [s.idari] : []).concat([s.aciklama]);
       kol.forEach(([t, w], c) => { x.strokeRect(cx + .5, y + .5, w, RH); x.fillText(kes(cells[c], w), cx + 6, y + RH / 2 + 1); cx += w; });
       y += RH;
     });
-    if (acik.length) { x.fillStyle = '#000'; x.font = 'italic 17px "Times New Roman", serif'; acik.forEach((t, i) => x.fillText(t, 8, y + 22 + i * 26)); }
     return cv;
   }
 
@@ -2761,6 +2813,7 @@ function mount(root, opts = {}) {
       case 'izinGun': { const n = sayi(v); mut(() => { k.izin = k.izin || []; if (n > 0) { if (k.izin[0]) k.izin[0].gun = n; else k.izin.push({gun: n, tur: 'YILLIK İZİN'}); } else k.izin = []; }, 'İzin değişti', `${k.ad}: ${n} gün`); break; }
       case 'izinTur': mut(() => { if (!k.izin || !k.izin[0]) k.izin = [{gun: 0, tur: v}]; else k.izin[0].tur = v; }, 'İzin türü', `${k.ad}: ${v}`); break;
       case 'planlanan': S.toplu = true; try { mut(() => { k.planlanan = v === '' ? null : sayi(v); k.kilit = v !== ''; }, 'Planlanan nöbet (elle)', `${k.ad}: ${v}`); } finally { S.toplu = false; } break;      // elle değişiklikte diğer kişilerin değerleri yeniden hesaplanmaz
+      case 'aciklama': S.toplu = true; try { mut(() => { k.aciklama = String(v || '').trim(); }, 'Kişi açıklaması', `${k.ad}: ${k.aciklama}`); } finally { S.toplu = false; } break;
       case 'kilit': mut(() => { k.kilit = !!v; }, v ? 'Kilitlendi' : 'Kilit açıldı', k.ad); break;
       case 'yolluk': mut(() => { k.gorev = k.gorev || {yer: '', hedef: null, kaynak: 'manuel', yolluk: '', tarih: '', gerekce: ''}; k.gorev.yolluk = v; }, 'Yolluk durumu', `${k.ad}: ${v}`); break;
       case 'gTarih': mut(() => { k.gorev.tarih = v; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${v}`); break;
@@ -2821,7 +2874,7 @@ function mount(root, opts = {}) {
     const t = e.target.closest('[data-act]'); if (!t) return;
     const a = t.dataset.act, v = t.dataset.v;
     if (/^(SELECT|INPUT|OPTION|TEXTAREA)$/.test(e.target.tagName)) return;      // form kontrolleri change olayıyla işlenir
-    if (['ist-sec', 'rol', 'plan-durum', 'f-q', 'f-birim', 'f-sinif', 'f-durum', 'tahmini', 'oto-oner', 'hedef-yuv', 'rot-kaynak', 'tema', 'ekip-of', 'p-boyut', 'f-surucu'].includes(a)) return;     // change/input ile işlenir
+    if (['ist-sec', 'rol', 'plan-durum', 'f-q', 'f-birim', 'f-sinif', 'f-durum', 'tahmini', 'oto-oner', 'hedef-yuv', 'talep-bekleyen', 'rot-kaynak', 'tema', 'ekip-of', 'p-boyut', 'f-surucu'].includes(a)) return;     // change/input ile işlenir
     e.preventDefault();
     try {
       switch (a) {
@@ -2946,7 +2999,7 @@ function mount(root, opts = {}) {
           ek('Fazla istasyonlar', ['İstasyon', 'Fazla nöbet'], ists.filter(x => x.h.fazlaVar).sort((a, b) => b.h.fazlaEf - a.h.fazlaEf).map(x => [x.b.ad, r1(x.h.fazlaH)]));
           xlsxIndir(wb, `Gorevlendirme-${S.y}-${C.pad(S.m)}.xlsx`); break;
         }
-        case 'excel-ist': { const b = S.plan.birimler.find(x => x.ad === v), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, excelBirimSheet(b), sheetAd(b.ad, new Set())); xlsxIndir(wb, `${b.ad}-${S.y}-${C.pad(S.m)}.xlsx`); break; }
+        case 'excel-ist': { const b = S.plan.birimler.find(x => x.ad === v), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, excelIstasyonSayfa(b), sheetAd(b.tur === 'bashekimlik' ? 'İL AMBULANS SERVİSİ BAŞHEKİMLİĞİ' : b.ad, new Set())); xlsxIndir(wb, `${b.ad}-${S.y}-${C.pad(S.m)}.xlsx`); break; }
         case 'excel-toplu': xlsxIndir(excelToplu(), `ASHI-Planlama-${S.y}-${C.pad(S.m)}.xlsx`); break;
         case 'yedek-al': indir(new Blob([JSON.stringify({surum: VERSION, plan: S.plan})], {type: 'application/json'}), `ashi-planlama-${S.y}-${C.pad(S.m)}.json`); break;
         case 'yedek-yukle': { const f = await dosyaSec('.json', false); if (!f) break; try { const j = JSON.parse(new TextDecoder().decode(await dosyaOku(f))); if (!j.plan || !Array.isArray(j.plan.kayitlar)) throw new Error('Geçersiz yedek'); if (!confirm('Bu ayın planı yedekle değiştirilecek. Devam edilsin mi?')) break; S.plan = j.plan; logla('Yedekten yüklendi'); kaydet(); } catch (er) { toast('Yedek okunamadı: ' + er.message); } break; }
@@ -2968,6 +3021,10 @@ function mount(root, opts = {}) {
   root.addEventListener('input', e => {
     const t = e.target;
     if (t && t.id === 'ap-ist-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(); root.querySelectorAll('.ap-pop-ist [data-ara]').forEach(x => { x.style.display = !q || x.dataset.ara.includes(q) ? '' : 'none'; }); return; }
+    if (t && (t.id === 'ap-d-kisi' || t.id === 'ap-d-ist')) {      // İstasyon dışı görevliler: aynı süzgeç, durum yeniden çizimde korunur
+      S.disAra = (root.querySelector('#ap-d-kisi') || {}).value || ''; S.disIst = (root.querySelector('#ap-d-ist') || {}).value || '';
+      const q = C.TR(S.disAra).trim(); root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!S.disIst || r.dataset.kay === S.disIst) ? '' : 'none'; }); return;
+    }
     if (!t || (t.id !== 'ap-g-kisi' && t.id !== 'ap-g-ist')) return;
     const q = C.TR((root.querySelector('#ap-g-kisi') || {}).value || '').trim(), ist = (root.querySelector('#ap-g-ist') || {}).value || '';
     root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!ist || r.dataset.kay === ist || r.dataset.hed === ist) ? '' : 'none'; });
@@ -2979,7 +3036,6 @@ function mount(root, opts = {}) {
       if (t.dataset.id && t.dataset.f) { const v = t.type === 'checkbox' ? t.checked : t.value; setField(t.dataset.id, t.dataset.f, v); render(); return; }
       if (t.dataset.d) { if (S.rol !== 'yonetici') return; const d = S.ayar.durumlar[t.dataset.d]; d[t.dataset.f] = t.type === 'checkbox' ? t.checked : t.value; await ayarKaydet(); otoHesapla(); kaydet(); render(); return; }
       if (t.dataset.rb) { const b = S.plan.birimler.find(x => x.ad === t.dataset.rb); if (b) mut(() => { b.cikisKota = t.value === '' ? null : Math.max(0, Math.round(sayi(t.value))); }, 'Rotasyon kotası', `${b.ad}: ${b.cikisKota === null ? 'otomatik' : b.cikisKota}`); render(); return; }
-      if (t.dataset.iac) { const b = S.plan.birimler.find(x => x.ad === t.dataset.iac); if (b) { S.toplu = true; try { mut(() => { b.aciklama = t.value.trim(); }, 'İstasyon açıklaması', b.ad); } finally { S.toplu = false; } } render(); return; }
       if (t.dataset.ib) { const b = S.plan.birimler.find(x => x.ad === t.dataset.ib); if (b) mut(() => { b.azamiMemur = t.value === '' ? null : Math.max(0, sayi(t.value)); }, 'İstasyon azami nöbeti', `${b.ad}: ${b.azamiMemur === null ? 'genel' : b.azamiMemur}`); render(); return; }
       if (t.hasAttribute('data-pano-azami')) { if (salt()) return; S.ayar.azamiMemur = Math.max(0, sayi(t.value)) || S.ayar.azamiMemur; await ayarKaydet(); otoHesapla(); kaydet(); render(); return; }
       if (t.dataset.ay) { if (S.rol !== 'yonetici') return; { const v = sayi(t.value), an = t.dataset.ay; S.ayar[an] = an === 'isciEk' ? Math.max(0, Math.round(v)) : (an === 'surEsik' || an === 'surDegilEsik') ? Math.min(100, Math.max(0, v)) : (v || (an === 'azamiMemur' ? 8 : 11)); } await ayarKaydet(); otoHesapla(); kaydet(); render(); return; }
@@ -3005,6 +3061,7 @@ function mount(root, opts = {}) {
         }
       }
       else if (a === 'hedef-yuv') { if (S.rol !== 'yonetici') return; S.ayar.hedefYuvarla = t.checked; await ayarKaydet(); if (S.plan) { otoHesapla(); kaydet(); } }
+      else if (a === 'talep-bekleyen') { S.talepBekleyen = t.checked; if (S.asos) asosHesapla(S.asos.dosyalar.map(d => ({ad: d.ad, tur: d.tur, p: d.p, boyut: d.boyut, hata: d.p ? null : d.hata}))); return; }
       else if (a === 'oto-geri') { if (S.rol !== 'yonetici') return; S.ayar.otoGeriCek = t.checked; await ayarKaydet(); }
       else if (a === 'oto-oner') { if (S.rol !== 'yonetici') return; S.ayar.otoOner = t.checked; await ayarKaydet(); if (t.checked && S.plan) { otoHesapla(); kaydet(); } }
       else return;
