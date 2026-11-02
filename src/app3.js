@@ -207,7 +207,7 @@
     const out = {};
     Object.entries(ay).forEach(([a, m]) => {
       const [yy, mm] = a.split('-').map(Number), ist = {}, kisi = [], dis = [];
-      const hedefStd = sinif => { try { const isci = sinif === 'isci', ms = C.ayMesai(yy, mm, isci, {}); return C.hedefNobet(ms, sinif === 'doktor' ? 'doktor' : isci ? 'isci' : 'memur', false, {isciDusulen: S.ayar.isciDusulen}).birim; } catch (er) { return 0; } };
+      const hedefStd = sinif => { try { const isci = sinif === 'isci', ms = C.ayMesai(yy, mm, isci, {}); return C.hedefNobet(ms, sinif === 'doktor' ? 'doktor' : isci ? 'isci' : 'memur', false, {isciDusulen: S.ayar.isciDusulen, hedefYuvarla: true}).birim; } catch (er) { return 0; } };      // gerçekleşen fazla nöbet: standart hedef (0,5 adıma yuvarlanmış) ile karşılaştırılır
       m.forEach((e, tc) => {
         const k = tcMap.get(tc), toplam = Object.values(e.birimler).reduce((x, v) => x + v, 0) / 24, brans = k ? bransAd(k) : (e.brans || ''), kadro = k ? k.birim : '', hedef = hedefStd(k ? k.sinif : /SURUCU|ISCI/.test(C.TR(e.brans)) ? 'isci' : 'memur');
         Object.entries(e.birimler).forEach(([b, saat]) => { const o = (ist[b] = ist[b] || {nobet: 0, kisi: 0}); o.nobet += saat / 24; o.kisi++; if (kadro && b !== kadro && b !== 'KOMUTA KONTROL MERKEZİ') dis.push({ad: k ? k.ad : e.ad, brans, kadro, istasyon: b, nobet: Math.round(saat / 24 * 100) / 100}); });
@@ -273,10 +273,10 @@
         k = {id: uid(), ad: a.ad, tc: a.tc, tel: a.tel || '', unvan: a.unvan, sinif, birim, durum: gelenKaynak ? 'GEÇİCİ GÖREVLİ' : '', durumMetin: '', izin: [], planlanan: null, kilit: false, gorev: null, dortB, memBas: '',
           kadroTur: a.kadroTur, sira: a.sira, istek: '', gecmis: [], gecmisAsos: []};
         const onc = S.oncePlanBirim && S.oncePlanBirim.get(a.tc);      // önceki ayın planında bu kişi başka birimdeyse kadro değişmiştir
-        if (onc && onc.birim !== birim) { k.kadroTarih = ayIlk(); rapor.nakil.push(`${k.ad}: ${onc.birim} → ${birim}`); } else if (onc && onc.kadroTarih) k.kadroTarih = onc.kadroTarih;
+        if (onc && onc.birim !== birim && !gelenKaynak) { k.kadroTarih = ayIlk(); rapor.nakil.push(`${k.ad}: ${onc.birim} → ${birim}`); } else if (onc && onc.kadroTarih) k.kadroTarih = onc.kadroTarih;
         plan.kayitlar.push(k); rapor.yeni.push(k.ad); tcMap.set(a.tc, k);
       } else {
-        if (k.birim !== birim && k.tc) { rapor.nakil.push(`${k.ad}: ${k.birim} → ${birim}`); k.kadroTarih = ayIlk(); }
+        if (k.birim !== birim && k.tc) { rapor.nakil.push(`${k.ad}: ${k.birim} → ${birim}`); if (!gelenKaynak) k.kadroTarih = ayIlk(); }      // yalnız kadro (atama) değişikliği 1 yıl engeli doğurur; geçici görev ve kurum dışı gelenler sayılmaz
         if (a.ad && C.TR(k.ad).split(' ').filter(Boolean).length < C.TR(a.ad).split(' ').filter(Boolean).length) k.ad = a.ad;      // elle eksik yazılmış ad ASOS'taki tam adla düzeltilir
         k.tc = a.tc; k.unvan = a.unvan || k.unvan; k.sinif = sinif; k.birim = birim; k.dortB = dortB; k.kadroTur = a.kadroTur || k.kadroTur; if (a.tel) k.tel = a.tel;
         rapor.degisen++;
@@ -643,7 +643,7 @@
     const t = e.target.closest('[data-act]'); if (!t) return;
     const a = t.dataset.act, v = t.dataset.v;
     if (/^(SELECT|INPUT|OPTION|TEXTAREA)$/.test(e.target.tagName)) return;      // form kontrolleri change olayıyla işlenir
-    if (['ist-sec', 'rol', 'plan-durum', 'f-q', 'f-birim', 'f-sinif', 'f-durum', 'tahmini', 'oto-oner', 'rot-kaynak', 'tema', 'ekip-of', 'p-boyut', 'f-surucu'].includes(a)) return;     // change/input ile işlenir
+    if (['ist-sec', 'rol', 'plan-durum', 'f-q', 'f-birim', 'f-sinif', 'f-durum', 'tahmini', 'oto-oner', 'hedef-yuv', 'rot-kaynak', 'tema', 'ekip-of', 'p-boyut', 'f-surucu'].includes(a)) return;     // change/input ile işlenir
     e.preventDefault();
     try {
       switch (a) {
@@ -804,6 +804,7 @@
           if (aciliyor && dis.length && confirm(`${b.ad} yeniden açılıyor. Başka birimlere görevli ${dis.length} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`)) toast(`${geriCagir(b)} personel geri çağrıldı.`);
         }
       }
+      else if (a === 'hedef-yuv') { if (S.rol !== 'yonetici') return; S.ayar.hedefYuvarla = t.checked; await ayarKaydet(); if (S.plan) { otoHesapla(); kaydet(); } }
       else if (a === 'oto-geri') { if (S.rol !== 'yonetici') return; S.ayar.otoGeriCek = t.checked; await ayarKaydet(); }
       else if (a === 'oto-oner') { if (S.rol !== 'yonetici') return; S.ayar.otoOner = t.checked; await ayarKaydet(); if (t.checked && S.plan) { otoHesapla(); kaydet(); } }
       else return;

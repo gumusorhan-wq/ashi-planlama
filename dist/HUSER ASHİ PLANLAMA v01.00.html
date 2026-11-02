@@ -254,7 +254,7 @@ const APCore = (() => {
     }
     return Math.round(mesai * 100) / 100;
   }
-  // Hedef nöbet (24 saatlik eşdeğer). memur/doktor: mesai/24 yukarı 0,5 adım; işçi: mesai/11 aşağı tam 12 saatlik nöbet → ×0,5
+  // Hedef nöbet (24 saatlik eşdeğer). memur/doktor: mesai/24 tam oran (ayar.hedefYuvarla: yukarı 0,5 adım); işçi: mesai/11 aşağı tam 12 saatlik nöbet → ×0,5
   function hedefNobet(mesai, sinif, nobetYok, ayar) {
     if (nobetYok || !(mesai > 0)) return {adet: 0, birim: 0};
     const a = ayar || {};
@@ -262,8 +262,8 @@ const APCore = (() => {
       const n = Math.floor(mesai / (a.isciDusulen || ISCI_NOBET_DUSULEN) + 1e-9);
       return {adet: n, birim: n * ADIM, hamAdet: mesai / (a.isciDusulen || ISCI_NOBET_DUSULEN)};
     }
-    const x = mesai / NOBET_SAAT;
-    const u = Math.ceil(x / ADIM - 1e-9) * ADIM;
+    const x = mesai / NOBET_SAAT;      // memur/doktor: tam oran (ör. 160 saat = 6,67 nöbet); ayar.hedefYuvarla ile eski yöntem (0,5 adıma yukarı) açılır
+    const u = a.hedefYuvarla ? Math.ceil(x / ADIM - 1e-9) * ADIM : x;
     return {adet: u, birim: u, hamAdet: x};
   }
 
@@ -309,7 +309,7 @@ const APCore = (() => {
       return {k, mesai, hedef: h.birim, hedefAdet: h.adet, nobetYok: !!dt.nobetYok};
     });
     // Azami nöbet: memur/doktor tam ay hedefinin üstüne azamiMemur'a kadar (ör. Kasım: hedef 7, azami 8); izinli kişide hedef + aynı ek; işçi: hedef + isciEk × 0,5
-    const a = ayar || {}, azamiMemur = a.azamiMemur || 0, tam = hedefNobet(ayMesai(y, m, false, ozel), 'memur', false).birim, ek = Math.max(0, azamiMemur - tam);
+    const a = ayar || {}, azamiMemur = a.azamiMemur || 0, tam = hedefNobet(ayMesai(y, m, false, ozel), 'memur', false, a).birim, ek = Math.max(0, azamiMemur - tam);
     satir.forEach(s => {
       s.azami = s.nobetYok || !(s.hedef > 0) ? 0 : (s.k.sinif === 'isci' ? s.hedef + (a.isciEk || 0) * ADIM : Math.min(Math.max(azamiMemur, s.hedef), s.hedef + ek));
     });
@@ -972,7 +972,7 @@ function mount(root, opts = {}) {
   let kaydetZamani = null;
   const kaydet = () => { clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
   const ayarKaydet = () => { const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
-  const HESAP_SURUM = 8;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
+  const HESAP_SURUM = 9;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
   function toast(t) { const id = uid(); S.toastlar.push({id, t}); toastCiz(); setTimeout(() => { S.toastlar = S.toastlar.filter(x => x.id !== id); toastCiz(); }, 5000); }
   function toastCiz() { root.querySelectorAll('.ap-toast').forEach(e => e.remove()); S.toastlar.forEach((x, i) => { const e = document.createElement('div'); e.className = 'ap-toast'; e.style.bottom = (14 + i * 46) + 'px'; e.textContent = x.t; root.appendChild(e); }); }
   function logla(islem, detay) { if (!S.plan) return; (S.plan.log = S.plan.log || []).unshift({t: Date.now(), rol: S.rol, islem, detay: detay || ''}); if (S.plan.log.length > 1500) S.plan.log.length = 1500; }
@@ -1017,7 +1017,7 @@ function mount(root, opts = {}) {
   const istMod = b => b && b.azamiMemur != null ? 'fazla' : S.ayar.panoMod;
   const azamiDeger = b => b && b.azamiMemur != null ? b.azamiMemur : S.ayar.azamiMemur;
   function hesaplaCtx(plan, y, m, birim, kisiler) {
-    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, azamiMemur: istMod(birim) === 'mesai' ? 0 : azamiDeger(birim), isciEk: 0, mod: istMod(birim), surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik}, birim.ekipOf ? 0 : birim.yuva);
+    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, hedefYuvarla: !!S.ayar.hedefYuvarla, azamiMemur: istMod(birim) === 'mesai' ? 0 : azamiDeger(birim), isciEk: 0, mod: istMod(birim), surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik}, birim.ekipOf ? 0 : birim.yuva);
   }
   const hesapla = birim => hesaplaCtx(S.plan, S.y, S.m, birim);
   const planlananToplam = (hesap) => hesap.satir.filter(s => !s.nobetYok).reduce((a, s) => a + sayi(s.k.planlanan), 0);
@@ -1269,7 +1269,7 @@ function mount(root, opts = {}) {
         <td>${gelen ? '<b>GEÇİCİ GÖREVLİ</b>' : `<select class="ap-sel" data-id="${k.id}" data-f="durum" ${dis}><option value="">—</option>${Object.keys(D).map(a => `<option ${a === k.durum ? 'selected' : ''}>${a}</option>`).join('')}</select>`}${k.durumMetin && k.durumMetin !== k.durum ? `<div class="ap-note">${esc(k.durumMetin)}</div>` : ''}</td>
         <td><input class="ap-in n" type="number" min="0" step="0.5" data-id="${k.id}" data-f="izinGun" value="${izinGun(k) || ''}" ${dis}>${izinTarihli(k) && izinAyGun(k) !== izinGun(k) ? `<div class="ap-note" title="İznin başlangıç-bitiş tarihleri ASOS'tan geldi; mesaiyi yalnız plan ayına düşen günler etkiler">${ayEtiket()}'da ${izinAyGun(k)} gün · mesaiden ${fmt(C.kisiMesai({...k, izin: [], sut: 0, durum: ''}, S.y, S.m, ozel(), durumlar()) - C.kisiMesai({...k, sut: 0, durum: ''}, S.y, S.m, ozel(), durumlar()))} saat düşer</div>` : ''}</td>
         <td><select class="ap-sel" data-id="${k.id}" data-f="izinTur" ${dis}><option value="">—</option>${IZIN_TURLERI.map(a => `<option ${a === ((k.izin || [])[0] || {}).tur ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
-        <td class="num">${s ? fmt(s.mesai) : ''}</td><td class="num">${s ? fmt(s.hedef) : ''}${(() => { if (!s || s.nobetYok || !(s.mesai > 0)) return ''; const tam = k.sinif === 'isci' ? s.mesai / (S.ayar.isciDusulen || 11) * C.ADIM : s.mesai / 24; return Math.abs(tam - s.hedef) > 0.005 ? `<div class="ap-note" title="Mesai saati ÷ ${k.sinif === 'isci' ? (S.ayar.isciDusulen || 11) + ' × 0,5' : '24'} = tam oran (hedef 0,5 adıma ${k.sinif === 'isci' ? 'aşağı' : 'yukarı'} yuvarlanır)">tam ${tam.toLocaleString('tr-TR', {maximumFractionDigits: 2})}</div>` : ''; })()}</td><td class="num">${s && !s.nobetYok ? fmt(s.azami) : ''}</td>
+        <td class="num">${s ? fmt(s.mesai) : ''}</td><td class="num">${s ? fmt(s.hedef) : ''}${(() => { if (!s || s.nobetYok || !(s.mesai > 0) || k.sinif !== 'isci') return ''; const tam = k.sinif === 'isci' ? s.mesai / (S.ayar.isciDusulen || 11) * C.ADIM : s.mesai / 24; return Math.abs(tam - s.hedef) > 0.005 ? `<div class="ap-note" title="Mesai saati ÷ ${k.sinif === 'isci' ? (S.ayar.isciDusulen || 11) + ' × 0,5' : '24'} = tam oran (hedef 0,5 adıma ${k.sinif === 'isci' ? 'aşağı' : 'yukarı'} yuvarlanır)">tam ${tam.toLocaleString('tr-TR', {maximumFractionDigits: 2})}</div>` : ''; })()}</td><td class="num">${s && !s.nobetYok ? fmt(s.azami) : ''}</td>
         <td>${istas && !(s && s.nobetYok) ? `<div class="ap-stp"><input class="ap-in n" type="number" min="0" step="0.5" data-id="${k.id}" data-f="planlanan" value="${k.planlanan ?? ''}" ${dis}><span class="ap-stb"><button type="button" data-act="plan-art" data-id="${k.id}" data-v="1" ${dis} title="0,5 artır">▲</button><button type="button" data-act="plan-art" data-id="${k.id}" data-v="-1" ${dis} title="0,5 azalt">▼</button></span></div>` : ''}</td>
         <td class="num fk ${fark > 0 ? 'ap-pos' : fark < 0 ? 'ap-neg' : ''}">${s && !s.nobetYok && k.planlanan != null ? (fark > 0 ? '+' : '') + fmt(fark) : ''}</td>
         <td>${istas && !(s && s.nobetYok) ? `<input type="checkbox" data-id="${k.id}" data-f="kilit" ${k.kilit ? 'checked' : ''} ${dis} title="Kilitli değer otomatik hesapta değişmez. Elle girilen planlanan değer kendiliğinden kilitlenir; kilidi açınca yeniden hesaplanır.">` : ''}</td>
@@ -1420,6 +1420,7 @@ function mount(root, opts = {}) {
       <div class="ap-card"><h2>Hesap ayarları</h2><div class="ap-row"><label>ATT sürücü sayılması için nöbetlerinin sürücü payı bu değerden büyük olmalı (%): <input class="ap-in n" type="number" min="0" max="100" data-ay="surDegilEsik" value="${S.ayar.surDegilEsik}" ${yon ? '' : 'disabled'}></label> <span class="ap-note">Nöbet kaydı olmayan ATT sürücü sayılmaz.</span></div>
       <div class="ap-row"><label>DOKTOR-AABT-ATT genel azami nöbet (24 sa.; istasyon sayfasından istasyon bazında değiştirilebilir) <input class="ap-in n" type="number" step="0.5" data-ay="azamiMemur" value="${S.ayar.azamiMemur}" ${yon ? '' : 'disabled'}></label>
       <label>İşçi nöbetinde sistemden düşülen saat <input class="ap-in n" type="number" step="0.5" data-ay="isciDusulen" value="${S.ayar.isciDusulen}" ${yon ? '' : 'disabled'}></label></div>
+      <div class="ap-row"><label title="Kapalıyken memur/doktor hedefi tam oranla hesaplanır (160 saat = 6,67 nöbet). Açıkken hedef 0,5 adıma yukarı yuvarlanır (160 saat = 7)."><input type="checkbox" data-act="hedef-yuv" ${S.ayar.hedefYuvarla ? 'checked' : ''} ${yon ? '' : 'disabled'}> Memur/doktor hedefini 0,5 adıma yuvarla (eski yöntem)</label></div>
       <div class="ap-row"><label><input type="checkbox" data-act="oto-geri" ${S.ayar.otoGeriCek !== false ? 'checked' : ''} ${yon ? '' : 'disabled'}> Açığı olan istasyonların başka istasyona görevli personelini listeler yüklenince / önceki aydan kopyalanınca otomatik geri çağır</label></div>
       <div class="ap-row"><label><input type="checkbox" data-act="oto-oner" ${S.ayar.otoOner !== false ? 'checked' : ''} ${yon ? '' : 'disabled'}> Planlanan nöbeti her değişiklikte otomatik hesapla (kilitli değerler korunur)</label></div>
       <p class="ap-note">Yuvarlama: DOKTOR-AABT-ATT hedefi yukarı 0,5 adıma, işçi hedefi aşağı tam 12 saatlik nöbete yuvarlanır.</p></div>
@@ -1478,7 +1479,7 @@ function mount(root, opts = {}) {
     return {ay: `${y}-${C.pad(m)}`, zaman: Date.now(), hesapImza: hesapImza(), ist};
   }
   // Hesap imzası: hesaplama sürümü + sonucu etkileyen ayarlar. Değişirse arşivdeki aylar yeni yönteme göre arka planda yeniden hesaplanır.
-  const hesapImza = () => JSON.stringify([HESAP_SURUM, S.ayar.isciDusulen, S.ayar.azamiMemur, S.ayar.panoMod, S.ayar.surEsik, S.ayar.surDegilEsik, Object.entries(S.ayar.durumlar).map(([k, v]) => [k, !!v.nobetYok, !!v.mesaiYok, !!v.disarida, !!v.pasif])]);
+  const hesapImza = () => JSON.stringify([HESAP_SURUM, !!S.ayar.hedefYuvarla, S.ayar.isciDusulen, S.ayar.azamiMemur, S.ayar.panoMod, S.ayar.surEsik, S.ayar.surDegilEsik, Object.entries(S.ayar.durumlar).map(([k, v]) => [k, !!v.nobetYok, !!v.mesaiYok, !!v.disarida, !!v.pasif])]);
   // Arşivlenmiş bir ayın planını (kopya üzerinde) güncel yöntemle yeniden hesaplar; kayıtlı plana dokunulmaz
   function planiYenidenHesapla(plan, y, m) {
     const kopya = JSON.parse(JSON.stringify(plan)), yedek = {plan: S.plan, y: S.y, m: S.m, toplu: S.toplu};
@@ -1937,7 +1938,7 @@ function mount(root, opts = {}) {
         <p>Bu ay ve sonraki aylar düzenlenebilir; <b>önceki aylar salt okunurdur</b> (arşiv görünümü). Aylar arası geçiş üst çubuktaki ‹ › düğmeleriyle yapılır.</p>`)}
       ${b('3. Pano', `<ul><li>Kartlar: açık istasyon, ekip OF (kapalı), aktif kayıt, ihtiyaç, kapasite, planlanan, personel önerilen, fazla nöbetle dönen, elle karar gereken istasyonlar. Karta tıklayınca istasyonlar süzülür.</li><li><b>Tüm planlamayı oluştur:</b> tek tuşla geri çağırma + nöbet hesabı + rotasyon görevlendirmesi. Kilitli değerler korunur.</li><li><b>Planlananı yeniden hesapla:</b> yalnız nöbet sayılarını yeniden hesaplar.</li><li><b>Tüm istasyonlar Excel (tek dosya):</b> her istasyon ayrı sayfada; sonda Plan özeti ve İstatistik sayfaları.</li><li><b>Mod:</b> <i>Mesai karşılığı</i> (kişi yalnız mesai saatini tamamlayacak kadar nöbet tutar) veya <i>Fazla mesaili</i> (DOKTOR-AABT-ATT için kişi başı en çok N nöbet yazılabilir).</li></ul>`)}
       ${b('4. İstasyon sayfası', `<ul><li>Üstte istasyonun <b>Plan: yazılan / gereken</b> durumu, <b>Nöbet branşı dengesi</b> (ekip şefi, YSP, sürücü; listedeki planlanan nöbetlere göre dolu / açık) ve uyarılar yer alır. Plan ihtiyaca eşit ve üç nöbet branşı doluysa "İstasyon tam" görünür.</li>
-        <li>Tablo: <b>Mesai</b> (izinler düşülmüş saat), <b>Hedef</b> (mesai ÷ 24, memur/doktorda yukarı, işçide aşağı yuvarlanmış; altında "tam 6,67" gibi tam oran), <b>Azami</b>, <b>Plan</b> (elle yazılır ya da ▲▼ ile 0,5 artırılır), <b>Fark</b>.</li>
+        <li>Tablo: <b>Mesai</b> (izinler düşülmüş saat), <b>Hedef</b> (memur/doktorda mesai ÷ 24 tam oran, ör. 160 saat = 6,67 nöbet; işçide mesai ÷ 11 aşağı tam 12 saatlik nöbete yuvarlanır ve altında tam oran görünür; yuvarlamayı siz yaparsınız, Ayarlar'dan eski 0,5 adım yuvarlama açılabilir), <b>Azami</b>, <b>Plan</b> (elle yazılır ya da ▲▼ ile 0,5 artırılır), <b>Fark</b>.</li>
         <li><b>Elle değiştirdiğiniz değer kilitlenir</b> (🔒) ve diğer kişilerin değerleri değişmez. Kilidi kaldırırsanız otomatik hesap o kişiyi yeniden hesaplar. <i>Planı onayla (kilitle)</i> tüm değerleri kilitler, <i>Kilitleri aç</i> hepsini serbest bırakır.</li>
         <li><b>Kırmızı satır / "Mesaisi eksik kalan personel" kutusu:</b> planlanan nöbet, Mesai sütunundaki saati karşılamıyor (eksik saat yazılır).</li>
         <li><b>Geçici görev</b> sütunu: istasyon, Başhekimlik ve KKM listeden seçilir; ilçe sağlık müdürlüğü, hastane gibi yerler için <i>Diğer (yaz)…</i> seçilip yazılır.</li>
@@ -1945,7 +1946,7 @@ function mount(root, opts = {}) {
         <li><b>Görüntü (PNG)</b> ve <b>Excel</b> çıktılarında nöbet sayıları gösterilmez; aile hekimliği ve uzmanlık eğitimindeki personel yer almaz.</li></ul>`)}
       ${b('5. Görevlendirme ve rotasyon', `<ul><li><b>Personel ihtiyacı değerlendirmesi:</b> hangi istasyon kaç kişiye ihtiyaç duyuyor. "Personel öner: N kişi" etiketine tıklayınca önerilen personel görünür.</li>
         <li><b>Aylık rotasyon:</b> her istasyondan ayda <i>kota</i> kadar kişi çıkar (varsayılan 1; mesaisi dolmayan istasyonda fazlalık kadar). Sıra: önce gitmek isteyenler, sonra en uzun süredir çıkmayanlar. Hedef: önce aynı ilçe, sonra yakından uzağa. <i>Önerilen çıkışlar</i> sekmesinde seçip <i>Seçilenleri görevlendir</i> deyin.</li>
-        <li><b>Görevlendirilemeyenler / önerilmeyenler:</b> 4/B personel 4 yıl dolmadan; <b>EKİP'te kadrosu (birimi) değişen personel 1 yıl dolmadan</b>; aile hekimliği; izinli, nöbet muaf, "gitmesin" işaretli kişiler; doktorlar yalnızca doktorlu (A1) istasyonlara ve KKM'ye; bir istasyonda nöbet branşını dolduran kişi (çıkarsa açık artacaksa); <b>işçi kendi istasyonu dışında tek işçi olarak önerilmez</b>.</li>
+        <li><b>Görevlendirilemeyenler / önerilmeyenler:</b> 4/B personel 4 yıl dolmadan; <b>EKİP'te atama ile kadro birimi değişen personel 1 yıl dolmadan</b> (geçici görev bu kurala girmez); aile hekimliği; izinli, nöbet muaf, "gitmesin" işaretli kişiler; doktorlar yalnızca doktorlu (A1) istasyonlara ve KKM'ye; bir istasyonda nöbet branşını dolduran kişi (çıkarsa açık artacaksa); <b>işçi kendi istasyonu dışında tek işçi olarak önerilmez</b>.</li>
         <li><b>İstasyon dışı görevliler:</b> geçici görevde olup başka bir istasyona atanmamış personel (Başhekimlik, KKM, hastane vb.). Bu kişilere kendi istasyonunda nöbet yazılmaz.</li>
         <li><b>Excel'e aktar:</b> görevlendirmenin tüm bölümlerini tek dosyada indirir.</li></ul>`)}
       ${b('6. İstasyon talepleri (onay akışı)', `<p>Plan <b>Kesinleştir</b> yapıldığında istasyon sorumluları kendi istasyonlarının nöbet sayılarını düzenleyip planlamaya gönderebilir. <b>İstasyon talepleri</b> sayfasında farkları görür; <i>Onayla</i> ile nöbet sayıları kesin plana işlenir (kilitlenir), <i>Düzeltme iste</i> ile geri gönderirsiniz. Onayı <i>geri al</i> ile eski değerlere dönebilirsiniz. Bekleyen tüm istasyonları tek seferde onaylayabilirsiniz.</p>`)}
@@ -2268,7 +2269,7 @@ function mount(root, opts = {}) {
     const out = {};
     Object.entries(ay).forEach(([a, m]) => {
       const [yy, mm] = a.split('-').map(Number), ist = {}, kisi = [], dis = [];
-      const hedefStd = sinif => { try { const isci = sinif === 'isci', ms = C.ayMesai(yy, mm, isci, {}); return C.hedefNobet(ms, sinif === 'doktor' ? 'doktor' : isci ? 'isci' : 'memur', false, {isciDusulen: S.ayar.isciDusulen}).birim; } catch (er) { return 0; } };
+      const hedefStd = sinif => { try { const isci = sinif === 'isci', ms = C.ayMesai(yy, mm, isci, {}); return C.hedefNobet(ms, sinif === 'doktor' ? 'doktor' : isci ? 'isci' : 'memur', false, {isciDusulen: S.ayar.isciDusulen, hedefYuvarla: true}).birim; } catch (er) { return 0; } };      // gerçekleşen fazla nöbet: standart hedef (0,5 adıma yuvarlanmış) ile karşılaştırılır
       m.forEach((e, tc) => {
         const k = tcMap.get(tc), toplam = Object.values(e.birimler).reduce((x, v) => x + v, 0) / 24, brans = k ? bransAd(k) : (e.brans || ''), kadro = k ? k.birim : '', hedef = hedefStd(k ? k.sinif : /SURUCU|ISCI/.test(C.TR(e.brans)) ? 'isci' : 'memur');
         Object.entries(e.birimler).forEach(([b, saat]) => { const o = (ist[b] = ist[b] || {nobet: 0, kisi: 0}); o.nobet += saat / 24; o.kisi++; if (kadro && b !== kadro && b !== 'KOMUTA KONTROL MERKEZİ') dis.push({ad: k ? k.ad : e.ad, brans, kadro, istasyon: b, nobet: Math.round(saat / 24 * 100) / 100}); });
@@ -2334,10 +2335,10 @@ function mount(root, opts = {}) {
         k = {id: uid(), ad: a.ad, tc: a.tc, tel: a.tel || '', unvan: a.unvan, sinif, birim, durum: gelenKaynak ? 'GEÇİCİ GÖREVLİ' : '', durumMetin: '', izin: [], planlanan: null, kilit: false, gorev: null, dortB, memBas: '',
           kadroTur: a.kadroTur, sira: a.sira, istek: '', gecmis: [], gecmisAsos: []};
         const onc = S.oncePlanBirim && S.oncePlanBirim.get(a.tc);      // önceki ayın planında bu kişi başka birimdeyse kadro değişmiştir
-        if (onc && onc.birim !== birim) { k.kadroTarih = ayIlk(); rapor.nakil.push(`${k.ad}: ${onc.birim} → ${birim}`); } else if (onc && onc.kadroTarih) k.kadroTarih = onc.kadroTarih;
+        if (onc && onc.birim !== birim && !gelenKaynak) { k.kadroTarih = ayIlk(); rapor.nakil.push(`${k.ad}: ${onc.birim} → ${birim}`); } else if (onc && onc.kadroTarih) k.kadroTarih = onc.kadroTarih;
         plan.kayitlar.push(k); rapor.yeni.push(k.ad); tcMap.set(a.tc, k);
       } else {
-        if (k.birim !== birim && k.tc) { rapor.nakil.push(`${k.ad}: ${k.birim} → ${birim}`); k.kadroTarih = ayIlk(); }
+        if (k.birim !== birim && k.tc) { rapor.nakil.push(`${k.ad}: ${k.birim} → ${birim}`); if (!gelenKaynak) k.kadroTarih = ayIlk(); }      // yalnız kadro (atama) değişikliği 1 yıl engeli doğurur; geçici görev ve kurum dışı gelenler sayılmaz
         if (a.ad && C.TR(k.ad).split(' ').filter(Boolean).length < C.TR(a.ad).split(' ').filter(Boolean).length) k.ad = a.ad;      // elle eksik yazılmış ad ASOS'taki tam adla düzeltilir
         k.tc = a.tc; k.unvan = a.unvan || k.unvan; k.sinif = sinif; k.birim = birim; k.dortB = dortB; k.kadroTur = a.kadroTur || k.kadroTur; if (a.tel) k.tel = a.tel;
         rapor.degisen++;
@@ -2704,7 +2705,7 @@ function mount(root, opts = {}) {
     const t = e.target.closest('[data-act]'); if (!t) return;
     const a = t.dataset.act, v = t.dataset.v;
     if (/^(SELECT|INPUT|OPTION|TEXTAREA)$/.test(e.target.tagName)) return;      // form kontrolleri change olayıyla işlenir
-    if (['ist-sec', 'rol', 'plan-durum', 'f-q', 'f-birim', 'f-sinif', 'f-durum', 'tahmini', 'oto-oner', 'rot-kaynak', 'tema', 'ekip-of', 'p-boyut', 'f-surucu'].includes(a)) return;     // change/input ile işlenir
+    if (['ist-sec', 'rol', 'plan-durum', 'f-q', 'f-birim', 'f-sinif', 'f-durum', 'tahmini', 'oto-oner', 'hedef-yuv', 'rot-kaynak', 'tema', 'ekip-of', 'p-boyut', 'f-surucu'].includes(a)) return;     // change/input ile işlenir
     e.preventDefault();
     try {
       switch (a) {
@@ -2865,6 +2866,7 @@ function mount(root, opts = {}) {
           if (aciliyor && dis.length && confirm(`${b.ad} yeniden açılıyor. Başka birimlere görevli ${dis.length} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`)) toast(`${geriCagir(b)} personel geri çağrıldı.`);
         }
       }
+      else if (a === 'hedef-yuv') { if (S.rol !== 'yonetici') return; S.ayar.hedefYuvarla = t.checked; await ayarKaydet(); if (S.plan) { otoHesapla(); kaydet(); } }
       else if (a === 'oto-geri') { if (S.rol !== 'yonetici') return; S.ayar.otoGeriCek = t.checked; await ayarKaydet(); }
       else if (a === 'oto-oner') { if (S.rol !== 'yonetici') return; S.ayar.otoOner = t.checked; await ayarKaydet(); if (t.checked && S.plan) { otoHesapla(); kaydet(); } }
       else return;

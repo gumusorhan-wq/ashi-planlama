@@ -126,7 +126,7 @@ const APCore = (() => {
     }
     return Math.round(mesai * 100) / 100;
   }
-  // Hedef nöbet (24 saatlik eşdeğer). memur/doktor: mesai/24 yukarı 0,5 adım; işçi: mesai/11 aşağı tam 12 saatlik nöbet → ×0,5
+  // Hedef nöbet (24 saatlik eşdeğer). memur/doktor: mesai/24 tam oran (ayar.hedefYuvarla: yukarı 0,5 adım); işçi: mesai/11 aşağı tam 12 saatlik nöbet → ×0,5
   function hedefNobet(mesai, sinif, nobetYok, ayar) {
     if (nobetYok || !(mesai > 0)) return {adet: 0, birim: 0};
     const a = ayar || {};
@@ -134,8 +134,8 @@ const APCore = (() => {
       const n = Math.floor(mesai / (a.isciDusulen || ISCI_NOBET_DUSULEN) + 1e-9);
       return {adet: n, birim: n * ADIM, hamAdet: mesai / (a.isciDusulen || ISCI_NOBET_DUSULEN)};
     }
-    const x = mesai / NOBET_SAAT;
-    const u = Math.ceil(x / ADIM - 1e-9) * ADIM;
+    const x = mesai / NOBET_SAAT;      // memur/doktor: tam oran (ör. 160 saat = 6,67 nöbet); ayar.hedefYuvarla ile eski yöntem (0,5 adıma yukarı) açılır
+    const u = a.hedefYuvarla ? Math.ceil(x / ADIM - 1e-9) * ADIM : x;
     return {adet: u, birim: u, hamAdet: x};
   }
 
@@ -181,7 +181,7 @@ const APCore = (() => {
       return {k, mesai, hedef: h.birim, hedefAdet: h.adet, nobetYok: !!dt.nobetYok};
     });
     // Azami nöbet: memur/doktor tam ay hedefinin üstüne azamiMemur'a kadar (ör. Kasım: hedef 7, azami 8); izinli kişide hedef + aynı ek; işçi: hedef + isciEk × 0,5
-    const a = ayar || {}, azamiMemur = a.azamiMemur || 0, tam = hedefNobet(ayMesai(y, m, false, ozel), 'memur', false).birim, ek = Math.max(0, azamiMemur - tam);
+    const a = ayar || {}, azamiMemur = a.azamiMemur || 0, tam = hedefNobet(ayMesai(y, m, false, ozel), 'memur', false, a).birim, ek = Math.max(0, azamiMemur - tam);
     satir.forEach(s => {
       s.azami = s.nobetYok || !(s.hedef > 0) ? 0 : (s.k.sinif === 'isci' ? s.hedef + (a.isciEk || 0) * ADIM : Math.min(Math.max(azamiMemur, s.hedef), s.hedef + ek));
     });

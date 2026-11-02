@@ -7,7 +7,9 @@ assert.deepStrictEqual([C.hedefNobet(168, 'memur', false).birim, C.hedefNobet(19
 // Kasım 2026: 21 hafta içi; işçi (30−5 pazar)=25 gün
 assert.strictEqual(C.ayMesai(2026, 11, false, {}), 168);
 assert.strictEqual(C.ayMesai(2026, 11, true, {}), 187.5);
-assert.strictEqual(C.hedefNobet(176, 'memur', false).birim, 7.5);       // 7,33 → 7,5 (üst)
+assert.ok(Math.abs(C.hedefNobet(176, 'memur', false).birim - 22 / 3) < 1e-9);       // tam oran: 7,33
+assert.strictEqual(C.hedefNobet(176, 'memur', false, {hedefYuvarla: true}).birim, 7.5);       // eski yöntem: 0,5 adıma yukarı
+assert.ok(Math.abs(C.hedefNobet(160, 'memur', false).birim - 6.6666667) < 1e-6);       // 160 saat = 6,67 nöbet
 // idari izin günü (toplu): hafta içi bir gün düşer
 assert.strictEqual(C.ayMesai(2026, 11, false, {'2026-11-10': {tur: 'idari'}}), 160);
 assert.strictEqual(C.ayMesai(2026, 11, false, {'2026-11-09': {tur: 'yarim'}}), 165);
@@ -15,7 +17,7 @@ assert.strictEqual(C.ayMesai(2026, 11, false, {'2026-11-09': {tur: 'yarim'}}), 1
 assert.strictEqual(C.gunSaat('2026-10-29', false, {}), 0); assert.strictEqual(C.gunSaat('2026-10-28', false, {}), 5);
 // izin: memur 5 gün izin → 168−40=128 → 5,33→5,5
 const k = {sinif: 'memur', durum: '', izin: [{gun: 5}]};
-assert.strictEqual(C.kisiMesai(k, 2026, 11, {}, D), 128); assert.strictEqual(C.hedefNobet(128, 'memur', false).birim, 5.5);
+assert.strictEqual(C.kisiMesai(k, 2026, 11, {}, D), 128); assert.ok(Math.abs(C.hedefNobet(128, 'memur', false).birim - 16 / 3) < 1e-9); assert.strictEqual(C.hedefNobet(128, 'memur', false, {hedefYuvarla: true}).birim, 5.5);
 // tarihli izin hafta sonuna düşerse mesaiyi etkilemez
 assert.strictEqual(C.kisiMesai({sinif: 'memur', izin: [{bas: '2026-11-07', bit: '2026-11-08'}]}, 2026, 11, {}, D), 168);
 // dağıtım
