@@ -358,13 +358,24 @@ const APCore = (() => {
     return {fill, rem, fazla};
   }
   // Önerilen planlanan nöbet: önce hedef nöbetlerle yuvalar doldurulur (fazla gruplar orantılı azalır), açık kalırsa azami sınıra kadar ek nöbet yazılır
+  // Fazlalık (hedefin üstüne yazılan) nöbetlerin dağıtımı: önce ATT sürücüler (sy), sonra AABT sürücüler (ka); kalan açık yuvalar diğer branşlar arasında eşit paylaştırılır (tur tur 0,25'lik dilimlerle)
+  function akisEk(ek, rem) {
+    const dem = {...rem}, fill = {}, kalan = {...ek}, fazla = {}; GRUPLAR.forEach(g => { fill[g] = {es: 0, ysp: 0, sur: 0}; });
+    const ver = (g, miktar) => { let k = miktar; for (const s of YETENEK[g]) { if (k <= 1e-9) break; const u = Math.min(k, Math.max(0, dem[s])); fill[g][s] += u; dem[s] -= u; k -= u; } return miktar - k; };
+    ['sy', 'ka'].forEach(g => { kalan[g] -= ver(g, Math.max(0, kalan[g] || 0)); });
+    const digerleri = GRUPLAR.filter(g => g !== 'sy' && g !== 'ka');
+    for (let tur = 0; tur < 20000; tur++) { let verildi = false; for (const g of digerleri) { if ((kalan[g] || 0) <= 1e-9) continue; const al = ver(g, Math.min(kalan[g], 0.25)); if (al > 1e-9) { kalan[g] -= al; verildi = true; } } if (!verildi) break; }
+    GRUPLAR.forEach(g => { fazla[g] = Math.max(0, kalan[g] || 0); });
+    ['es', 'ysp', 'sur'].forEach(s => { dem[s] = Math.round(dem[s] * 100) / 100; });
+    return {fill, rem: dem, fazla};
+  }
   function oneri(hesap, kilitli) {
     const {ihtiyac, gruplar: gr} = hesap, sonuc = new Map(), D3 = ihtiyac / 3;
     const ser = g => gr[g].filter(s => !kilitli || !kilitli.has(s.k.id));
     const kil = g => gr[g].filter(s => kilitli && kilitli.has(s.k.id)).reduce((x, s) => x + kilitli.get(s.k.id), 0);
     const top = (L, f) => L.reduce((x, s) => x + s[f], 0), kilitSup = {}, sup1 = {}, ek = {};
     GRUPLAR.forEach(g => { const L = ser(g); kilitSup[g] = kil(g); sup1[g] = top(L, 'hedef'); ek[g] = top(L, 'azami') - top(L, 'hedef'); });
-    const f0 = akis(kilitSup, {es: D3, ysp: D3, sur: D3}), f1 = akis(sup1, f0.rem), f2 = akis(ek, f1.rem);
+    const f0 = akis(kilitSup, {es: D3, ysp: D3, sur: D3}), f1 = akis(sup1, f0.rem), f2 = akisEk(ek, f1.rem);
     GRUPLAR.forEach(g => {
       const L = ser(g), t = x => x.es + x.ysp + x.sur, total = t(f1.fill[g]) + t(f2.fill[g]);
       dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), g === 'isci' ? ADIM : 0.01).forEach((v, i) => sonuc.set(L[i].k.id, v));

@@ -137,4 +137,7 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   assert.strictEqual(gm(12, 'mesai').ihtiyacTur, 'icerde'); }
 // kadro değişikliği: 1 yıl görevlendirme engeli
 { const k = {kadroTarih: '2026-10-01'}; assert.ok(C.gorevlendirmeEngeli(k, '2027-09-30').includes('Kadro değişikliği'), '1 yıl dolmadan engel'); assert.strictEqual(C.gorevlendirmeEngeli(k, '2027-10-01'), '', '1 yıl dolunca engel yok'); assert.strictEqual(C.gorevlendirmeEngeli({}, '2026-11-01'), ''); }
+// fazlalık dağıtımı: önce ATT sürücü (sy) azamisine kadar, sonra AABT sürücü (ka); kalan diğer branşlar arasında eşit
+{ const kisi = (id, hedef, azami) => ({k: {id}, hedef, azami}), gr = {dok: [], isci: [], ke: [kisi('ke', 7, 8)], ka: [kisi('ka', 3, 10)], ysp: [kisi('ysp', 7, 8)], sy: [kisi('sy', 3, 10)]};
+  const o = C.oneri({ihtiyac: 28.5, gruplar: gr}, null); assert.ok(Math.abs(o.get('sy') - 10) < 0.011, 'ATT sürücü fazlalığı önce alır: ' + o.get('sy')); assert.ok(Math.abs(o.get('ka') - 4.5) < 0.011, 'AABT sürücü sonra: ' + o.get('ka')); }
 console.log('çekirdek testleri geçti');
