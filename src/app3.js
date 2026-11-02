@@ -105,6 +105,12 @@
     rows.slice(hi + 1).forEach(r => {
       tani.satir++;
       const tc = String(r[ti] || '').replace(/\D/g, ''); if (!tc) { tani.tcYok++; return; }
+      const idariTur = eti >= 0 ? (/KOMUTA/.test(C.TR(r[eti])) ? 'kkm' : /IDARI/.test(C.TR(r[eti])) ? 'bh' : '') : '';
+      if (idariTur) {      // Başhekimlik (İdari) ve Komuta Kontrol nöbetleri: istasyon rol sayımına girmez; yalnızca kimin nöbet tuttuğu ve gerçekleşen nöbet için okunur
+        let saat = si >= 0 ? saatOku(r[si]) : 0; if (!(saat > 0)) saat = 1; tani.idari = (tani.idari || 0) + 1;
+        out.push({tc, rol: '', idari: idariTur, saat, ad: ((adI >= 0 ? r[adI] : '') + ' ' + (soyI >= 0 ? r[soyI] : '')).trim().toLocaleUpperCase('tr-TR'), brans: nlbI >= 0 ? String(r[nlbI] || '') : '', birimMetin: String(ebI >= 0 && r[ebI] ? r[ebI] : (enI >= 0 ? r[enI] : '') || ''), mesai: si >= 0 && /^MESAI/.test(C.TR(r[si])), bas: bi >= 0 ? String(r[bi]) : '', ay: bi >= 0 ? C.tarihIso(r[bi]).slice(0, 7) : ''});
+        return;
+      }
       if (eti >= 0 && !/ISTASYON/.test(C.TR(r[eti]))) { tani.istasyonDisi++; return; }
       if (epi >= 0 && r[epi] !== '' && !/AMBULANS/.test(C.TR(r[epi]))) { tani.ambulansDisi++; return; }
       const g = C.TR(r[gi]); ornek(tani.gorevler, r[gi]);
@@ -203,7 +209,7 @@
   function birimBul(plan, metin) { const a = C.istAnahtar(metin || ''); if (!a) return ''; const b = plan.birimler.find(x => x.tur === 'istasyon' && C.istAnahtar(x.ad) === a); return b ? b.ad : ''; }
   function gercekHazirla(plan, satirlar) {
     const tcMap = new Map(plan.kayitlar.filter(k => k.tc).map(k => [k.tc, k])), ay = {};
-    satirlar.forEach(r => { if (!r.ay || r.mesai) return; const m = (ay[r.ay] = ay[r.ay] || new Map()), e = m.get(r.tc) || {ad: r.ad, brans: r.brans, birimler: {}}; const ist = birimBul(plan, r.birimMetin) || (C.TR(r.birimMetin).includes('KOMUTA') ? 'KOMUTA KONTROL MERKEZİ' : String(r.birimMetin || '').trim() || '—'); e.birimler[ist] = (e.birimler[ist] || 0) + r.saat; m.set(r.tc, e); });
+    satirlar.forEach(r => { if (!r.ay || r.mesai) return; const m = (ay[r.ay] = ay[r.ay] || new Map()), e = m.get(r.tc) || {ad: r.ad, brans: r.brans, birimler: {}}; const ist = birimBul(plan, r.birimMetin) || (C.TR(r.birimMetin).includes('KOMUTA') ? 'KOMUTA KONTROL MERKEZİ' : C.TR(r.birimMetin).includes('BASHEKIM') ? 'BAŞHEKİMLİK' : String(r.birimMetin || '').trim() || '—'); e.birimler[ist] = (e.birimler[ist] || 0) + r.saat; m.set(r.tc, e); });
     const out = {};
     Object.entries(ay).forEach(([a, m]) => {
       const [yy, mm] = a.split('-').map(Number), ist = {}, kisi = [], dis = [];
@@ -225,19 +231,25 @@
     const plan = kaynakPlan ? JSON.parse(JSON.stringify(kaynakPlan)) : bosPlan();
     if (tur === 'N') {
       // Nöbet kayıtları aya göre saklanır (ay → ekip şefi / YSP / sürücü saati); aynı ay yeniden yüklenirse o ayın verisi yenilenir; son 6 ay birlikte değerlendirilir
-      const say = new Map(), aylar = new Set(satirlar.map(r => r.ay || 'belirsiz'));
+      const tumSatir = satirlar, idari = tumSatir.filter(r => r.idari); satirlar = tumSatir.filter(r => !r.idari); satirlar.tani = tumSatir.tani;
+      const say = new Map(), aylar = new Set(tumSatir.map(r => r.ay || 'belirsiz'));
       satirlar.forEach(r => { const m = say.get(r.tc) || {}, ay = r.ay || 'belirsiz'; (m[ay] = m[ay] || {es: 0, ysp: 0, sur: 0})[r.rol] += r.saat; say.set(r.tc, m); });
+      // Başhekimlik / KKM nöbeti (mesai kayıtları hariç): kişi → birim ve ay bazında nöbet sayısı
+      const idariMap = new Map(); idari.forEach(r => { if (r.mesai || !r.ay) return; const e = idariMap.get(r.tc) || {birim: r.idari === 'bh' ? 'BAŞHEKİMLİK' : 'KOMUTA KONTROL MERKEZİ', aylar: {}}; const a = (e.aylar[r.ay] = e.aylar[r.ay] || {sayi: 0, saat: 0}); a.sayi++; a.saat += r.saat; idariMap.set(r.tc, e); });
       const esk = {degil: S.ayar.surDegilEsik / 100};
       const rp = {tur, yeni: [], degisen: 0, nakil: [], eksik: [], toplam: satirlar.length, kisi: say.size, eslesen: 0, aylar: [...aylar].sort(), surucu: 0, degil: 0, dogrulanmadi: 0, att: 0, plan, tani: satirlar.tani};
       plan.kayitlar.forEach(k => {
         if (!k.tc) return;
         k.rolAy = {...(k.rolAy || {})}; aylar.forEach(a => { delete k.rolAy[a]; });
         const m = say.get(k.tc); if (m) { Object.assign(k.rolAy, m); rp.eslesen++; }
+        const idr = idariMap.get(k.tc); k.idariNobet = k.idariNobet ? {birim: k.idariNobet.birim, aylar: {...k.idariNobet.aylar}} : null; if (k.idariNobet) aylar.forEach(a => { delete k.idariNobet.aylar[a]; });
+        if (idr) { k.idariNobet = k.idariNobet || {birim: idr.birim, aylar: {}}; k.idariNobet.birim = idr.birim; Object.assign(k.idariNobet.aylar, idr.aylar); rp.idariKisi = (rp.idariKisi || 0) + 1; }
+        if (k.idariNobet && !Object.keys(k.idariNobet.aylar).length) k.idariNobet = null;
         k.rolSay = Object.keys(k.rolAy).length ? C.rolToplam(k.rolAy) : null;
         if (k.sinif === 'memur') { rp.att++; const d = C.surucuDurumu(k, esk).tip; if (d === 'surucu') rp.surucu++; else if (d === 'degil') rp.degil++; else rp.dogrulanmadi++; }
       });
       plan.nobetAylari = [...new Set([...(plan.nobetAylari || []), ...aylar])].sort();
-      rp.gercek = gercekHazirla(plan, satirlar);
+      rp.gercek = gercekHazirla(plan, tumSatir);
       return rp;
     }
     if (tur === 'I') {
@@ -401,14 +413,15 @@
       const gelen = k.birim !== b.ad;
       return {k, gelen, renk: gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), sinif: k.sinif,
         hucre: [k.ad, unvanKisa(k), gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), izinAyGun(k) ? fmt(izinAyGun(k)) : '', izinAyGun(k) ? izinTur(k) : '', gelen ? `${k.birim} NOLU ASHİ ${AYLAR[S.m].toLocaleUpperCase('tr-TR')}` : cikGorev(k), (k.gorev && k.gorev.yolluk) || ''],
-        tahmini: (sm.get(k.id) && !sm.get(k.id).nobetYok && k.planlanan != null) ? k.planlanan : ''};
+        tahmini: (sm.get(k.id) && !sm.get(k.id).nobetYok && k.planlanan != null) ? k.planlanan : '', idari: idariNobetVar(k) ? 'NÖBET TUTAR' : ''};
     });
   }
   function excelBirimSheet(b) {
     const satirlar = birimSatirlari(b), tah = false;      // istasyona giden çıktıda nöbet sayıları gösterilmez
-    const bas = ['AD SOYAD', 'ÜNVAN', 'G.GÖREV DURUMU', '', 'İZİNLER', 'GEÇİCİ GÖREV TARİHLERİ', 'YOLLUK DURUMU'].concat(tah ? ['TAHMİNİ NÖBET'] : []);
+    const idB = b.tur === 'bashekimlik' || b.tur === 'kkm';      // Başhekimlik / KKM çıktısında nöbet tutanlar ayrıca işaretlenir (sayı gösterilmez)
+    const bas = ['AD SOYAD', 'ÜNVAN', 'G.GÖREV DURUMU', '', 'İZİNLER', 'GEÇİCİ GÖREV TARİHLERİ', 'YOLLUK DURUMU'].concat(tah ? ['TAHMİNİ NÖBET'] : []).concat(idB ? ['NÖBET'] : []);
     const aoa = [[b.ad + (b.tur === 'istasyon' ? ' NOLU ASHİ' : '') + (b.ekipOf ? ' — EKİP OF' : '')], bas];
-    satirlar.forEach(s => aoa.push(s.hucre.concat(tah ? [s.tahmini] : [])));
+    satirlar.forEach(s => aoa.push(s.hucre.concat(tah ? [s.tahmini] : []).concat(idB ? [s.idari] : [])));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [{wch: 32}, {wch: 16}, {wch: 30}, {wch: 6}, {wch: 14}, {wch: 42}, {wch: 16}, {wch: 14}];
     ws['!merges'] = [{s: {r: 0, c: 0}, e: {r: 0, c: bas.length - 1}}];
@@ -441,8 +454,8 @@
   const xlsxIndir = (wb, ad) => indir(new Blob([XLSX.write(wb, {bookType: 'xlsx', type: 'array'})], {type: 'application/octet-stream'}), ad);
 
   function pngCiz(b) {
-    const satirlar = birimSatirlari(b), tah = false;      // istasyona giden çıktıda nöbet sayıları gösterilmez
-    const kol = [['AD SOYAD', 290], ['UNVAN', 140], ['G.GÖREV DURUMU', 300], ['', 50], ['İZİNLER', 130], ['GEÇİCİ GÖREV TARİHLERİ', 330], ['YOLLUK DURUMU', 160]].concat(tah ? [['TAHMİNİ NÖBET', 150]] : []);
+    const satirlar = birimSatirlari(b), tah = false, idB = b.tur === 'bashekimlik' || b.tur === 'kkm';      // istasyona giden çıktıda nöbet sayıları gösterilmez
+    const kol = [['AD SOYAD', 290], ['UNVAN', 140], ['G.GÖREV DURUMU', 300], ['', 50], ['İZİNLER', 130], ['GEÇİCİ GÖREV TARİHLERİ', 330], ['YOLLUK DURUMU', 160]].concat(tah ? [['TAHMİNİ NÖBET', 150]] : []).concat(idB ? [['NÖBET', 170]] : []);
     const W = kol.reduce((a, c) => a + c[1], 0), RH = 32, TH = 56, HH = 52;
     const sepSay = satirlar.filter((s, i) => i > 0 && s.sinif !== satirlar[i - 1].sinif && !s.gelen && !satirlar[i - 1].gelen).length;
     const tmp = document.createElement('canvas').getContext('2d'); tmp.font = '17px "Times New Roman", serif';
@@ -461,7 +474,7 @@
       if (i > 0 && s.sinif !== satirlar[i - 1].sinif && !s.gelen && !satirlar[i - 1].gelen) { x.fillStyle = '#0b2a5b'; x.fillRect(0, y, W, 8); y += 8; }
       if (s.renk) { x.fillStyle = s.renk; x.fillRect(0, y, W, RH); }
       x.fillStyle = '#000'; x.font = '17px "Times New Roman", serif'; cx = 0;
-      const cells = s.hucre.concat(tah ? [s.tahmini === '' ? '' : fmt(s.tahmini)] : []);
+      const cells = s.hucre.concat(tah ? [s.tahmini === '' ? '' : fmt(s.tahmini)] : []).concat(idB ? [s.idari] : []);
       kol.forEach(([t, w], c) => { x.strokeRect(cx + .5, y + .5, w, RH); x.fillText(kes(cells[c], w), cx + 6, y + RH / 2 + 1); cx += w; });
       y += RH;
     });
