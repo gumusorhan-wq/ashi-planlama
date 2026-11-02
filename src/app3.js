@@ -705,6 +705,21 @@
           S.plan.birimler.forEach(b => oner(b.ad)); otoHesapla(); logla('Tüm planlama tek tuşla oluşturuldu', `${gc} geri çağrıldı, ${gv} görevlendirme`); kaydet();
           toast(`Planlama oluşturuldu: ${gc} personel geri çağrıldı, ${gv} görevlendirme yapıldı, nöbetler hesaplandı.`); break;
         }
+        case 'plan-sifirla': {      // bu ayın planını tamamen siler; sayfa "bu ay için plan yok" durumuna döner
+          if (!planlamaRol()) { toast('Planı sıfırlama yetkiniz yok.'); break; }
+          if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur; sıfırlanamaz.' : 'Bu ay kilitli; önce kilidi açın.'); break; }
+          if (!confirm(`${ayEtiket()} planı TAMAMEN silinsin mi?\n\nKişiler, nöbet sayıları, görevlendirmeler, istasyon onayları ve Modül 2 nöbet listeleri silinir. Arşiv ve diğer aylar etkilenmez. Bu işlem geri alınamaz (önce Ayarlar'dan JSON yedeği alabilirsiniz).`)) break;
+          clearTimeout(kaydetZamani); await depo.del(anahtar(S.y, S.m)); S.plan = null; S.planAnahtarlari = (S.planAnahtarlari || []).filter(k => k !== anahtar(S.y, S.m)); S.ist = ''; S.sayfa = 'pano'; S.takipVeri = null; S.asos = null;
+          toast(`${ayEtiket()} planı sıfırlandı.`); break;
+        }
+        case 'tum-sifirla': {      // tüm aylık planlar + arşiv + gerçekleşen nöbet + yükleme günlüğü (ayarlar korunur); yalnız yönetici
+          if (S.rol !== 'yonetici') { toast('Yalnızca yönetici tüm verileri sıfırlayabilir.'); break; }
+          if (!confirm('TÜM aylık planlar, arşiv kayıtları, gerçekleşen nöbet verisi ve yükleme günlüğü silinecek (Ayarlar korunur). Bu işlem geri alınamaz.\n\nDevam edilsin mi?')) break;
+          if ((prompt('Onaylamak için SIFIRLA yazın:') || '').trim().toLocaleUpperCase('tr-TR') !== 'SIFIRLA') { toast('Vazgeçildi.'); break; }
+          clearTimeout(kaydetZamani); const ks = ((await depo.keys()) || []).map(String).filter(k => /^(plan|arsiv|gercek):/.test(k) || k === 'yuklemeler'); for (const k of ks) await depo.del(k);
+          S.plan = null; S.planAnahtarlari = []; S.arsivVeri = null; S.gercekVeri = null; S.yuklemeler = []; S.takipVeri = null; S.ist = ''; S.sayfa = 'pano'; S.asos = null; S.oncePlanBirim = new Map();
+          toast(`${ks.length} kayıt silindi; uygulama sıfırlandı.`); break;
+        }
         case 'oner-hepsi': mut(() => S.plan.birimler.forEach(b => oner(b.ad)), 'Tüm istasyonlarda planlanan önerildi', ''); toast('Planlanan nöbetler önerildi (kilitli olanlar korundu).'); break;
         case 'kisi-ekle': { const ad = prompt('Ad Soyad:'); if (!ad) break; const un = prompt('Ünvan (ör. ATT, DOKTOR, SÜREKLİ İŞÇİ):', 'ATT') || 'ATT'; mut(() => S.plan.kayitlar.push({id: uid(), ad: ad.toLocaleUpperCase('tr-TR'), tc: '', unvan: un, sinif: C.sinifTespit(un) || 'memur', birim: S.ist, durum: '', durumMetin: '', izin: [], planlanan: null, kilit: false, gorev: null, dortB: C.dortB(un), memBas: ''}), 'Kişi eklendi', `${ad} → ${S.ist}`); break; }
         case 'kisi-sil': { const k = kayit(t.dataset.id); if (k && confirm(`${k.ad} kaydı silinsin mi?`)) mut(() => { (S.plan.silinen = S.plan.silinen || []).unshift({...JSON.parse(JSON.stringify(k)), _silZaman: Date.now(), _silBirim: k.birim}); S.plan.silinen.length = Math.min(S.plan.silinen.length, 200); S.plan.kayitlar = S.plan.kayitlar.filter(x => x.id !== k.id); }, 'Kişi silindi', k.ad); break; }
