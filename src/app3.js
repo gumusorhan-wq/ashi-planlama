@@ -443,22 +443,29 @@
   // TAHMİNİ NÖBET = personelin mesai saatinden: memur/doktor "7 Nöbet + 8 Saat" (24 saatlik nöbet + kalan saat), işçi "16 Nöbet" (12 saatlik nöbet). Planlanan nöbet sayısı yazılmaz.
   function excelIstasyonSayfa(b) {
     const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
-    const kis = S.plan.kayitlar.filter(k => (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)) && !gizliKisi(k)).sort((x, y) => trCollator.compare(x.ad, y.ad));
-    const tahmini = k => { const s = sm.get(k.id); if (!s || s.nobetYok || !(s.mesai > 0)) return ''; if (k.sinif === 'isci') return `${Math.floor(s.mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(s.mesai / 24 + 1e-9), sa = Math.round((s.mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
-    const brans = k => { const s = sm.get(k.id), g = s ? s.grup : ''; return k.sinif === 'isci' || g === 'sy' ? 'Sürücü' : g === 'ysp' ? 'ATT / Yrd. Sağlık Personeli' : 'Ekip Şefi'; };
-    const kalanAy = k => { const bit = k.gorev && k.gorev.bit; if (!bit) return ''; const x = (+bit.slice(0, 4)) * 12 + (+bit.slice(5, 7)) - (S.y * 12 + S.m); return x > 0 ? x : 0; };
+    // Yüklenen örnek dosyadaki gibi: kendi kadrosundaki (görevde dışarıda olanlar hariç) ve buraya geçici görevli gelen personel, soyadı sırasıyla
+    const kis = S.plan.kayitlar.filter(k => { if (gizliKisi(k)) return false; const giden = k.birim === b.ad && (D[k.durum] || {}).disarida && k.gorev && (k.gorev.hedef || k.gorev.yer) && k.gorev.hedef !== b.ad; return !giden && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)); }).sort((x, y) => trCollator.compare(x.ad, y.ad));
+    const mesaiK = k => { const s = sm.get(k.id); if (s) return s.nobetYok ? 0 : s.mesai; try { return C.kisiMesai(k, S.y, S.m, ozel(), D); } catch (e) { return 0; } };
+    const tahmini = k => { const mesai = mesaiK(k); if (!(mesai > 0)) return ''; if (isciK(k)) return `${Math.floor(mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
+    const isciK = k => /ISCI/.test(C.TR((k.kadroTur || '') + ' ' + (k.unvan || ''))) || k.sinif === 'isci';
+    const surucuK = k => isciK(k) || /SOFOR|SURUCU/.test(C.TR(k.unvan || ''));
+    const brans = k => {      // işçi / şoför: Sürücü; doktor ve AABT: Ekip Şefi; ATT: ATT / Yrd. Sağlık Personeli (örnek dosyadaki düzen)
+      if (surucuK(k) && !/HIZMETLI/.test(C.TR(k.unvan || ''))) return 'Sürücü';
+      return k.sinif === 'doktor' || C.kadroTip(k) === 'AABT' ? 'Ekip Şefi' : 'ATT / Yrd. Sağlık Personeli';
+    };
     const aoa = [['AD SOYAD', 'UNVAN', 'SRC YETKİSİ', 'KADRO TÜRÜ', 'BRANŞ', 'İZİN (GÜN)', 'TAHMİNİ NÖBET', 'G.GÖREV DURUMU', 'GELDİĞİ/GİTTİĞİ İSTASYON', 'NEDEN', 'KALAN AY', 'YOLLUK DURUMU', 'AÇIKLAMA']];
-    kis.forEach((k, i) => {
-      const gelen = k.birim !== b.ad, giden = !gelen && ((D[k.durum] || {}).disarida) && k.gorev && (k.gorev.hedef || k.gorev.yer), u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
-      aoa.push([k.ad, (k.unvan || '').trim(), /\bSRC\b/.test(u) ? 'EVET' : '', k.sinif === 'isci' ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, giden ? '' : tahmini(k),
-        gelen ? 'GEÇİCİ GÖREVLİ' : giden ? 'GEÇİCİ GÖREVDE' : '', gelen ? `Geldiği istasyon: ${k.birim || 'Tanımsız İstasyon'}` : giden ? `Gittiği istasyon: ${k.gorev.hedef || k.gorev.yer}` : '',
-        (gelen || giden) && k.gorev ? (k.gorev.gerekce || '') : '', gelen || giden ? kalanAy(k) : '', (k.gorev && k.gorev.yolluk) || '', k.aciklama || '']);
+    kis.forEach(k => {
+      const gelen = k.birim !== b.ad, u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
+      aoa.push([k.ad, (k.unvan || '').trim(), /\bSRC\b/.test(u) ? 'EVET' : '', /ISCI/.test(C.TR(k.kadroTur || '')) ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, tahmini(k),
+        gelen ? 'GEÇİCİ GÖREVLİ' : '', gelen ? `Geldiği istasyon: ${k.birim || 'Tanımsız İstasyon'}` : '', '', '', (k.gorev && k.gorev.yolluk) || '', k.aciklama || '']);      // NEDEN ve KALAN AY örnek dosyada boştur; planlama birimi elle doldurur
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [22.8, 14.8, 10.8, 12.8, 22.8, 9.8, 16.8, 16.8, 28, 18.8, 9.8, 12.8, 36].map(wch => ({wch})); return ws;
   }
   function excelToplu() {
-    const wb = XLSX.utils.book_new(), kul = new Set();
-    S.plan.birimler.filter(b => b.tur === 'istasyon').forEach(b => { XLSX.utils.book_append_sheet(wb, excelIstasyonSayfa(b), sheetAd(b.ad, kul)); });
+    const wb = XLSX.utils.book_new(), kul = new Set(), sayfalar = [];
+    S.plan.birimler.forEach(b => { if (b.tur === 'istasyon' || b.tur === 'kkm' || b.tur === 'bashekimlik') sayfalar.push({ad: b.tur === 'bashekimlik' ? 'İL AMBULANS SERVİSİ BAŞHEKİMLİĞİ' : b.ad, ws: excelIstasyonSayfa(b)}); });
+    sayfalar.push({ad: 'Tanımsız İstasyon', ws: XLSX.utils.aoa_to_sheet([['AD SOYAD', 'UNVAN', 'SRC YETKİSİ', 'KADRO TÜRÜ', 'BRANŞ', 'İZİN (GÜN)', 'TAHMİNİ NÖBET', 'G.GÖREV DURUMU', 'GELDİĞİ/GİTTİĞİ İSTASYON', 'NEDEN', 'KALAN AY', 'YOLLUK DURUMU', 'AÇIKLAMA']])});
+    sayfalar.sort((x, y) => trCollator.compare(x.ad, y.ad)).forEach(x => XLSX.utils.book_append_sheet(wb, x.ws, sheetAd(x.ad, kul)));      // sayfa sırası: alfabetik (örnek dosyadaki gibi)
     return wb;
   }
   const xlsxIndir = (wb, ad) => indir(new Blob([XLSX.write(wb, {bookType: 'xlsx', type: 'array'})], {type: 'application/octet-stream'}), ad);
@@ -789,7 +796,7 @@
           ek('Fazla istasyonlar', ['İstasyon', 'Fazla nöbet'], ists.filter(x => x.h.fazlaVar).sort((a, b) => b.h.fazlaEf - a.h.fazlaEf).map(x => [x.b.ad, r1(x.h.fazlaH)]));
           xlsxIndir(wb, `Gorevlendirme-${S.y}-${C.pad(S.m)}.xlsx`); break;
         }
-        case 'excel-ist': { const b = S.plan.birimler.find(x => x.ad === v), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, excelBirimSheet(b), sheetAd(b.ad, new Set())); xlsxIndir(wb, `${b.ad}-${S.y}-${C.pad(S.m)}.xlsx`); break; }
+        case 'excel-ist': { const b = S.plan.birimler.find(x => x.ad === v), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, excelIstasyonSayfa(b), sheetAd(b.tur === 'bashekimlik' ? 'İL AMBULANS SERVİSİ BAŞHEKİMLİĞİ' : b.ad, new Set())); xlsxIndir(wb, `${b.ad}-${S.y}-${C.pad(S.m)}.xlsx`); break; }
         case 'excel-toplu': xlsxIndir(excelToplu(), `ASHI-Planlama-${S.y}-${C.pad(S.m)}.xlsx`); break;
         case 'yedek-al': indir(new Blob([JSON.stringify({surum: VERSION, plan: S.plan})], {type: 'application/json'}), `ashi-planlama-${S.y}-${C.pad(S.m)}.json`); break;
         case 'yedek-yukle': { const f = await dosyaSec('.json', false); if (!f) break; try { const j = JSON.parse(new TextDecoder().decode(await dosyaOku(f))); if (!j.plan || !Array.isArray(j.plan.kayitlar)) throw new Error('Geçersiz yedek'); if (!confirm('Bu ayın planı yedekle değiştirilecek. Devam edilsin mi?')) break; S.plan = j.plan; logla('Yedekten yüklendi'); kaydet(); } catch (er) { toast('Yedek okunamadı: ' + er.message); } break; }
@@ -811,6 +818,10 @@
   root.addEventListener('input', e => {
     const t = e.target;
     if (t && t.id === 'ap-ist-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(); root.querySelectorAll('.ap-pop-ist [data-ara]').forEach(x => { x.style.display = !q || x.dataset.ara.includes(q) ? '' : 'none'; }); return; }
+    if (t && (t.id === 'ap-d-kisi' || t.id === 'ap-d-ist')) {      // İstasyon dışı görevliler: aynı süzgeç, durum yeniden çizimde korunur
+      S.disAra = (root.querySelector('#ap-d-kisi') || {}).value || ''; S.disIst = (root.querySelector('#ap-d-ist') || {}).value || '';
+      const q = C.TR(S.disAra).trim(); root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!S.disIst || r.dataset.kay === S.disIst) ? '' : 'none'; }); return;
+    }
     if (!t || (t.id !== 'ap-g-kisi' && t.id !== 'ap-g-ist')) return;
     const q = C.TR((root.querySelector('#ap-g-kisi') || {}).value || '').trim(), ist = (root.querySelector('#ap-g-ist') || {}).value || '';
     root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!ist || r.dataset.kay === ist || r.dataset.hed === ist) ? '' : 'none'; });
