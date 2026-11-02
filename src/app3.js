@@ -732,6 +732,7 @@
           const l = await opts.veriKaynagi({ay: ayAnahtari(), turler: ['N', 'I']}); if (!l || !l.length) { toast('ASHİ\'den veri gelmedi.'); break; }
           await asosDosyalariIsle(l); return;
         }
+        case 'ist-kmp': S.istKmp = !S.istKmp; break;
         case 'rot-sekme': S.rotSekme = v; break;
         case 'ozet-sekme': S.ozetSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;

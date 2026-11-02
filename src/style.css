@@ -64,7 +64,7 @@ table.ap-t{border-collapse:collapse;width:100%;font-size:13px;background:var(--a
 
 /* İstasyon tablosu: sabit sütun genişlikleri, yana taşma yok */
 .ap-tw-ist{overflow-x:auto}
-table.ap-ist{table-layout:fixed;width:100%;min-width:1380px;font-size:12.5px}
+table.ap-ist{table-layout:fixed;font-size:12.5px}
 .ap-ist th{padding:6px 4px;font-size:11px;white-space:normal;line-height:1.2}
 .ap-ist td{padding:3px 4px;overflow-wrap:anywhere;vertical-align:middle}
 .ap-ist .ap-in,.ap-ist .ap-sel{width:100%;min-width:0;max-width:100%;font-size:12.5px;padding:4px 5px;text-overflow:ellipsis}
@@ -113,3 +113,12 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-ist tr.mes-eksik td:first-child input{color:#b91c1c;font-weight:700}.ap-ist tr.mes-eksik td.fk{color:#b91c1c !important;font-weight:800}
 table.n2l tr.tt td,table.n2l tr.tt th{background:#fbd5d5 !important}
 table.tk td{text-align:center;font-size:12.5px}table.tk td:first-child,table.tk td:nth-child(2){text-align:left;white-space:nowrap}table.tk td.tk-iz{background:rgba(250,204,21,.28)}table.tk td.tk-gr{background:rgba(220,38,38,.16)}table.tk td.tk-bos{background:transparent}
+
+.ap-ist th{white-space:nowrap;padding:8px 6px}.ap-ist td{padding:6px 6px}
+.ap-ist.kmp .gz,.ap-ist.kmp col.gz{display:none}
+.ap-ist th:first-child,.ap-ist td:first-child{position:sticky;left:0;z-index:3;background:var(--ap-card,#fff)}
+.ap-ist th:first-child{background:#e6eff7;z-index:4}.ap-ist tr.c[style*=background] td:first-child{background:inherit}.ap-ist tr.sep td:first-child{background:#0b2a5b}
+.ap-dark .ap-ist th:first-child{background:#1b2a3a}.ap-dark .ap-ist th{white-space:nowrap}
+.ap-ist .ap-sel{font-size:12.5px}.ap-ist td .ap-note{white-space:normal}
+.ap-ist th:first-child,.ap-ist td:first-child{box-shadow:2px 0 0 #cbd5e1}
+.ap-ist th,.ap-ist td{padding-left:5px;padding-right:5px}
