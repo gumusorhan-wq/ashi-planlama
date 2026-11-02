@@ -74,6 +74,7 @@ const NobetCore = (() => {
         const A = new Set(L.filter(x => x.tip === 'surA').map(x => x.gun)), G = new Set(L.filter(x => x.tip === 'surG').map(x => x.gun));
         if (K.isciGece) A.forEach(d => { if (A.has(d + 1) && A.has(d + 2)) ekle('isciGece', 300, d + 2, p.id, `${p.ad}: ${d}., ${d + 1}., ${d + 2}. gün art arda 3 gece`); });
         G.forEach(d => { if (A.has(d - 1)) ekle('dinlenme', 700, d, p.id, `${p.ad}: ${d - 1}. gün gece nöbetinden sonra ${d}. gün gündüz nöbeti (dinlenme yok)`); });
+        if (Math.abs(G.size - A.size) > 1) ekle('gunGece', 120 * (Math.abs(G.size - A.size) - 1), 0, p.id, `${p.ad}: gündüz ${G.size}, gece ${A.size} nöbet (gece / gündüz eşit dağılmalı)`);
       }
       // iki nöbet arası en fazla maxAra gün (izin araya giriyorsa sayılmaz)
       const tum = L.map(x => x.gun).filter((d, i, a) => a.indexOf(d) === i);
@@ -264,7 +265,7 @@ const NobetCore = (() => {
       const gv = new Set(); for (const d of all) { if (gv.has(d)) c += 800; gv.add(d); }          // aynı gün birden fazla nöbet
       g24.sort((a, b) => a - b); for (let k = 1; k < g24.length; k++) if (g24[k] - g24[k - 1] - 1 < K.minAra) c += 700;
       if (K.surGunAsiri) s24.forEach(d => { if (s24.has(d + 2) && s24.has(d + 4)) c += 300; });
-      if (p.isci) { if (K.isciGece) A.forEach(d => { if (A.has(d + 1) && A.has(d + 2)) c += 300; }); G.forEach(d => { if (A.has(d - 1)) c += 700; }); }
+      if (p.isci) { if (K.isciGece) A.forEach(d => { if (A.has(d + 1) && A.has(d + 2)) c += 300; }); G.forEach(d => { if (A.has(d - 1)) c += 700; }); if (Math.abs(G.size - A.size) > 1) c += 120 * (Math.abs(G.size - A.size) - 1); }
       const tum = [...new Set(all)].sort((a, b) => a - b);
       for (let k = 1; k < tum.length; k++) { const bos = tum[k] - tum[k - 1] - 1; if (bos > K.maxAra) { let iz = false; for (let d = tum[k - 1] + 1; d < tum[k]; d++) if (p.izin.has(d)) { iz = true; break; } if (!iz) c += 60 * (bos - K.maxAra); } }
       if (H.ozelSay > 0 && pl.length >= 2) { let oz = 0; for (const s of pl) if (H.ozel[slotD[s]]) oz++; c += ozelCeza(oz, pl.length, H.ozelOran); }
@@ -323,7 +324,7 @@ const NobetCore = (() => {
   }
 
   // Kural ihlalleri: boş yuva, yetenek dışı, izinli kişiye nöbet, aynı gün çift görev, dinlenme, izin öncesi boşluk, gün aşırı sürücü, 3 gece, azami aralık. Bunlar kalmamalıdır (istek ve nöbet sayısı farkı tercihtir; hafta sonu dengesi de kural gibi zorlanır).
-  const SERT = new Set(['eksik', 'yetenek', 'izin', 'cakisma', 'dinlenme', 'izinOnce', 'surGunAsiri', 'isciGece', 'aralik', 'ozelGun']);
+  const SERT = new Set(['eksik', 'yetenek', 'izin', 'cakisma', 'dinlenme', 'izinOnce', 'surGunAsiri', 'isciGece', 'aralik', 'ozelGun', 'gunGece']);
   const sertSay = ihlal => ihlal.filter(i => SERT.has(i.tur)).length;
   const kalite = (son) => sertSay(son.ihlal) * 1e7 + son.toplam;
 

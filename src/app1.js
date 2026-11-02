@@ -72,6 +72,7 @@ function mount(root, opts = {}) {
   async function planYukle() {
     S.plan = (await depo.get(anahtar(S.y, S.m))) || null;
     if (S.plan && guncelAy()) ofUygula(S.plan);
+    try { const py = S.m === 1 ? S.y - 1 : S.y, pm = S.m === 1 ? 12 : S.m - 1, op = await depo.get(anahtar(py, pm)); S.oncePlanBirim = new Map(); ((op && op.kayitlar) || []).forEach(k => { if (k.tc) S.oncePlanBirim.set(k.tc, {birim: k.birim, kadroTarih: k.kadroTarih || ''}); }); } catch (e) { S.oncePlanBirim = new Map(); }
     S.planAnahtarlari = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort();
     if (S.plan && !S.ist) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     if (S.plan && S.ist && !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';

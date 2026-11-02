@@ -311,11 +311,19 @@ const APCore = (() => {
     const kalanGun = Math.ceil((Date.parse(dolum + 'T00:00:00Z') - Date.parse(refIso + 'T00:00:00Z')) / 864e5);
     return {dolum, uygun: kalanGun <= 0, kalanGun, yakinda: kalanGun > 0 && kalanGun <= 92};
   }
+  // Kadro (birim) değişikliği: EKİP listesinde birimi değişen personel, değişiklikten itibaren 1 yıl başka birime görevlendirilemez / rotasyona önerilmez
+  function kadroYilDurum(kadroTarih, refIso) {
+    if (!kadroTarih) return {yok: true, uygun: true};
+    const b = new Date(kadroTarih + 'T00:00:00Z'), dolum = iso(b.getUTCFullYear() + 1, b.getUTCMonth() + 1, b.getUTCDate());
+    return {dolum, uygun: Date.parse(dolum + 'T00:00:00Z') <= Date.parse(refIso + 'T00:00:00Z')};
+  }
   function gorevlendirmeEngeli(k, refIso) {
-    if (!k.dortB) return '';
-    const d = dortYilDurum(k.memBas, refIso);
-    if (d.bilinmiyor) return '';
-    return d.uygun ? '' : `4/B personel 4 yılını doldurmadan görevlendirilemez (dolum: ${d.dolum.split('-').reverse().join('.')})`;
+    if (k.dortB) {
+      const d = dortYilDurum(k.memBas, refIso);
+      if (!d.bilinmiyor && !d.uygun) return `4/B personel 4 yılını doldurmadan görevlendirilemez (dolum: ${d.dolum.split('-').reverse().join('.')})`;
+    }
+    const y = kadroYilDurum(k.kadroTarih, refIso);
+    return y.uygun ? '' : `Kadro değişikliği: 1 yıl dolmadan görevlendirilemez (dolum: ${y.dolum.split('-').reverse().join('.')})`;
   }
 
   // YYYY-AA anahtarları: iki tarih arasındaki aylar (sinirIso'yu aşmaz)
@@ -353,7 +361,7 @@ const APCore = (() => {
     return Math.round(2 * 6371 * Math.asin(Math.sqrt(h)));
   }
 
-  const api = {izinSon, surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
+  const api = {izinSon, surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, kadroYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
     durumAnahtar, sinifTespit, DURUM_VARSAYILAN, OZEL_TUR, RESMI, MESAI, YUVA_VARSAYILAN, ADIM};
   return api;
 })();

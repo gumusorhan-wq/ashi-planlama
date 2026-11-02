@@ -133,4 +133,6 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   assert.strictEqual(gm(11, 'fazla').ihtiyacTur, 'elle'); assert.strictEqual(gm(11, 'fazla').ihtiyacKisi, 0);   // 88 < 90 ama kalan 2 bir kişiye yetmez
   assert.strictEqual(gm(11, 'mesai').ihtiyacTur, 'oner'); assert.strictEqual(gm(10, 'fazla').ihtiyacKisi, 1);   // 80 → 10 açık ≥ 7: 1 kişi
   assert.strictEqual(gm(12, 'mesai').ihtiyacTur, 'icerde'); }
+// kadro değişikliği: 1 yıl görevlendirme engeli
+{ const k = {kadroTarih: '2026-10-01'}; assert.ok(C.gorevlendirmeEngeli(k, '2027-09-30').includes('Kadro değişikliği'), '1 yıl dolmadan engel'); assert.strictEqual(C.gorevlendirmeEngeli(k, '2027-10-01'), '', '1 yıl dolunca engel yok'); assert.strictEqual(C.gorevlendirmeEngeli({}, '2026-11-01'), ''); }
 console.log('çekirdek testleri geçti');

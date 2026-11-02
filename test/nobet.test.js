@@ -38,6 +38,9 @@ const on = N.oneriler(L, girdi, null, 10); assert.ok(on.oneriler.length > 0);
 // hafta sonu / resmî tatil dengesi: eşit adetli 24 saatlik kişilerin özel gün nöbet sayıları birbirine yakın olmalı
 { const H2 = N.hazirla({...girdi, tatil: [2]}); const oz = {}; for (let d = 1; d <= 30; d++) ['es', 'ysp', 'sur'].forEach(s => { const id = r.liste[d][s]; if (id != null && id <= 8) oz[id] = (oz[id] || 0) + (H2.ozel[d] ? 1 : 0); });
   const v = Object.values(oz); assert.ok(Math.max(...v) - Math.min(...v) <= 3, 'hafta sonu dağılımı dengeli olmalı: ' + JSON.stringify(oz)); }
+// işçi gündüz / gece nöbet sayıları eşit (en çok 1 fark)
+{ const H3 = N.hazirla(girdi), dg = {}; for (let d = 1; d <= 30; d++) { const L = r.liste[d]; if (L.surG != null) { (dg[L.surG] = dg[L.surG] || {g: 0, a: 0}).g++; } if (L.surA != null) { (dg[L.surA] = dg[L.surA] || {g: 0, a: 0}).a++; } }
+  Object.entries(dg).forEach(([id, v]) => assert.ok(Math.abs(v.g - v.a) <= 1, 'işçi ' + id + ' gündüz ' + v.g + ' gece ' + v.a)); }
 // zorlama: yetersiz kadroda bile boş yuva ve sert ihlal kalmamalı
 { const az = []; for (let i = 1; i <= 4; i++) az.push(kisi(i, 'ka', 6)); for (let i = 5; i <= 7; i++) az.push(kisi(i, 'ysp', 6)); az.push(kisi(8, 'sy', 5, 0, {izin: [{bas: '2026-11-05', bit: '2026-11-12'}]}));
   const z = N.uret({y: 2026, m: 11, kisiler: az}, {sureMs: 800, deneme: 2, seed: 5, zorlaMs: 4000}); assert.strictEqual(z.sert, 0, 'zorlamayla sert ihlal kalmamalı: ' + JSON.stringify(z.say)); }
