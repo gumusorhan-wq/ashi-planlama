@@ -270,7 +270,7 @@
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && a !== 'modul') return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && !a.startsWith('takip-') && a !== 'modul') return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
@@ -323,6 +323,14 @@
       }
       case 'arsiv-sil': if (planlamaRol() && confirm(`${ayAd(v)} arşivi silinsin mi?`)) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
       case 'arstat-aylar': S.arstatAc = S.arstatAc === 'ayno' && S.arstatAyAc === v ? '' : 'ayno'; S.arstatAyAc = v; break;
+      case 'takip-pop': S.arstatAc = S.arstatAc === 'tk-' + v ? '' : 'tk-' + v; break;
+      case 'takip-yil': { const T = S.takip, y = +v; T.yil = T.yil.includes(y) ? T.yil.filter(x => x !== y) : [...T.yil, y]; break; }
+      case 'takip-ay': { const T = S.takip, m = +v; T.ay = T.ay.includes(m) ? T.ay.filter(x => x !== m) : [...T.ay, m]; break; }
+      case 'takip-ilce': { const T = S.takip, l = istAdlari().filter(x => C.ilceAdi(x) === v), hepsi = l.every(x => T.ist.includes(x)); T.ist = hepsi ? T.ist.filter(x => !l.includes(x)) : [...new Set([...T.ist, ...l])]; break; }
+      case 'takip-temizle': S.takip[v] = []; break;
+      case 'takip-sekme': S.takip.sekme = v; break;
+      case 'takip-yenile': S.takipVeri = null; break;
+      case 'takip-excel': takipExcel(); return true;
       case 'arsiv-ay-sil': if (planlamaRol() && confirm(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`)) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;
       case 'arsiv-ay': { const l = [...new Set(S.arsivSecili || [])]; S.arsivSecili = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
@@ -353,10 +361,13 @@
   async function ekChange(t) {
     const a = t.dataset.act, n = t.dataset.n2;
     if (a === 'arstat-ist') { const l = S.arsivIstler = S.arsivIstler || [], v = t.dataset.v, i = l.indexOf(v); if (t.checked && i < 0) l.push(v); else if (!t.checked && i >= 0) l.splice(i, 1); return true; }
+    if (a === 'takip-ist') { const T = S.takip, v = t.dataset.v; T.ist = t.checked ? [...new Set([...T.ist, v])] : T.ist.filter(x => x !== v); return true; }
+    if (a === 'takip-sadece') { S.takip.sadece = t.checked; return true; }
+    if (a === 'takip-ara') { S.takip.ara = t.value; return true; }
     if (a === 'arsiv-ay') return false;
     if (!n) return false;
     const b = S.plan && n2Birim();
-    if (n === 'teklif') { const b2 = S.plan && n2Birim(); if (!b2 || !n2Duzenlenir(b2.ad)) return false; const id = t.dataset.id, v = t.value === '' ? null : Math.max(0, Math.round(sayi(t.value) * 2) / 2); mut2(() => { const o = n2OnayYaz(b2.ad); if (v == null) delete o.teklif[id]; else o.teklif[id] = v; }); return true; }
+    if (n === 'teklif') { const b2 = S.plan && n2Birim(); if (!b2 || !n2Duzenlenir(b2.ad)) return false; const id = t.dataset.id, v = t.value === '' ? null : Math.max(0, Math.round(sayi(t.value) * 100) / 100); mut2(() => { const o = n2OnayYaz(b2.ad); if (v == null) delete o.teklif[id]; else o.teklif[id] = v; }); return true; }
     if (n === 'ist') { S.n2.ist = t.value; S.n2.oneri = null; return true; }
     if (n === 'kural') { const dp = n2Depo(b.ad), k = t.dataset.k; mut2(() => { dp.kural = {...dp.kural, [k]: t.type === 'checkbox' ? t.checked : Math.max(0, Math.round(sayi(t.value))) }; }, 'Modül 2: kural', `${k}`); return true; }
     if (n === 'hucre') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { dp.liste = dp.liste || NC.bos(NC.gunSayisi(S.y, S.m)); dp.liste[g][tip] = t.value === '' ? null : t.value; }, 'Modül 2: elle değişiklik', `${g}. gün ${tip}`); return true; }

@@ -647,7 +647,7 @@
     e.preventDefault();
     try {
       switch (a) {
-        case 'sayfa': S.sayfa = v; break;
+        case 'sayfa': S.sayfa = v; if (v === 'takip') S.takipVeri = null; break;
         case 'liste-surucu': S.filtre = {q: '', durum: '', birim: '', sinif: 'memur', surucu: 'dogrulanmadi'}; S.pSayfa = 0; S.sayfa = 'personel'; break;
         case 'gorev-sekme': S.gorevSekme = v; break;
         case 'oner-ac': S.onerAc = S.onerAc === v ? '' : v; break;

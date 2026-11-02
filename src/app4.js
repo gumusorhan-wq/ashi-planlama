@@ -211,6 +211,62 @@
       <div class="ap-ilist">${tum.map(a => `<label data-ara="${esc(C.TR(a))}" ${gizle(a, ilceGoster(a)) ? 'style="display:none"' : ''}><input type="checkbox" data-pop data-act="arstat-ist" data-v="${esc(a)}" ${sec.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div>
       <div class="ap-popalt"><span class="ap-note">İlçe düğmesi o ilçenin tüm istasyonlarını seçer / kaldırır</span><button class="ap-btn sm" data-pop data-act="arstat-pop" data-v="">Kapat ✕</button></div></div>` : ''}</div>`;
   }
+  // ---- İzin ve geçici görev takibi: personelin hangi aylarda izin kullandığı / geçici görevlendirildiği (kayıtlı tüm aylık planlardan) ----
+  async function takipYukle() {
+    const anahtarlar = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort(), veri = {};
+    const proje = p => (p.kayitlar || []).map(k => ({a: k.tc || k.ad, ad: k.ad, unvan: k.unvan || '', birim: k.birim || '', izin: (k.izin || []).map(i => ({tur: i.tur, gun: i.gun, bas: i.bas, bit: i.bit})), durum: k.durum || '', durumMetin: k.durumMetin || '', gorev: k.gorev && (k.gorev.hedef || k.gorev.yer) ? {hedef: k.gorev.hedef || '', yer: k.gorev.yer || '', tarih: k.gorev.tarih || ''} : null}));
+    for (const key of anahtarlar) { const p = await depo.get(key); if (p && p.kayitlar) veri[String(key).slice(5)] = proje(p); }
+    if (S.plan) veri[ayAnahtari()] = proje(S.plan);
+    S.takipVeri = veri;
+  }
+  const takipDurum = () => S.takip = S.takip || {yil: [], ay: [], ist: [], sekme: 'izin', ara: '', sadece: true};
+  const takipKisa = a => `${AY_KISA[+a.slice(5) - 1]} ${a.slice(2, 4)}`;
+  function takipHazirla() {
+    const T = takipDurum(), D = durumlar(), veri = S.takipVeri || {}, aylar = Object.keys(veri).sort().filter(a => (!T.yil.length || T.yil.includes(+a.slice(0, 4))) && (!T.ay.length || T.ay.includes(+a.slice(5))));
+    const ara = C.TR(T.ara || '').trim(), kisiler = new Map();
+    aylar.forEach(ay => veri[ay].forEach(r => {
+      if (T.ist.length && !T.ist.includes(r.birim)) return;
+      if (ara && !C.TR(r.ad).includes(ara)) return;
+      const e = kisiler.get(r.a) || {ad: r.ad, unvan: r.unvan, ekip: r.birim, h: {}}; e.ekip = r.birim; e.unvan = r.unvan || e.unvan;
+      // izin: tarihli izinlerin ay içine düşen günleri + tarihsiz gün sayısı; izin sayılan durumlar (rapor, doğum, ücretsiz izin vb.)
+      let n = 0; const tur = new Set();
+      r.izin.forEach(i => { if (i.bas && i.bit) { let c = 0; for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(C.izinSon(i) + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) c++; if (c) { n += c; tur.add(i.tur); } } else if (sayi(i.gun) > 0) { n += sayi(i.gun); tur.add(i.tur); } });
+      const dt = D[r.durum] || {}, durumIzin = r.durum && (dt.nobetYok || dt.mesaiYok) && !dt.disarida && !/AİLE HEK|UZMANLIK|GEÇİCİ/.test(r.durum) ? r.durum : '';
+      const gDurum = (D[r.durum] || {}).disarida || r.gorev;
+      e.h[ay] = {izinGun: n, izinTur: [...tur].filter(Boolean), durumIzin, gorev: r.gorev, gorevVar: !!gDurum, gorevYok: !!gDurum && !r.gorev, durumMetin: r.durumMetin};
+      kisiler.set(r.a, e);
+    }));
+    const satir = [...kisiler.values()].sort((a, b) => trCollator.compare(a.ekip, b.ekip) || trCollator.compare(a.ad, b.ad));
+    const izinVar = h => h && (h.izinGun > 0 || h.durumIzin), gorevVar = h => h && h.gorevVar;
+    return {aylar, satir, izinVar, gorevVar, T};
+  }
+  function takipExcel() {
+    const {aylar, satir, izinVar, gorevVar} = takipHazirla(), wb = XLSX.utils.book_new(), temiz = s => String(s == null ? '' : s);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Ad soyad', 'Ünvan', 'Ekip', ...aylar.map(takipKisa), 'Toplam gün'], ...satir.filter(e => aylar.some(a => izinVar(e.h[a]))).map(e => [e.ad, e.unvan, e.ekip, ...aylar.map(a => { const h = e.h[a]; return izinVar(h) ? (h.izinGun ? h.izinGun + ' gün' + (h.izinTur.length ? ' (' + h.izinTur.join(', ') + ')' : '') : '') + (h.durumIzin ? (h.izinGun ? ' · ' : '') + h.durumIzin : '') : ''; }), aylar.reduce((x, a) => x + ((e.h[a] || {}).izinGun || 0), 0)])]), 'İzin takibi');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Ad soyad', 'Ünvan', 'Ekip', ...aylar.map(takipKisa), 'Görevli ay sayısı'], ...satir.filter(e => aylar.some(a => gorevVar(e.h[a]))).map(e => [e.ad, e.unvan, e.ekip, ...aylar.map(a => { const h = e.h[a]; return gorevVar(h) ? (h.gorev ? temiz(h.gorev.hedef || h.gorev.yer) + (h.gorev.tarih ? ' ' + h.gorev.tarih : '') : (h.durumMetin || 'GEÇİCİ GÖREVDE (yer seçilmedi)')) : ''; }), aylar.filter(a => gorevVar(e.h[a])).length])]), 'Geçici görev takibi');
+    xlsxIndir(wb, `Izin-Gorev-Takibi-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+  function takipHtml() {
+    if (S.rol !== 'yonetici' && S.rol !== 'planlayici') return '<div class="ap-card ap-empty"><h2>Yetki yok</h2><p>İzin / görev takibi yalnızca planlama yetkililerine açıktır.</p></div>';
+    if (S.takipVeri == null) { if (!S.takipYuk) { S.takipYuk = true; takipYukle().then(() => { S.takipYuk = false; render(); }); } return '<div class="ap-card">Aylık planlar okunuyor…</div>'; }
+    const T = takipDurum(), veri = S.takipVeri, tumAylar = Object.keys(veri).sort(), yillar = [...new Set(tumAylar.map(a => +a.slice(0, 4)))].sort((a, b) => b - a);
+    const {aylar, satir, izinVar, gorevVar} = takipHazirla(), izinSekme = T.sekme !== 'gorev', say = izinSekme ? izinVar : gorevVar;
+    const gorunen = T.sadece ? satir.filter(e => aylar.some(a => say(e.h[a]))) : satir;
+    const pop = (anahtar, etiket, icerik) => `<div class="ap-popwrap"><button class="ap-btn" data-pop data-act="takip-pop" data-v="${anahtar}">${etiket} ▾</button>${S.arstatAc === 'tk-' + anahtar ? `<div class="ap-pop" data-pop>${icerik}<div class="ap-popalt"><button class="ap-btn sm" data-pop data-act="takip-temizle" data-v="${anahtar}">Temizle (tümü)</button><button class="ap-btn sm" data-pop data-act="takip-pop" data-v="${anahtar}">Kapat ✕</button></div></div>` : ''}</div>`;
+    const etYil = !T.yil.length ? 'Yıl: tümü' : `Yıl: ${[...T.yil].sort().join(', ')}`, etAy = !T.ay.length ? 'Ay: tümü' : `Ay: ${[...T.ay].sort((a, b) => a - b).map(m => AY_KISA[m - 1]).join(', ')}`;
+    const ist = istAdlari(), gruplar = new Map(); ist.forEach(a => { const k = C.ilceAdi(a), g = gruplar.get(k) || {ad: ilceGoster(a), list: []}; g.list.push(a); gruplar.set(k, g); });
+    const etIst = !T.ist.length ? 'Ekip: tümü' : T.ist.length === 1 ? `Ekip: ${T.ist[0]}` : `Ekip: ${T.ist.length} seçili`;
+    const yilIc = `<div class="ap-aygrid">${yillar.map(y => `<button class="ap-aybtn ${T.yil.includes(y) ? 'sec' : 'mv'}" data-pop data-act="takip-yil" data-v="${y}">${y}</button>`).join('') || '<span class="ap-note">Kayıtlı plan yok</span>'}</div>`;
+    const ayIc = `<div class="ap-aygrid">${AY_KISA.map((ad, i) => `<button class="ap-aybtn ${T.ay.includes(i + 1) ? 'sec' : 'mv'}" data-pop data-act="takip-ay" data-v="${i + 1}">${ad}</button>`).join('')}</div>`;
+    const istIc = `<div class="ap-chips">${[...gruplar.entries()].map(([k, g]) => { const n = g.list.filter(a => T.ist.includes(a)).length; return `<button class="ap-chip ${n === g.list.length ? 'sec' : n ? 'kis' : ''}" data-pop data-act="takip-ilce" data-v="${esc(k)}">${esc(g.ad)} (${g.list.length})</button>`; }).join('')}</div><div class="ap-ilist">${ist.map(a => `<label><input type="checkbox" data-pop data-act="takip-ist" data-v="${esc(a)}" ${T.ist.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div>`;
+    const hucre = (h, e) => { if (!say(h)) return '<td class="tk-bos"></td>'; if (izinSekme) { const t = (h.izinTur || []).join(', '); return `<td class="tk-iz" title="${esc(t || h.durumIzin || '')}">${h.izinGun ? `<b>${h.izinGun}</b> gün` : ''}${h.durumIzin ? `<div class="ap-note">${esc(h.durumIzin)}</div>` : ''}</td>`; } const g = h.gorev; return `<td class="tk-gr" title="${esc(g ? [g.hedef || g.yer, g.tarih].filter(Boolean).join(' ') : (h.durumMetin || 'Yer seçilmedi'))}">${g ? esc((g.hedef || g.yer).replace(/^MANİSA /, '').slice(0, 26)) : h.durumMetin ? `<span class="ap-note">${esc(h.durumMetin.slice(0, 30))}</span>` : '<span class="ap-note">yer yok</span>'}</td>`; };
+    const toplam = e => izinSekme ? aylar.reduce((x, a) => x + ((e.h[a] || {}).izinGun || 0), 0) + ' gün' : aylar.filter(a => gorevVar(e.h[a])).length + ' ay';
+    const tablo = `<div class="ap-tw"><table class="ap-t tk"><thead><tr><th>Ad soyad</th><th>Ekip</th>${aylar.map(a => `<th style="text-align:center">${takipKisa(a)}</th>`).join('')}<th>${izinSekme ? 'Toplam izin' : 'Görevli ay'}</th></tr></thead><tbody>${gorunen.slice(0, 600).map(e => `<tr><td>${esc(e.ad)}</td><td>${esc(e.ekip)}</td>${aylar.map(a => hucre(e.h[a], e)).join('')}<td><b>${toplam(e)}</b></td></tr>`).join('') || `<tr><td colspan="${aylar.length + 3}" class="ap-empty">Seçilen süzgeçlere uyan kayıt yok</td></tr>`}</tbody></table></div>${gorunen.length > 600 ? '<div class="ap-note">İlk 600 kişi gösteriliyor; süzgeçleri daraltın ya da Excel\'e aktarın.</div>' : ''}`;
+    return `<div class="ap-card"><h2>İzin ve geçici görev takibi</h2><p class="ap-note">Kayıtlı aylık planlardan (${tumAylar.length} ay${tumAylar.length ? ': ' + takipKisa(tumAylar[0]) + ' – ' + takipKisa(tumAylar[tumAylar.length - 1]) : ''}) personelin hangi aylarda izin kullandığı ve hangi aylarda geçici görevlendirildiği. Süzgeçlerde çoklu seçim yapılır; boş bırakılırsa tümü.</p>
+      <div class="ap-row">${pop('yil', etYil, yilIc)}${pop('ay', etAy, ayIc)}${pop('ist', etIst, istIc)}<input class="ap-in" data-act="takip-ara" placeholder="Ad ara…" value="${esc(T.ara || '')}"><label class="ap-note"><input type="checkbox" data-act="takip-sadece" ${T.sadece ? 'checked' : ''}> Yalnız kaydı olanlar</label><button class="ap-btn" data-act="takip-yenile" title="Kayıtlı planları yeniden okur">Yenile</button><button class="ap-btn" data-act="takip-excel">Excel'e aktar</button></div></div>
+      <div class="ap-subnav ap-noprint"><button class="${izinSekme ? 'on' : ''}" data-act="takip-sekme" data-v="izin">İzin takibi</button><button class="${izinSekme ? '' : 'on'}" data-act="takip-sekme" data-v="gorev">Geçici görev takibi</button></div>
+      <div class="ap-card"><div class="ap-note" style="margin-bottom:6px">${gorunen.length} kişi · ${aylar.length} ay${izinSekme ? ' · hücre: o ayda kullanılan izin günü (üzerine gelince izin türü)' : ' · hücre: o ay görevlendirildiği yer (üzerine gelince tarih)'}</div>${tablo}</div>`;
+  }
   function arstatHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
     const aylar = [...new Set([...Object.keys(S.arsivVeri), ...Object.keys(S.gercekVeri || {})])].sort();
