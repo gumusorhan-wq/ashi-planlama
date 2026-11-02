@@ -413,19 +413,18 @@
       const gelen = k.birim !== b.ad;
       return {k, gelen, renk: gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), sinif: k.sinif,
         hucre: [k.ad, unvanKisa(k), gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), izinAyGun(k) ? fmt(izinAyGun(k)) : '', izinAyGun(k) ? izinTur(k) : '', gelen ? `${k.birim} NOLU ASHİ ${AYLAR[S.m].toLocaleUpperCase('tr-TR')}` : cikGorev(k), (k.gorev && k.gorev.yolluk) || ''],
-        tahmini: (sm.get(k.id) && !sm.get(k.id).nobetYok && k.planlanan != null) ? k.planlanan : '', idari: idariNobetVar(k) ? 'NÖBET TUTAR' : ''};
+        tahmini: (sm.get(k.id) && !sm.get(k.id).nobetYok && k.planlanan != null) ? k.planlanan : '', idari: idariNobetVar(k) ? 'NÖBET TUTAR' : '', aciklama: k.aciklama || ''};
     });
   }
   function excelBirimSheet(b) {
     const satirlar = birimSatirlari(b), tah = false;      // istasyona giden çıktıda nöbet sayıları gösterilmez
     const idB = b.tur === 'bashekimlik' || b.tur === 'kkm';      // Başhekimlik / KKM çıktısında nöbet tutanlar ayrıca işaretlenir (sayı gösterilmez)
-    const bas = ['AD SOYAD', 'ÜNVAN', 'G.GÖREV DURUMU', '', 'İZİNLER', 'GEÇİCİ GÖREV TARİHLERİ', 'YOLLUK DURUMU'].concat(tah ? ['TAHMİNİ NÖBET'] : []).concat(idB ? ['NÖBET'] : []);
+    const bas = ['AD SOYAD', 'ÜNVAN', 'G.GÖREV DURUMU', '', 'İZİNLER', 'GEÇİCİ GÖREV TARİHLERİ', 'YOLLUK DURUMU'].concat(tah ? ['TAHMİNİ NÖBET'] : []).concat(idB ? ['NÖBET'] : []).concat(['AÇIKLAMA']);
     const aoa = [[b.ad + (b.tur === 'istasyon' ? ' NOLU ASHİ' : '') + (b.ekipOf ? ' — EKİP OF' : '')], bas];
-    satirlar.forEach(s => aoa.push(s.hucre.concat(tah ? [s.tahmini] : []).concat(idB ? [s.idari] : [])));
+    satirlar.forEach(s => aoa.push(s.hucre.concat(tah ? [s.tahmini] : []).concat(idB ? [s.idari] : []).concat([s.aciklama])));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch: 32}, {wch: 16}, {wch: 30}, {wch: 6}, {wch: 14}, {wch: 42}, {wch: 16}, {wch: 14}];
+    ws['!cols'] = [{wch: 32}, {wch: 16}, {wch: 30}, {wch: 6}, {wch: 14}, {wch: 42}, {wch: 16}, {wch: 14}, {wch: 14}, {wch: 40}];
     ws['!merges'] = [{s: {r: 0, c: 0}, e: {r: 0, c: bas.length - 1}}];
-    if (b.aciklama) { const r0 = satirlar.length + 3; XLSX.utils.sheet_add_aoa(ws, [['Açıklama: ' + b.aciklama]], {origin: {r: r0, c: 0}}); ws['!merges'].push({s: {r: r0, c: 0}, e: {r: r0, c: bas.length - 1}}); }
     const sinir = {top: {style: 'thin'}, bottom: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'}};
     for (let c = 0; c < bas.length; c++) { const h = XLSX.utils.encode_cell({r: 1, c}); if (ws[h]) ws[h].s = {font: {bold: true}, border: sinir, fill: {patternType: 'solid', fgColor: {rgb: 'DCE6F1'}}}; }
     if (ws['A1']) ws['A1'].s = {font: {bold: true, sz: 14}, alignment: {horizontal: 'center'}};
@@ -453,7 +452,7 @@
       const gelen = k.birim !== b.ad, giden = !gelen && ((D[k.durum] || {}).disarida) && k.gorev && (k.gorev.hedef || k.gorev.yer), u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
       aoa.push([k.ad, (k.unvan || '').trim(), /\bSRC\b/.test(u) ? 'EVET' : '', k.sinif === 'isci' ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, giden ? '' : tahmini(k),
         gelen ? 'GEÇİCİ GÖREVLİ' : giden ? 'GEÇİCİ GÖREVDE' : '', gelen ? `Geldiği istasyon: ${k.birim || 'Tanımsız İstasyon'}` : giden ? `Gittiği istasyon: ${k.gorev.hedef || k.gorev.yer}` : '',
-        (gelen || giden) && k.gorev ? (k.gorev.gerekce || '') : '', gelen || giden ? kalanAy(k) : '', (k.gorev && k.gorev.yolluk) || '', i === 0 ? (b.aciklama || '') : '']);
+        (gelen || giden) && k.gorev ? (k.gorev.gerekce || '') : '', gelen || giden ? kalanAy(k) : '', (k.gorev && k.gorev.yolluk) || '', k.aciklama || '']);
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [22.8, 14.8, 10.8, 12.8, 22.8, 9.8, 16.8, 16.8, 28, 18.8, 9.8, 12.8, 36].map(wch => ({wch})); return ws;
   }
@@ -466,12 +465,10 @@
 
   function pngCiz(b) {
     const satirlar = birimSatirlari(b), tah = false, idB = b.tur === 'bashekimlik' || b.tur === 'kkm';      // istasyona giden çıktıda nöbet sayıları gösterilmez
-    const kol = [['AD SOYAD', 290], ['UNVAN', 140], ['G.GÖREV DURUMU', 300], ['', 50], ['İZİNLER', 130], ['GEÇİCİ GÖREV TARİHLERİ', 330], ['YOLLUK DURUMU', 160]].concat(tah ? [['TAHMİNİ NÖBET', 150]] : []).concat(idB ? [['NÖBET', 170]] : []);
+    const kol = [['AD SOYAD', 290], ['UNVAN', 140], ['G.GÖREV DURUMU', 300], ['', 50], ['İZİNLER', 130], ['GEÇİCİ GÖREV TARİHLERİ', 330], ['YOLLUK DURUMU', 160]].concat(tah ? [['TAHMİNİ NÖBET', 150]] : []).concat(idB ? [['NÖBET', 170]] : []).concat([['AÇIKLAMA', 300]]);
     const W = kol.reduce((a, c) => a + c[1], 0), RH = 32, TH = 56, HH = 52;
     const sepSay = satirlar.filter((s, i) => i > 0 && s.sinif !== satirlar[i - 1].sinif && !s.gelen && !satirlar[i - 1].gelen).length;
-    const tmp = document.createElement('canvas').getContext('2d'); tmp.font = '17px "Times New Roman", serif';
-    const acik = []; if (b.aciklama) { String(b.aciklama).split(/\n/).forEach(par => { let satir = ''; par.split(/\s+/).forEach(w => { const dene = satir ? satir + ' ' + w : w; if (tmp.measureText('Açıklama: ' + dene).width > W - 24 && satir) { acik.push(satir); satir = w; } else satir = dene; }); acik.push(satir); }); acik[0] = 'Açıklama: ' + acik[0]; }
-    const AH = acik.length ? acik.length * 26 + 18 : 0;
+    const AH = 0;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = TH + HH + satirlar.length * RH + sepSay * 8 + 4 + AH;
     const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height);
     x.strokeStyle = '#000'; x.lineWidth = 1; x.textBaseline = 'middle';
@@ -485,11 +482,10 @@
       if (i > 0 && s.sinif !== satirlar[i - 1].sinif && !s.gelen && !satirlar[i - 1].gelen) { x.fillStyle = '#0b2a5b'; x.fillRect(0, y, W, 8); y += 8; }
       if (s.renk) { x.fillStyle = s.renk; x.fillRect(0, y, W, RH); }
       x.fillStyle = '#000'; x.font = '17px "Times New Roman", serif'; cx = 0;
-      const cells = s.hucre.concat(tah ? [s.tahmini === '' ? '' : fmt(s.tahmini)] : []).concat(idB ? [s.idari] : []);
+      const cells = s.hucre.concat(tah ? [s.tahmini === '' ? '' : fmt(s.tahmini)] : []).concat(idB ? [s.idari] : []).concat([s.aciklama]);
       kol.forEach(([t, w], c) => { x.strokeRect(cx + .5, y + .5, w, RH); x.fillText(kes(cells[c], w), cx + 6, y + RH / 2 + 1); cx += w; });
       y += RH;
     });
-    if (acik.length) { x.fillStyle = '#000'; x.font = 'italic 17px "Times New Roman", serif'; acik.forEach((t, i) => x.fillText(t, 8, y + 22 + i * 26)); }
     return cv;
   }
 
@@ -607,6 +603,7 @@
       case 'izinGun': { const n = sayi(v); mut(() => { k.izin = k.izin || []; if (n > 0) { if (k.izin[0]) k.izin[0].gun = n; else k.izin.push({gun: n, tur: 'YILLIK İZİN'}); } else k.izin = []; }, 'İzin değişti', `${k.ad}: ${n} gün`); break; }
       case 'izinTur': mut(() => { if (!k.izin || !k.izin[0]) k.izin = [{gun: 0, tur: v}]; else k.izin[0].tur = v; }, 'İzin türü', `${k.ad}: ${v}`); break;
       case 'planlanan': S.toplu = true; try { mut(() => { k.planlanan = v === '' ? null : sayi(v); k.kilit = v !== ''; }, 'Planlanan nöbet (elle)', `${k.ad}: ${v}`); } finally { S.toplu = false; } break;      // elle değişiklikte diğer kişilerin değerleri yeniden hesaplanmaz
+      case 'aciklama': S.toplu = true; try { mut(() => { k.aciklama = String(v || '').trim(); }, 'Kişi açıklaması', `${k.ad}: ${k.aciklama}`); } finally { S.toplu = false; } break;
       case 'kilit': mut(() => { k.kilit = !!v; }, v ? 'Kilitlendi' : 'Kilit açıldı', k.ad); break;
       case 'yolluk': mut(() => { k.gorev = k.gorev || {yer: '', hedef: null, kaynak: 'manuel', yolluk: '', tarih: '', gerekce: ''}; k.gorev.yolluk = v; }, 'Yolluk durumu', `${k.ad}: ${v}`); break;
       case 'gTarih': mut(() => { k.gorev.tarih = v; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${v}`); break;
@@ -825,7 +822,6 @@
       if (t.dataset.id && t.dataset.f) { const v = t.type === 'checkbox' ? t.checked : t.value; setField(t.dataset.id, t.dataset.f, v); render(); return; }
       if (t.dataset.d) { if (S.rol !== 'yonetici') return; const d = S.ayar.durumlar[t.dataset.d]; d[t.dataset.f] = t.type === 'checkbox' ? t.checked : t.value; await ayarKaydet(); otoHesapla(); kaydet(); render(); return; }
       if (t.dataset.rb) { const b = S.plan.birimler.find(x => x.ad === t.dataset.rb); if (b) mut(() => { b.cikisKota = t.value === '' ? null : Math.max(0, Math.round(sayi(t.value))); }, 'Rotasyon kotası', `${b.ad}: ${b.cikisKota === null ? 'otomatik' : b.cikisKota}`); render(); return; }
-      if (t.dataset.iac) { const b = S.plan.birimler.find(x => x.ad === t.dataset.iac); if (b) { S.toplu = true; try { mut(() => { b.aciklama = t.value.trim(); }, 'İstasyon açıklaması', b.ad); } finally { S.toplu = false; } } render(); return; }
       if (t.dataset.ib) { const b = S.plan.birimler.find(x => x.ad === t.dataset.ib); if (b) mut(() => { b.azamiMemur = t.value === '' ? null : Math.max(0, sayi(t.value)); }, 'İstasyon azami nöbeti', `${b.ad}: ${b.azamiMemur === null ? 'genel' : b.azamiMemur}`); render(); return; }
       if (t.hasAttribute('data-pano-azami')) { if (salt()) return; S.ayar.azamiMemur = Math.max(0, sayi(t.value)) || S.ayar.azamiMemur; await ayarKaydet(); otoHesapla(); kaydet(); render(); return; }
       if (t.dataset.ay) { if (S.rol !== 'yonetici') return; { const v = sayi(t.value), an = t.dataset.ay; S.ayar[an] = an === 'isciEk' ? Math.max(0, Math.round(v)) : (an === 'surEsik' || an === 'surDegilEsik') ? Math.min(100, Math.max(0, v)) : (v || (an === 'azamiMemur' ? 8 : 11)); } await ayarKaydet(); otoHesapla(); kaydet(); render(); return; }

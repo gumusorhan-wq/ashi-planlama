@@ -64,7 +64,7 @@ table.ap-t{border-collapse:collapse;width:100%;font-size:13px;background:var(--a
 
 /* İstasyon tablosu: sabit sütun genişlikleri, yana taşma yok */
 .ap-tw-ist{overflow-x:auto}
-table.ap-ist{table-layout:fixed;width:100%;min-width:1240px;font-size:12.5px}
+table.ap-ist{table-layout:fixed;width:100%;min-width:1380px;font-size:12.5px}
 .ap-ist th{padding:6px 4px;font-size:11px;white-space:normal;line-height:1.2}
 .ap-ist td{padding:3px 4px;overflow-wrap:anywhere;vertical-align:middle}
 .ap-ist .ap-in,.ap-ist .ap-sel{width:100%;min-width:0;max-width:100%;font-size:12.5px;padding:4px 5px;text-overflow:ellipsis}
