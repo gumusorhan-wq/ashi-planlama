@@ -371,6 +371,13 @@
     if (!S.plan) return bosHtml();
     return ({pano: panoHtml, ist: istHtml, gorev: gorevHtml, personel: personelHtml, ozel: ozelHtml, stat: statHtml, talep: talepHtml, log: logHtml, ayar: ayarHtml, arsiv: arsivHtml, arstat: arstatHtml, takip: takipHtml}[S.sayfa] || panoHtml)();
   }
+  // Plan kutusunda Enter: değer kaydedilir ve odak alt satırın plan kutusuna geçer
+  const PLAN_KUTU = 'input[data-f=planlanan], input[data-n2=teklif]';
+  function odakUygula() {
+    if (S.odakSonraki == null) return;
+    const l = root.querySelectorAll(PLAN_KUTU), i = S.odakSonraki; S.odakSonraki = null;
+    const h = l[i] || l[l.length - 1]; if (h) { h.focus({preventScroll: false}); try { h.select(); } catch (e) {} }
+  }
   function render() {
     const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0;
     const koyu = S.ayar && (S.ayar.tema === 'koyu' || (S.ayar.tema === 'sistem' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
@@ -391,4 +398,5 @@
     toastCiz();
     const tw2 = root.querySelector('.ap-tw'); if (tw2) { tw2.scrollLeft = sl; tw2.scrollTop = st; }
     window.scrollTo(0, sy);
+    odakUygula();
   }

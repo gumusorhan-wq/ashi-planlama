@@ -764,6 +764,12 @@
   });
   // Açık seçim penceresi (aylar / istasyonlar): boşluğa tıklayınca ya da Esc ile kapanır
   document.addEventListener('click', e => { if (S.arstatAc && root.isConnected && !e.target.closest('[data-pop],.ap-pop')) { S.arstatAc = ''; render(); } }, true);
+  root.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !e.target.matches || !e.target.matches(PLAN_KUTU)) return;
+    e.preventDefault(); const l = [...root.querySelectorAll(PLAN_KUTU)], i = l.indexOf(e.target); if (i < 0) return;
+    S.odakSonraki = i + 1; e.target.blur();      // değişiklik varsa change olayı kaydeder ve yeniden çizer; çizim sonunda odak alt satıra geçer
+    setTimeout(odakUygula, 120);                  // değişiklik yoksa çizim olmaz; odak yine geçer
+  });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.arstatAc) { S.arstatAc = ''; render(); } });
   // Görevlendirmeler listesini yazdıkça süz (yeniden çizmeden)
   root.addEventListener('input', e => {
