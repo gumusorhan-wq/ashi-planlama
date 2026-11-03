@@ -123,3 +123,6 @@ table.tk td{text-align:center;font-size:12.5px}table.tk td:first-child,table.tk 
 .ap-ist th:first-child,.ap-ist td:first-child{box-shadow:2px 0 0 #cbd5e1}
 .ap-ist th,.ap-ist td{padding-left:5px;padding-right:5px}
 .ap-toolbar .ap-btn{padding:5px 11px;font-size:13px}.ap-toolbar .ap-in.n{width:54px;padding:4px 6px}
+/* İzin açıklaması: izin günü ve izin türü kutularının altında, iki sütun boyunca tek satır */
+.ap-ist td.iz-g,.ap-ist td.iz-t{vertical-align:top}
+.ap-ist td .ap-note.iz-not{white-space:nowrap;width:max-content;position:relative;z-index:1;margin-top:3px;overflow-wrap:normal}
