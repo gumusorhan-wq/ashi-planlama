@@ -785,7 +785,7 @@
         case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); break; }
         case 'og-ekle': { const d = root.querySelector('#ap-og-t').value, tur = root.querySelector('#ap-og-tur').value; if (!d) { toast('Tarih seçin.'); break; } mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break; }
         case 'og-sil': mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
-        case 'liste': { const i = v.indexOf(':'), t = v.slice(0, i), d = v.slice(i + 1); S.filtre = {q: '', durum: t === 'durum' ? d : '', birim: '', sinif: t === 'sinif' ? d : '', ozel: t === 'ozel' ? d : '', ozelAd: t.dataset.ad || ''}; S.pSayfa = 0; S.sayfa = 'personel'; break; }
+        case 'liste': { const i = v.indexOf(':'), tip = v.slice(0, i), d = v.slice(i + 1), ozelAd = t.dataset.ad || ''; S.filtre = {q: '', durum: tip === 'durum' ? d : '', birim: '', sinif: tip === 'sinif' ? d : '', ozel: tip === 'ozel' ? d : '', ozelAd}; S.pSayfa = 0; S.sayfa = 'personel'; break; }
         case 'f-ozel-sil': S.filtre = {...S.filtre, ozel: '', ozelAd: ''}; S.pSayfa = 0; break;
         case 'plan-bos': S.plan = bosPlan(); logla('Boş plan oluşturuldu'); kaydet(); S.sayfa = 'ist'; break;
         case 'plan-kopya': {
