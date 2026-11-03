@@ -96,11 +96,11 @@
     const H = rows[hi].map(C.TR), ix = re => H.findIndex(h => re.test(h));
     // İki biçim: eski "İzin Talepleri Raporu" (Adı Soyadı, yalnız bitiş) ve "İzin ve Rapor Bilgileri" (TC, Adı + Soyadı, başlangıç + bitiş)
     const adI = ix(/^ADI SOYADI$/), ad1 = ix(/^ADI$/), soI = ix(/^SOYADI$/), tcI = ix(/^(T\.?C\.? KIMLIK NO|TC KIMLIK NO|TCKN|T\.?C\.? NO)$/);
-    const unI = ix(/^UNVAN$/), kuI = ix(/^CALISTIGI KURUM$/), tuI = ix(/^IZIN TURU$/), basI = ix(/^TALEP EDILEN IZIN BASLANGIC/), biI = ix(/^TALEP EDILEN IZIN BITIS/), guI = ix(/^TALEP EDILEN IZIN GUN/), duI = ix(/^TALEP DURUMU$/);
+    const unI = ix(/^UNVAN$/), kuI = ix(/^CALISTIGI KURUM$/), tuI = ix(/^IZIN TURU$/), basI = ix(/^TALEP EDILEN IZIN BASLANGIC/), biI = ix(/^TALEP EDILEN IZIN BITIS/), guI = ix(/^TALEP EDILEN IZIN GUN/), duI = ix(/^TALEP DURUMU$/), isI = ix(/^ISE BASLAMA TARIHI/);
     const out = []; rows.slice(hi + 1).forEach(r => {
       const ad = (adI >= 0 ? String(r[adI] || '') : `${ad1 >= 0 ? r[ad1] || '' : ''} ${soI >= 0 ? r[soI] || '' : ''}`).trim(); const bit = C.tarihIso(r[biI]); if (!ad || !bit) return;
       const bas = basI >= 0 ? C.tarihIso(r[basI]) : '';
-      out.push({tur: 'T', tc: tcI >= 0 ? String(r[tcI] || '').replace(/\D/g, '') : '', ad: ad.toLocaleUpperCase('tr-TR').replace(/\s+/g, ' '), unvan: String(r[unI] || '').trim(), kurum: String(r[kuI] || '').trim(), izinTur: String(r[tuI] || '').trim() || 'Yıllık İzin', bas: bas && bas <= bit ? bas : '', bit, gun: Math.max(1, Math.round(sayi(r[guI]) || 1)), durum: String(r[duI] || '').trim()});
+      out.push({tur: 'T', tc: tcI >= 0 ? String(r[tcI] || '').replace(/\D/g, '') : '', ad: ad.toLocaleUpperCase('tr-TR').replace(/\s+/g, ' '), unvan: String(r[unI] || '').trim(), kurum: String(r[kuI] || '').trim(), izinTur: String(r[tuI] || '').trim() || 'Yıllık İzin', bas: bas && bas <= bit ? bas : '', bit, gun: Math.max(1, Math.round(sayi(r[guI]) || 1)), durum: String(r[duI] || '').trim(), donus: isI >= 0 ? C.tarihIso(r[isI]) : ''});
     });
     return out;
   }
@@ -292,7 +292,7 @@
         if (r.bas ? (r.bit < ilk || bas > son) : (r.bit < pencereBas || bas > pencereSon)) { rp.talep.pencereDisi++; return; }
         const cakisan = (k.izin || []).some(i => i.bas && i.bit && i.bas <= r.bit && C.izinSon(i) >= bas);
         if (cakisan) { rp.talep.tekrar++; return; }
-        (k.izin = k.izin || []).push({tur: 'YILLIK İZİN', gun: r.gun, bas, bit: r.bit, talep: true, talepDurum: r.durum}); rp.talep.eklenen++; eklenenKisi.add(k.id);
+        (k.izin = k.izin || []).push({tur: 'YILLIK İZİN', gun: r.gun, bas, bit: r.bit, talep: true, talepDurum: r.durum, donus: r.donus || undefined}); rp.talep.eklenen++; eklenenKisi.add(k.id);
       });
       rp.kisi = kisiler.size; rp.talep.kisiEklenen = eklenenKisi.size; rp.talep.eslesmeyen = [...eslesmeyen].sort(trCollator.compare);
       return rp;

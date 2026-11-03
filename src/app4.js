@@ -219,7 +219,7 @@
     if (S.plan) veri[ayAnahtari()] = proje(S.plan);
     S.takipVeri = veri;
   }
-  const takipDurum = () => S.takip = S.takip || {yil: [S.y], ay: [S.m], ist: [], sekme: 'izin', ara: '', sadece: true};   // açılışta seçili planın yılı ve ayı (temizlenince tümü)
+  const takipDurum = () => S.takip = S.takip || {yil: [S.y], ay: [], ist: [], sekme: 'izin', ara: '', sadece: true};   // açılışta seçili planın yılı, tüm aylar (izin ve geçici görev)
   const takipKisa = a => `${AY_KISA[+a.slice(5) - 1]} ${a.slice(2, 4)}`;
   function takipHazirla() {
     const T = takipDurum(), D = durumlar(), veri = S.takipVeri || {}, aylar = Object.keys(veri).sort().filter(a => (!T.yil.length || T.yil.includes(+a.slice(0, 4))) && (!T.ay.length || T.ay.includes(+a.slice(5))));
@@ -253,7 +253,7 @@
     const T = takipDurum(), veri = S.takipVeri, tumAylar = Object.keys(veri).sort(), yillar = [...new Set(tumAylar.map(a => +a.slice(0, 4)))].sort((a, b) => b - a);
     const {aylar, satir, izinVar, gorevVar} = takipHazirla(), izinSekme = T.sekme !== 'gorev', say = izinSekme ? izinVar : gorevVar;
     const gorunen = T.sadece ? satir.filter(e => aylar.some(a => say(e.h[a]))) : satir;
-    const pop = (anahtar, etiket, icerik) => `<div class="ap-popwrap"><button class="ap-btn" data-pop data-act="takip-pop" data-v="${anahtar}">${etiket} ▾</button>${S.arstatAc === 'tk-' + anahtar ? `<div class="ap-pop" data-pop>${icerik}<div class="ap-popalt"><button class="ap-btn sm" data-pop data-act="takip-temizle" data-v="${anahtar}">Temizle (tümü)</button><button class="ap-btn sm" data-pop data-act="takip-pop" data-v="${anahtar}">Kapat ✕</button></div></div>` : ''}</div>`;
+    const pop = (anahtar, etiket, icerik) => `<div class="ap-popwrap"><button class="ap-btn" data-pop data-act="takip-pop" data-v="${anahtar}">${etiket} ▾</button>${S.arstatAc === 'tk-' + anahtar ? `<div class="ap-pop" data-pop>${icerik}<div class="ap-popalt">${anahtar === 'ay' || anahtar === 'yil' ? `<button class="ap-btn sm" data-pop data-act="takip-tumu" data-v="${anahtar}">Tümünü seç</button>` : ''}<button class="ap-btn sm" data-pop data-act="takip-temizle" data-v="${anahtar}">Temizle (tümü)</button><button class="ap-btn sm" data-pop data-act="takip-pop" data-v="${anahtar}">Kapat ✕</button></div></div>` : ''}</div>`;
     const etYil = !T.yil.length ? 'Yıl: tümü' : `Yıl: ${[...T.yil].sort().join(', ')}`, etAy = !T.ay.length ? 'Ay: tümü' : `Ay: ${[...T.ay].sort((a, b) => a - b).map(m => AY_KISA[m - 1]).join(', ')}`;
     const ist = istAdlari(), gruplar = new Map(); ist.forEach(a => { const k = C.ilceAdi(a), g = gruplar.get(k) || {ad: ilceGoster(a), list: []}; g.list.push(a); gruplar.set(k, g); });
     const etIst = !T.ist.length ? 'Ekip: tümü' : T.ist.length === 1 ? `Ekip: ${T.ist[0]}` : `Ekip: ${T.ist.length} seçili`;

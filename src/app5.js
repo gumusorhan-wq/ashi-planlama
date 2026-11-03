@@ -2,7 +2,7 @@
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
   const N2_SEKME = [['plan', 'Planlama'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
-  const IHLAL_AD = {eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği', gunGece: 'İşçi gündüz / gece dengesizliği'};
+  const IHLAL_AD = {donus: 'İzin / rapor dönüşü nöbetsiz', eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği', gunGece: 'İşçi gündüz / gece dengesizliği'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
   // İstasyon sorumlusu, planlama onaylanmadan (Kesinleştir / Ayı kilitle) kendi istasyonunun planlamasını ve nöbet listesi araçlarını göremez
   const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
@@ -155,15 +155,17 @@
     const hata = new Map(); d.ihlal.forEach(i => { const a = `${i.gun}|${i.kisi == null ? '' : i.kisi}`; hata.set(a, (hata.get(a) || '') + i.mesaj + '\n'); if (i.yuva) hata.set(`${i.gun}||${i.yuva}`, i.mesaj); });
     const secenek = (yuva, tip, sec) => `<option value=""></option>` + ks.filter(k => (k.grup === 'isci') === (tip === 'surG' || tip === 'surA') && NC.YETENEK[k.grup].includes(yuva)).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
     const hucre = (gun, tip) => { const yuva = tip === 'surG' || tip === 'surA' ? 'sur' : tip, id = L[gun][tip], e = (id != null && hata.get(`${gun}|${id}`)) || (id == null && hata.get(`${gun}||${yuva}`) && (tip === 'sur' || tip === 'es' || tip === 'ysp') ? 'Boş' : '');
-      return `<td class="${e ? 'n2e' : ''}" title="${esc(e)}"><select class="ap-sel n2s" data-n2="hucre" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'}>${secenek(yuva, tip, id)}</select></td>`; };
+      const bl = L[gun].bol && L[gun].bol[tip];
+      const bolHtml = bl ? `<div class="ap-note n2bol" title="İzin / rapor dönüşü: aynı gün dönen iki kişi bu nöbeti böler (saatine göre kısmi nöbet sayılır)">+ ${esc(n2Ad(G, bl.id))} <select class="ap-sel" data-n2="bol" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'}>${[[12, '12/12'], [8, '16/8 (sonra 8 sa)'], [16, '8/16 (sonra 16 sa)'], ['', 'bölmeyi kaldır']].map(([v, t]) => `<option value="${v}" ${String(v) === String(bl.saat) ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : '';
+      return `<td class="${e ? 'n2e' : ''}" title="${esc(e)}"><select class="ap-sel n2s" data-n2="hucre" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'}>${secenek(yuva, tip, id)}</select>${bolHtml}</td>`; };
     const sat = [...Array(N)].map((_, i) => { const g = i + 1, w = new Date(Date.UTC(S.y, S.m - 1, g)).getUTCDay(); return `<tr class="${w === 0 || w === 6 ? 'hs' : ''} ${(G.girdi.tatil || []).includes(g) ? 'tt' : ''}"><td class="num">${g}</td><td>${GUN_AD[w]}</td>${hucre(g, 'es')}${hucre(g, 'ysp')}${hucre(g, 'sur')}${ks.some(k => k.grup === 'isci') ? hucre(g, 'surG') + hucre(g, 'surA') : ''}</tr>`; }).join('');
-    const sayim = ks.map(k => { let a = 0, y = 0; for (let g = 1; g <= N; g++) ['es', 'ysp', 'sur'].forEach(t => { if (L[g][t] === k.id) a++; }); for (let g = 1; g <= N; g++) ['surG', 'surA'].forEach(t => { if (L[g][t] === k.id) y++; }); return {k, birim: a + y / 2, hedef: (k.adet || 0) + (k.yarim || 0) / 2}; });
+    const sayim = ks.map(k => { let a = 0, y = 0; for (let g = 1; g <= N; g++) { const B = L[g].bol || {}; ['es', 'ysp', 'sur'].forEach(t => { if (L[g][t] === k.id) a += B[t] ? (24 - B[t].saat) / 24 : 1; if (B[t] && B[t].id === k.id) a += B[t].saat / 24; }); } for (let g = 1; g <= N; g++) ['surG', 'surA'].forEach(t => { if (L[g][t] === k.id) y++; }); return {k, birim: Math.round((a + y / 2) * 100) / 100, hedef: (k.adet || 0) + (k.yarim || 0) / 2}; });
     const ozetIh = Object.entries(d.say).filter(([t]) => t !== 'adet').map(([t, n]) => `${IHLAL_AD[t]}: <b>${n}</b>`).join(' · ');
     const kisiGoruntu = S.n2.gorunum === 'kisi';
     const kisiTablo = () => {
       const bas = [...Array(N)].map((_, i) => `<th class="n2d">${i + 1}</th>`).join('');
       return `<div class="ap-tw"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}<th>Liste</th><th>Hedef</th></tr></thead><tbody>${sayim.map(({k, birim, hedef}) => {
-        const p = H.byId.get(k.id), c = [...Array(N)].map((_, i) => { const g = i + 1; let x = ''; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (L[g][t] === k.id) x = NC.KOD[t]; }); return `<td class="n2c ${x ? 'nb' : p.izin.has(g) ? 'iz' : p.istek.has(g) ? 'is' : ''}">${x || (p.izin.has(g) ? 'İ' : p.istek.has(g) ? '✕' : '')}</td>`; }).join('');
+        const p = H.byId.get(k.id), c = [...Array(N)].map((_, i) => { const g = i + 1; let x = ''; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (L[g][t] === k.id) x = NC.KOD[t] + (L[g].bol && L[g].bol[t] ? '½' : ''); if (L[g].bol && L[g].bol[t] && L[g].bol[t].id === k.id) x = NC.KOD[t] + '½'; }); return `<td class="n2c ${x ? 'nb' : p.izin.has(g) ? 'iz' : p.istek.has(g) ? 'is' : ''}">${x || (p.izin.has(g) ? 'İ' : p.istek.has(g) ? '✕' : '')}</td>`; }).join('');
         return `<tr><td class="n2n">${esc(k.ad)}</td>${c}<td class="num"><b>${fmt(birim)}</b></td><td class="num ${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(hedef)}</td></tr>`; }).join('')}</tbody></table></div><p class="ap-note">E: ekip şefi · Y: YSP · S: sürücü (24 sa.) · G: sürücü gündüz · A: sürücü gece (12 sa. işçi)</p>`; };
     const lSek = [['liste', 'Nöbet listesi'], ['kisi', 'Kişi başına nöbet']], la = lSek.some(x => x[0] === S.n2.altSekme) ? S.n2.altSekme : 'liste';
     const lNav = `<div class="ap-subnav ap-noprint">${lSek.map(([v, t]) => `<button class="${la === v ? 'on' : ''}" data-act="n2-alt" data-v="${v}">${t}</button>`).join('')}</div>`;
@@ -211,7 +213,8 @@
   function n2Excel(b) {
     const {G, H, L} = n2Deneti(b), N = H.N, wb = XLSX.utils.book_new(), ad = id => (id == null ? '' : n2Ad(G, id));
     const g = [['Gün', 'Tarih', 'Ekip şefi', 'YSP', 'Sürücü (24 sa.)', 'Sürücü gündüz', 'Sürücü gece']];
-    for (let i = 1; i <= N; i++) g.push([i, `${C.pad(i)}.${C.pad(S.m)}.${S.y}`, ad(L[i].es), ad(L[i].ysp), ad(L[i].sur), ad(L[i].surG), ad(L[i].surA)]);
+    const hc = (i, t) => { const b = L[i].bol && L[i].bol[t]; return b ? `${ad(L[i][t])} (${24 - b.saat} sa) / ${ad(b.id)} (${b.saat} sa)` : ad(L[i][t]); };
+    for (let i = 1; i <= N; i++) g.push([i, `${C.pad(i)}.${C.pad(S.m)}.${S.y}`, hc(i, 'es'), hc(i, 'ysp'), hc(i, 'sur'), ad(L[i].surG), ad(L[i].surA)]);
     // hafta sonu: turuncu, resmî tatil / bayram: kırmızı tonu (hem gün listesinde hem kişi listesinde)
     const tatil = new Set(G.girdi.tatil || []), renk = d => tatil.has(d) ? 'F8B4B4' : (H.ozel[d] ? 'FDD9A0' : null);
     const boya = (ws, r, c1, c2, rgb) => { for (let c = c1; c <= c2; c++) { const a = XLSX.utils.encode_cell({r, c}); if (!ws[a]) ws[a] = {t: 's', v: ''}; ws[a].s = {fill: {patternType: 'solid', fgColor: {rgb}}}; } };
@@ -219,7 +222,7 @@
     XLSX.utils.sheet_add_aoa(wsG, [['Renkler: turuncu = hafta sonu · kırmızı = resmî tatil / bayram']], {origin: {r: N + 2, c: 0}});
     XLSX.utils.book_append_sheet(wb, wsG, 'Gün listesi');
     const k = [['Personel', ...[...Array(N)].map((_, i) => i + 1), 'Toplam']];
-    G.girdi.kisiler.forEach(p => { const r = [p.ad]; let t = 0; for (let i = 1; i <= N; i++) { let x = ''; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(s => { if (L[i][s] === p.id) { x = NC.KOD[s]; t += s === 'surG' || s === 'surA' ? .5 : 1; } }); r.push(x); } r.push(t); k.push(r); });
+    G.girdi.kisiler.forEach(p => { const r = [p.ad]; let t = 0; for (let i = 1; i <= N; i++) { let x = ''; const B = L[i].bol || {}; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(s => { if (L[i][s] === p.id) { x = NC.KOD[s] + (B[s] ? '½' : ''); t += s === 'surG' || s === 'surA' ? .5 : B[s] ? (24 - B[s].saat) / 24 : 1; } if (B[s] && B[s].id === p.id) { x = NC.KOD[s] + '½'; t += B[s].saat / 24; } }); r.push(x); } r.push(Math.round(t * 100) / 100); k.push(r); });
     const wsK = XLSX.utils.aoa_to_sheet(k); for (let d = 1; d <= N; d++) { const rg = renk(d); if (rg) boya(wsK, 0, d, d, rg), k.forEach((_, ri) => { if (ri) boya(wsK, ri, d, d, rg); }); }
     XLSX.utils.book_append_sheet(wb, wsK, 'Kişi listesi');
     xlsxIndir(wb, `${b.ad}-Nobet-Listesi-${S.y}-${C.pad(S.m)}.xlsx`);
@@ -258,7 +261,8 @@
         <li><b>Üretim kuralları:</b> her gün üç nöbet branşı (ekip şefi, YSP, sürücü) dolu; yetenek uyumu (doktor → ekip şefi, işçi → sürücü 12 saat gündüz/gece, AABT → ekip şefi/YSP, ATT → YSP/sürücü); izinli güne ve izin öncesi 3 güne nöbet yok; iki 24 saatlik nöbet arası en az 1, en çok 5 gün; sürücüye gün aşırı üst üste 3 nöbet yok; işçiye art arda 3 gece yok ve gecenin ertesi gündüz yok; <b>işçide gündüz ve gece nöbetleri eşit</b>; <b>hafta sonu ve resmî tatil nöbetleri kişiler arasında dengeli</b>.</li>
         <li><b>Denetim:</b> ihlalleri listeler; <i>Öneriler</i> sekmesi her ihlal için en iyi değişiklikleri sunar, <i>Uygula</i> ile listeye işler.</li>
         <li><b>Kadro yetersizse</b> boş yuva kalmaması için bazı kişilerin nöbet sayısı Modül 1 hedefinden farklı çıkabilir ("Nöbet sayısı farkı" olarak görünür).</li>
-        <li><b>Çıktı:</b> Excel'de gün listesi ve kişi listesi; <b>hafta sonları turuncu, resmî tatiller kırmızı</b> renklidir.</li></ul>`)}
+        <li><b>Çıktı:</b> Excel'de gün listesi ve kişi listesi; <b>hafta sonları turuncu, resmî tatiller kırmızı</b> renklidir.</li>
+        <li><b>İzin / rapor dönüşü:</b> izin veya rapordan dönen personel işe başlama günü mutlaka nöbete yazılır (İzin ve Rapor Bilgileri dosyasındaki İşe Başlama Tarihi; yoksa izin bitişinin ertesi günü). Aynı gün birden fazla kişi dönüyor ve yer yoksa o nöbet <b>12/12 bölünür</b>; hücredeki ikinci seçimden <b>8/16 – 16/8</b> yapılabilir veya bölme kaldırılabilir. Bölünen nöbet saatine göre kısmi sayılır (½). Dönüş günü nöbetsiz kalan kişi Denetim'de <i>İzin / rapor dönüşü nöbetsiz</i> olarak görünür.</li></ul>`)}
       ${b('9. Çıktılar', `<ul><li><b>İstasyon PNG / Excel:</b> ad soyad, ünvan, görev durumu, izinler, geçici görev tarihleri, yolluk durumu ve kişi açıklamaları. Nöbet sayıları yer almaz.</li><li><b>Tüm istasyonlar Excel:</b> her istasyon ayrı sayfa, tek dosya.</li><li><b>Görevlendirme Excel:</b> ihtiyaç, rotasyon, görevlendirmeler, istasyon dışı görevliler.</li><li><b>Arşiv istatistikleri Excel:</b> seçilen aylar ve istasyonlar için tüm tablolar.</li></ul>`)}
       ${b('10. Arşiv ve istatistikler', `<ul><li><b>Arşiv › Yüklenen dosyalar:</b> yüklenen her dosyanın günlüğü (aynı ay için ikinci yükleme öncekini günceller). Dosyanın kendisi saklanmaz.</li><li><b>Aylara göre arşiv:</b> yıl yıl açılır liste; geçmiş ayı açarak o ayın planını salt okunur görürsünüz.</li><li><b>Aylık arşiv:</b> ayı arşive kaydeder (TC, telefon, sağlık bilgisi yazılmaz).</li>
         <li><b>Arşiv istatistikleri:</b> ay ve istasyon seçerek (açılır, çoklu seçim, ilçe bazlı toplu seçim) seyir, istasyon özeti, gelen/çıkan personel, fazla nöbet ve gerçekleşen nöbet raporları. Sayıdaki düğmeye tıklayınca hangi aylar olduğu görünür.</li></ul>`)}
@@ -328,6 +332,7 @@
       case 'takip-ay': { const T = S.takip, m = +v; T.ay = T.ay.includes(m) ? T.ay.filter(x => x !== m) : [...T.ay, m]; break; }
       case 'takip-ilce': { const T = S.takip, l = istAdlari().filter(x => C.ilceAdi(x) === v), hepsi = l.every(x => T.ist.includes(x)); T.ist = hepsi ? T.ist.filter(x => !l.includes(x)) : [...new Set([...T.ist, ...l])]; break; }
       case 'takip-temizle': S.takip[v] = []; break;
+      case 'takip-tumu': S.takip[v] = v === 'ay' ? AY_KISA.map((_, i) => i + 1) : [...new Set(Object.keys(S.takipVeri || {}).map(a => +a.slice(0, 4)))]; break;
       case 'takip-sekme': S.takip.sekme = v; break;
       case 'takip-yenile': S.takipVeri = null; break;
       case 'takip-excel': takipExcel(); return true;
@@ -370,6 +375,7 @@
     if (n === 'teklif') { const b2 = S.plan && n2Birim(); if (!b2 || !n2Duzenlenir(b2.ad)) return false; const id = t.dataset.id, v = t.value === '' ? null : Math.max(0, Math.round(sayi(t.value) * 100) / 100); mut2(() => { const o = n2OnayYaz(b2.ad); if (v == null) delete o.teklif[id]; else o.teklif[id] = v; }); return true; }
     if (n === 'ist') { S.n2.ist = t.value; S.n2.oneri = null; return true; }
     if (n === 'kural') { const dp = n2Depo(b.ad), k = t.dataset.k; mut2(() => { dp.kural = {...dp.kural, [k]: t.type === 'checkbox' ? t.checked : Math.max(0, Math.round(sayi(t.value))) }; }, 'Modül 2: kural', `${k}`); return true; }
-    if (n === 'hucre') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { dp.liste = dp.liste || NC.bos(NC.gunSayisi(S.y, S.m)); dp.liste[g][tip] = t.value === '' ? null : t.value; }, 'Modül 2: elle değişiklik', `${g}. gün ${tip}`); return true; }
+    if (n === 'hucre') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { dp.liste = dp.liste || NC.bos(NC.gunSayisi(S.y, S.m)); dp.liste[g][tip] = t.value === '' ? null : t.value; if (dp.liste[g].bol && dp.liste[g].bol[tip] && (t.value === '' || dp.liste[g].bol[tip].id === t.value)) { const B = {...dp.liste[g].bol}; delete B[tip]; dp.liste[g].bol = B; } }, 'Modül 2: elle değişiklik', `${g}. gün ${tip}`); return true; }
+    if (n === 'bol') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { const B = {...(dp.liste[g].bol || {})}; if (t.value === '') delete B[tip]; else B[tip] = {...B[tip], saat: +t.value}; dp.liste[g].bol = B; }, 'Modül 2: bölünmüş nöbet', `${g}. gün ${tip} ${t.value || 'kaldırıldı'}`); return true; }
     return false;
   }

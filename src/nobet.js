@@ -10,6 +10,7 @@ const NobetCore = (() => {
   const KOD = {es: 'E', ysp: 'Y', sur: 'S', surG: 'G', surA: 'A'};
 
   function rng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  const gunEkle = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
   const bos = N => Array.from({length: N + 1}, () => ({es: null, ysp: null, sur: null, surG: null, surA: null}));   // 1..N
 
   // Girdiyi gün indekslerine çevirir. kisi: {id, ad, grup, adet (24 saatlik nöbet), yarim (işçi 12 saatlik adet), izin:[{bas,bit}], istek:[iso]}
@@ -17,16 +18,20 @@ const NobetCore = (() => {
     const N = g.gun || gunSayisi(g.y, g.m), K = {...KURAL, ...(kural || {})}, ay = `${g.y}-${pad(g.m)}`;
     const gunNo = d => (d && d.slice(0, 7) === ay ? +d.slice(8, 10) : null);
     const P = g.kisiler.map(k => {
-      const izin = new Set(), once = new Set(), istek = new Set(), baslar = [];
+      const izin = new Set(), once = new Set(), istek = new Set(), baslar = [], donusAday = [];
       (k.izin || []).forEach(i => {
         if (!i.bas || !i.bit) return;
-        const bas = i.bas, bit = i.bit;
+        // ASOS izin/rapor kaydında bitiş = işe dönüş günüdür (izin bir gün önce biter); diğerlerinde bitiş iznin son günüdür
+        const bas = i.bas, bit = i.asos ? gunEkle(i.bit, -1) : i.bit, donus = i.donus || (i.asos ? i.bit : gunEkle(i.bit, 1));
         for (let d = 1; d <= N; d++) { const x = iso(g.y, g.m, d); if (x >= bas && x <= bit) izin.add(d); }
+        const dn = gunNo(donus); if (dn) donusAday.push(dn);
         const b = gunNo(bas); if (b) { baslar.push(b); for (let d = Math.max(1, b - K.izinOnce); d < b; d++) once.add(d); }
         else if (bas > iso(g.y, g.m, N)) { const kal = Math.round((Date.parse(bas + 'T00:00:00Z') - Date.parse(iso(g.y, g.m, N) + 'T00:00:00Z')) / 864e5); for (let d = N; d > N - (K.izinOnce - kal + 1) && d >= 1; d--) once.add(d); }   // izin sonraki ayın başında başlıyorsa bu ayın son günleri boş
       });
       (k.istek || []).forEach(x => { const d = gunNo(x); if (d) istek.add(d); });
-      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: YETENEK[k.grup] || ['ysp'], isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, izin, once, istek, baslar};
+      // İzin / rapor dönüşü: işe başlama günü nöbete girmek zorunludur (o gün başka bir izinle kapanmıyorsa)
+      const donus = new Set(donusAday.filter(d => !izin.has(d)));
+      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: YETENEK[k.grup] || ['ysp'], isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, izin, once, istek, baslar, donus};
     });
     // hafta sonu (cumartesi/pazar) ve resmî tatil günleri: nöbetlerin bu günlere kişiler arasında dengeli dağılması için
     const ozel = new Uint8Array(N + 2); let ozelSay = 0;
@@ -43,7 +48,8 @@ const NobetCore = (() => {
     const gorev = new Map(P.map(p => [p.id, []]));         // kişi → [{gun, tip}]
     for (let d = 1; d <= N; d++) {
       const L = liste[d];
-      ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(s => { const id = L[s]; if (id != null && byId.has(id)) gorev.get(id).push({gun: d, tip: s}); });
+      ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(s => { const id = L[s]; if (id != null && byId.has(id)) gorev.get(id).push({gun: d, tip: s, saat: L.bol && L.bol[s] ? 24 - L.bol[s].saat : 24}); });
+      if (L.bol) Object.entries(L.bol).forEach(([s, b]) => { if (b && b.id != null && byId.has(b.id) && L[s] != null) gorev.get(b.id).push({gun: d, tip: 'bol', yuva: s, saat: b.saat}); });
       const surTamam = L.sur != null || (L.surG != null && L.surA != null);
       if (L.es == null) ekle('eksik', 1000, d, null, `${d}. gün ${YUVA_AD.es} nöbet branşı boş`, {yuva: 'es'});
       if (L.ysp == null) ekle('eksik', 1000, d, null, `${d}. gün ${YUVA_AD.ysp} nöbet branşı boş`, {yuva: 'ysp'});
@@ -55,13 +61,14 @@ const NobetCore = (() => {
       L.forEach(x => { (gunde[x.gun] = gunde[x.gun] || []).push(x); });
       // yetenek, izin, istek, aynı gün çakışma
       L.forEach(x => {
-        const yuva = x.tip === 'surG' || x.tip === 'surA' ? 'sur' : x.tip;
+        const yuva = x.tip === 'bol' ? x.yuva : x.tip === 'surG' || x.tip === 'surA' ? 'sur' : x.tip;
         if (!p.yet.includes(yuva)) ekle('yetenek', 900, x.gun, p.id, `${p.ad}: ${YUVA_AD[yuva]} nöbet branşında görevlendirilemez`);
         if (p.izin.has(x.gun)) ekle('izin', 900, x.gun, p.id, `${p.ad}: ${x.gun}. gün izinli`);
         else if (p.istek.has(x.gun)) ekle('istek', 80, x.gun, p.id, `${p.ad}: ${x.gun}. gün nöbet istemiyor`);
         if (p.once.has(x.gun) && !p.izin.has(x.gun)) ekle('izinOnce', 300, x.gun, p.id, `${p.ad}: yıllık izin öncesi ${K.izinOnce} gün boşluk kuralı (${x.gun}. gün)`);
       });
       Object.keys(gunde).forEach(d => { if (gunde[d].length > 1) ekle('cakisma', 800, +d, p.id, `${p.ad}: ${d}. gün birden fazla nöbet branşında`); });
+      (p.donus || new Set()).forEach(d => { if (!gunde[d]) ekle('donus', 600, d, p.id, `${p.ad}: ${d}. gün izin / rapor dönüşü — işe başladığı gün nöbete girmeli`); });
       // 24 saatlik nöbetler: dinlenme (min boşluk gün) ve sürücü gün aşırı 3
       const g24 = L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).map(x => x.gun);
       for (let i = 1; i < g24.length; i++) if (g24[i] - g24[i - 1] - 1 < K.minAra) ekle('dinlenme', 700, g24[i], p.id, `${p.ad}: ${g24[i - 1]}. ve ${g24[i]}. gün art arda 24 saatlik nöbet (arada en az ${K.minAra} gün boşluk gerekir)`);
@@ -85,7 +92,8 @@ const NobetCore = (() => {
       // hafta sonu / resmî tatil dengesi
       if (H.ozelSay > 0 && L.length >= 2) { const oz = new Set(L.filter(x => H.ozel[x.gun]).map(x => x.gun)).size, c = ozelCeza(L.filter(x => H.ozel[x.gun]).length, L.length, H.ozelOran); if (c > 0) ekle('ozelGun', c, 0, p.id, `${p.ad}: ${L.filter(x => H.ozel[x.gun]).length} hafta sonu / resmî tatil nöbeti (dengeli dağılımda ≈ ${(L.length * H.ozelOran).toFixed(1)})`); }
       // nöbet sayısı: planlanan ile yazılan
-      const birim = L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).length + 0.5 * L.filter(x => x.tip === 'surG' || x.tip === 'surA').length, hedef = p.hedef24 + p.hedefYarim / 2;
+      // bölünmüş nöbet saatine göre kısmi sayılır (12 sa = 0,5; 8 sa = 0,33; 16 sa = 0,67)
+      const birim = Math.round((L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).reduce((t, x) => t + (x.saat != null ? x.saat / 24 : 1), 0) + 0.5 * L.filter(x => x.tip === 'surG' || x.tip === 'surA').length) * 100) / 100, hedef = p.hedef24 + p.hedefYarim / 2;
       if (Math.abs(birim - hedef) > 0.01) ekle('adet', 40 * Math.abs(birim - hedef), 0, p.id, `${p.ad}: planlanan ${hedef} nöbet, listede ${birim}`, {fark: birim - hedef});
     });
     const toplam = ihlal.reduce((x, i) => x + i.agirlik, 0), say = {};
@@ -256,8 +264,9 @@ const NobetCore = (() => {
     const hasDay = P.map(() => new Uint8Array(N + 2)); place.forEach((pl, i) => pl.forEach(s => { hasDay[i][slotD[s]]++; }));
     // maliyet
     const pcost = i => {
-      const p = P[i], pl = place[i]; if (!pl.length) return 0;
-      let c = 0; const g24 = [], all = [], A = new Set(), G = new Set(), s24 = new Set();
+      const p = P[i], pl = place[i]; let c = 0;
+      (p.donus || new Set()).forEach(d => { if (!hasDay[i][d]) c += 600; });                 // izin / rapor dönüş günü nöbette olmalı
+      if (!pl.length) return c; const g24 = [], all = [], A = new Set(), G = new Set(), s24 = new Set();
       for (const s of pl) { const d = slotD[s], t = slotT[s]; all.push(d);
         if (p.izin.has(d)) c += 900; else if (p.istek.has(d)) c += 80;
         if (p.once.has(d) && !p.izin.has(d)) c += 300;
@@ -324,7 +333,26 @@ const NobetCore = (() => {
   }
 
   // Kural ihlalleri: boş yuva, yetenek dışı, izinli kişiye nöbet, aynı gün çift görev, dinlenme, izin öncesi boşluk, gün aşırı sürücü, 3 gece, azami aralık. Bunlar kalmamalıdır (istek ve nöbet sayısı farkı tercihtir; hafta sonu dengesi de kural gibi zorlanır).
-  const SERT = new Set(['eksik', 'yetenek', 'izin', 'cakisma', 'dinlenme', 'izinOnce', 'surGunAsiri', 'isciGece', 'aralik', 'ozelGun', 'gunGece']);
+  const SERT = new Set(['eksik', 'yetenek', 'izin', 'cakisma', 'dinlenme', 'izinOnce', 'surGunAsiri', 'isciGece', 'aralik', 'ozelGun', 'gunGece', 'donus']);
+
+  // İzin / rapor dönüşü: işe başladığı gün nöbette olmayan kişi yerleştirilir. Sıra: boş uygun nöbet branşı → dönüşü olmayan
+  // birinin tuttuğu uygun nöbet branşı (o kişi bu nöbeti bırakır) → aynı gün dönen başka birinin nöbeti 12/12 bölünür.
+  function donusYerlestir(liste, H) {
+    const {P} = H, gunde = (id, d) => { const L = liste[d]; return ['es', 'ysp', 'sur', 'surG', 'surA'].some(t => L[t] === id) || Object.values(L.bol || {}).some(b => b && b.id === id); };
+    let yer = 0, bol = 0;
+    P.forEach(p => (p.donus || new Set()).forEach(d => {
+      if (!liste[d] || gunde(p.id, d)) return;
+      const L = liste[d], yuvalar = p.isci ? ['sur'] : p.yet.filter(y => y !== 'sur' || (L.surG == null && L.surA == null));
+      const bosY = yuvalar.find(y => L[y] == null && !(y === 'sur' && (L.surG != null || L.surA != null)));
+      if (bosY) { L[bosY] = p.id; yer++; return; }
+      const donen = id => { const q = H.byId.get(id); return !!q && q.donus && q.donus.has(d); };
+      const alY = yuvalar.find(y => L[y] != null && !donen(L[y]) && !(L.bol && L.bol[y]));
+      if (alY) { L[alY] = p.id; yer++; return; }
+      const bolY = yuvalar.find(y => L[y] != null && donen(L[y]) && !(L.bol && L.bol[y]));
+      if (bolY) { L.bol = {...(L.bol || {}), [bolY]: {id: p.id, saat: 12}}; bol++; }
+    }));
+    return {yer, bol};
+  }
   const sertSay = ihlal => ihlal.filter(i => SERT.has(i.tur)).length;
   const kalite = (son) => sertSay(son.ihlal) * 1e7 + son.toplam;
 
@@ -373,8 +401,10 @@ const NobetCore = (() => {
         if (kal >= 1e7) { const it = iyilestir(eniyi, H, o.seed + 91, 7000); const s2 = denetle(it.liste, H); if (kalite(s2) < kal) { eniyi = it.liste; kal = kalite(s2); } }
       }
     }
+    eniyi = eniyi.map(x => ({...x, ...(x.bol ? {bol: {...x.bol}} : {})}));
+    const dy = donusYerlestir(eniyi, H);
     const son = denetle(eniyi, H);
-    return {liste: eniyi, ihlal: son.ihlal, ceza: son.toplam, say: son.say, deneme: denendi, sureMs: Date.now() - t0, zorlandi, sert: sertSay(son.ihlal)};
+    return {liste: eniyi, ihlal: son.ihlal, ceza: son.toplam, say: son.say, deneme: denendi, sureMs: Date.now() - t0, zorlandi, sert: sertSay(son.ihlal), donus: dy};
   }
 
   function oneriler(liste, girdi, kural, enFazla) {
