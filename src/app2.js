@@ -345,11 +345,12 @@
   function statHtml() {
     const {say} = istatistik(), ists = S.plan.birimler.filter(b => b.tur === 'istasyon');
     const sat = (t, v, f) => `<tr><td>${t}</td><td class="num"><b>${v === undefined ? 0 : fmt(v)}</b></td>${f ? `<td><a href="#" data-act="liste" data-v="${f}">Listele</a></td>` : '<td></td>'}</tr>`;
-    const durumSat = Object.keys(durumlar()).filter(k => say['durum:' + k]).map(k => sat(k, say['durum:' + k], 'durum:' + k)).join('');
+    const durumAc = {'GEÇİCİ GÖREVDE': 'GEÇİCİ GÖREVDE <span class="ap-note">(kadromuzdan, başka yerde çalışan)</span>', 'GEÇİCİ GÖREVLİ': 'GEÇİCİ GÖREVLİ <span class="ap-note">(kadrosu başka yerde, bize gelen)</span>'};
+    const durumSat = Object.keys(durumlar()).filter(k => say['durum:' + k]).map(k => sat(durumAc[k] || k, say['durum:' + k], 'durum:' + k)).join('');
     const izinSat = Object.keys(say).filter(k => k.startsWith('izinTur:')).map(k => sat(k.slice(8), say[k])).join('');
     let ih = 0, pl = 0; ists.forEach(b => { const h = hesapla(b); ih += h.ihtiyac; pl += planlananToplam(h); });
     return `<div class="ap-two"><div class="ap-card"><h2>Personel</h2><table class="ap-t"><tbody>${sat('Toplam aktif kayıt', say.toplam, 'durum:')}${sat('Doktor', say['sinif:doktor'])}${sat('Memur', say['sinif:memur'])}${sat('İşçi', say['sinif:isci'])}${sat('4/B personel', say.dortB)}${sat('İzinli personel', say.izinli, 'durum:_izin')}${sat('Toplam izin günü', say.izinGun)}${izinSat}</tbody></table></div>
-      <div class="ap-card"><h2>Durum ve görevlendirme</h2><table class="ap-t"><tbody>${durumSat}${sat('Görevlendirme (toplam)', say.gorev)}${sat('Yolluklu', say['yolluk:YOLLUKLU'])}${sat('Yolluksuz', say['yolluk:YOLLUKSUZ'])}${sat('Yolluk durumu belirtilmemiş', say['yolluk:Belirtilmemiş'])}</tbody></table></div></div>
+      <div class="ap-card"><h2>Durum ve görevlendirme</h2><table class="ap-t"><tbody>${durumSat}${sat('Görev yeri girilmiş görevlendirme <span class="ap-note">(Geçici görev sütunu dolu)</span>', say.gorev)}${sat('&nbsp;&nbsp;Yolluklu', say['yolluk:YOLLUKLU'])}${sat('&nbsp;&nbsp;Yolluksuz', say['yolluk:YOLLUKSUZ'])}${sat('&nbsp;&nbsp;Yolluk durumu belirtilmemiş', say['yolluk:Belirtilmemiş'])}</tbody></table><p class="ap-note"><b>Geçici görevde</b>: kadrosu bizdeki istasyonda olup başka bir istasyonda, Başhekimlikte, KKM'de ya da dış kurumda çalışan. <b>Geçici görevli</b>: kadrosu başka birimde olup bizim istasyonlarımızda çalışan. <b>Görev yeri girilmiş görevlendirme</b>: istasyon sayfasındaki Geçici görev sütununda gideceği yer yazılı kişiler (dışarıya görevlendirmeler); Geçici görevde sayısından azsa aradaki kişilerin görev yeri henüz girilmemiştir. Yolluk bilgisi aynı sütundan seçilir.</p></div></div>
       <div class="ap-card"><h2>Plan özeti</h2><div>İstasyon ihtiyacı toplamı: <b>${ih}</b> · Planlanan: <b>${fmt(pl)}</b> · Fark: <b>${fmt(pl - ih)}</b></div></div>`;
   }
 
