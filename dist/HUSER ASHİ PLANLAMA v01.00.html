@@ -1414,9 +1414,23 @@ function mount(root, opts = {}) {
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div></div>`;
     return nav + ({deg: degerlendirme, rot: sekme === 'rot' ? rotasyonHtml() : '', ozet, list: liste, dis}[sekme] || degerlendirme);
   }
+  // İstatistik sayfasındaki satırların listesi (istatistikle aynı kapsam: pasif ve aile hekimliğindekiler hariç)
+  function ozelUyar(k, o) {
+    const D = durumlar(); if ((D[k.durum] || {}).pasif || aileHek(k)) return false;
+    if (o === 'tum') return true;
+    if (o === 'dortB') return !!k.dortB;
+    if (o === 'izinli') return izinGun(k) > 0;
+    if (o.startsWith('izinTur:')) { const t = o.slice(8); return (k.izin || []).some(i => sayi(i.gun) > 0 && (i.tur || 'Belirtilmemiş') === t); }
+    const g = k.gorev && (k.gorev.hedef || k.gorev.yer);
+    if (o === 'gorev') return !!g;
+    if (o.startsWith('yolluk:')) return !!g && (k.gorev.yolluk || 'Belirtilmemiş') === o.slice(7);
+    if (o.startsWith('sinif:')) return k.sinif === o.slice(6);
+    if (o.startsWith('durum:')) return k.durum === o.slice(6);
+    return true;
+  }
   function personelHtml() {
     const D = durumlar(), f = S.filtre, q = C.TR(f.q);
-    let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)) && (planlamaRol() || !gizliKisi(k)));
+    let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.ozel || ozelUyar(k, f.ozel)) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)) && (planlamaRol() || !gizliKisi(k)));
     liste = [...liste.filter(k => !gizliKisi(k)), ...liste.filter(gizliKisi)];
     const boyut = S.pBoyut || 50, sayfaSay = Math.max(1, Math.ceil(liste.length / boyut)); if (S.pSayfa >= sayfaSay) S.pSayfa = sayfaSay - 1; if (S.pSayfa < 0) S.pSayfa = 0;
     const bas = S.pSayfa * boyut, gos = liste.slice(bas, bas + boyut);
@@ -1436,7 +1450,7 @@ function mount(root, opts = {}) {
       <select class="ap-sel" data-act="f-sinif"><option value="">Tüm sınıflar</option>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === f.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <select class="ap-sel" data-act="f-surucu" title="ATT sürücülüğü"><option value="">ATT sürücülüğü: tümü</option><option value="dogrulanmadi" ${f.surucu === 'dogrulanmadi' ? 'selected' : ''}>Doğrulanmadı</option><option value="surucu" ${f.surucu === 'surucu' ? 'selected' : ''}>Sürücü</option><option value="degil" ${f.surucu === 'degil' ? 'selected' : ''}>Sürücü değil</option></select>
       <select class="ap-sel" data-act="f-durum"><option value="">Tüm durumlar</option><option value="_izin" ${f.durum === '_izin' ? 'selected' : ''}>İzinli</option>${Object.keys(D).map(a => `<option ${a === f.durum ? 'selected' : ''}>${a}</option>`).join('')}</select>
-      <span class="ap-note">${liste.length} kayıt${S.plan.disKurum && S.plan.disKurum.length ? ` · Dış kurum: ${S.plan.disKurum.length}` : ''}</span></div>
+      ${f.ozel ? `<span class="ap-chip sec">${esc(f.ozelAd || 'İstatistik süzgeci')} <a href="#" data-act="f-ozel-sil" title="Süzgeci kaldır">✕</a></span>` : ''}<span class="ap-note">${liste.length} kayıt${S.plan.disKurum && S.plan.disKurum.length ? ` · Dış kurum: ${S.plan.disKurum.length}` : ''}</span></div>
       ${pager()}<div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>TC</th><th>ÜNVAN</th><th>SINIF</th><th>BİRİM</th><th>NÖBET ROLÜ</th><th>SÜRÜCÜLÜK</th><th>DURUM</th><th>GÖREV BAŞLANGICI</th><th>4/B 4 YIL DOLUMU</th><th>YILLIK İZİN KALAN</th></tr></thead><tbody>${rows || '<tr><td colspan="11" class="ap-empty">Kayıt yok</td></tr>'}</tbody></table></div>${pager()}`;
   }
 
@@ -1467,13 +1481,13 @@ function mount(root, opts = {}) {
   }
   function statHtml() {
     const {say} = istatistik(), ists = S.plan.birimler.filter(b => b.tur === 'istasyon');
-    const sat = (t, v, f) => `<tr><td>${t}</td><td class="num"><b>${v === undefined ? 0 : fmt(v)}</b></td>${f ? `<td><a href="#" data-act="liste" data-v="${f}">Listele</a></td>` : '<td></td>'}</tr>`;
+    const sat = (t, v, f) => `<tr><td>${t}</td><td class="num"><b>${v === undefined ? 0 : fmt(v)}</b></td>${f ? `<td><a href="#" data-act="liste" data-v="ozel:${esc(f)}" data-ad="${esc(String(t).replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim())}">Listele</a></td>` : '<td></td>'}</tr>`;
     const durumAc = {'GEÇİCİ GÖREVDE': 'GEÇİCİ GÖREVDE <span class="ap-note">(kadromuzdan, başka yerde çalışan)</span>', 'GEÇİCİ GÖREVLİ': 'GEÇİCİ GÖREVLİ <span class="ap-note">(kadrosu başka yerde, bize gelen)</span>'};
     const durumSat = Object.keys(durumlar()).filter(k => say['durum:' + k]).map(k => sat(durumAc[k] || k, say['durum:' + k], 'durum:' + k)).join('');
-    const izinSat = Object.keys(say).filter(k => k.startsWith('izinTur:')).map(k => sat(k.slice(8), say[k])).join('');
+    const izinSat = Object.keys(say).filter(k => k.startsWith('izinTur:')).map(k => sat(k.slice(8), say[k], k)).join('');
     let ih = 0, pl = 0; ists.forEach(b => { const h = hesapla(b); ih += h.ihtiyac; pl += planlananToplam(h); });
-    return `<div class="ap-two"><div class="ap-card"><h2>Personel</h2><table class="ap-t"><tbody>${sat('Toplam aktif kayıt', say.toplam, 'durum:')}${sat('Doktor', say['sinif:doktor'])}${sat('Memur', say['sinif:memur'])}${sat('İşçi', say['sinif:isci'])}${sat('4/B personel', say.dortB)}${sat('İzinli personel', say.izinli, 'durum:_izin')}${sat('Toplam izin günü', say.izinGun)}${izinSat}</tbody></table></div>
-      <div class="ap-card"><h2>Durum ve görevlendirme</h2><table class="ap-t"><tbody>${durumSat}${sat('Görev yeri girilmiş görevlendirme <span class="ap-note">(Geçici görev sütunu dolu)</span>', say.gorev)}${sat('&nbsp;&nbsp;Yolluklu', say['yolluk:YOLLUKLU'])}${sat('&nbsp;&nbsp;Yolluksuz', say['yolluk:YOLLUKSUZ'])}${sat('&nbsp;&nbsp;Yolluk durumu belirtilmemiş', say['yolluk:Belirtilmemiş'])}</tbody></table><p class="ap-note"><b>Geçici görevde</b>: kadrosu bizdeki istasyonda olup başka bir istasyonda, Başhekimlikte, KKM'de ya da dış kurumda çalışan. <b>Geçici görevli</b>: kadrosu başka birimde olup bizim istasyonlarımızda çalışan. <b>Görev yeri girilmiş görevlendirme</b>: istasyon sayfasındaki Geçici görev sütununda gideceği yer yazılı kişiler (dışarıya görevlendirmeler); Geçici görevde sayısından azsa aradaki kişilerin görev yeri henüz girilmemiştir. Yolluk bilgisi aynı sütundan seçilir.</p></div></div>
+    return `<div class="ap-two"><div class="ap-card"><h2>Personel</h2><table class="ap-t"><tbody>${sat('Toplam aktif kayıt', say.toplam, 'tum')}${sat('Doktor', say['sinif:doktor'], 'sinif:doktor')}${sat('Memur', say['sinif:memur'], 'sinif:memur')}${sat('İşçi', say['sinif:isci'], 'sinif:isci')}${sat('4/B personel', say.dortB, 'dortB')}${sat('İzinli personel', say.izinli, 'izinli')}${sat('Toplam izin günü', say.izinGun, 'izinli')}${izinSat}</tbody></table></div>
+      <div class="ap-card"><h2>Durum ve görevlendirme</h2><table class="ap-t"><tbody>${durumSat}${sat('Görev yeri girilmiş görevlendirme <span class="ap-note">(Geçici görev sütunu dolu)</span>', say.gorev, 'gorev')}${sat('&nbsp;&nbsp;Yolluklu', say['yolluk:YOLLUKLU'], 'yolluk:YOLLUKLU')}${sat('&nbsp;&nbsp;Yolluksuz', say['yolluk:YOLLUKSUZ'], 'yolluk:YOLLUKSUZ')}${sat('&nbsp;&nbsp;Yolluk durumu belirtilmemiş', say['yolluk:Belirtilmemiş'], 'yolluk:Belirtilmemiş')}</tbody></table><p class="ap-note"><b>Geçici görevde</b>: kadrosu bizdeki istasyonda olup başka bir istasyonda, Başhekimlikte, KKM'de ya da dış kurumda çalışan. <b>Geçici görevli</b>: kadrosu başka birimde olup bizim istasyonlarımızda çalışan. <b>Görev yeri girilmiş görevlendirme</b>: istasyon sayfasındaki Geçici görev sütununda gideceği yer yazılı kişiler (dışarıya görevlendirmeler); Geçici görevde sayısından azsa aradaki kişilerin görev yeri henüz girilmemiştir. Yolluk bilgisi aynı sütundan seçilir.</p></div></div>
       <div class="ap-card"><h2>Plan özeti</h2><div>İstasyon ihtiyacı toplamı: <b>${ih}</b> · Planlanan: <b>${fmt(pl)}</b> · Fark: <b>${fmt(pl - ih)}</b></div></div>`;
   }
 
@@ -2998,7 +3012,8 @@ function mount(root, opts = {}) {
         case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); break; }
         case 'og-ekle': { const d = root.querySelector('#ap-og-t').value, tur = root.querySelector('#ap-og-tur').value; if (!d) { toast('Tarih seçin.'); break; } mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break; }
         case 'og-sil': mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
-        case 'liste': S.filtre = {q: '', durum: v.slice(6), birim: '', sinif: ''}; S.pSayfa = 0; S.sayfa = 'personel'; break;
+        case 'liste': { const i = v.indexOf(':'), t = v.slice(0, i), d = v.slice(i + 1); S.filtre = {q: '', durum: t === 'durum' ? d : '', birim: '', sinif: t === 'sinif' ? d : '', ozel: t === 'ozel' ? d : '', ozelAd: t.dataset.ad || ''}; S.pSayfa = 0; S.sayfa = 'personel'; break; }
+        case 'f-ozel-sil': S.filtre = {...S.filtre, ozel: '', ozelAd: ''}; S.pSayfa = 0; break;
         case 'plan-bos': S.plan = bosPlan(); logla('Boş plan oluşturuldu'); kaydet(); S.sayfa = 'ist'; break;
         case 'plan-kopya': {
           const pk = S.m === 1 ? `plan:${S.y - 1}-12` : `plan:${S.y}-${C.pad(S.m - 1)}`, onceki = await depo.get(pk); if (!onceki) { toast('Önceki ay planı yok.'); break; }
