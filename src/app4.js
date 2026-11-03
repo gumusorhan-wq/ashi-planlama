@@ -50,7 +50,7 @@
     finally { S.arsivCalisiyor = false; if (S.arsivTekrar) { S.arsivTekrar = false; setTimeout(() => arsivArkaPlan(), 300); } }
   }
   // Yüklenen dosya günlüğü (Arşiv sayfasında gösterilir): hangi dosya, hangi tür, kaç satır, hangi aya uygulandı
-  const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', I: 'Personel İzin-Muafiyet Raporu', N: 'Nöbet Listesi / Hareket Raporu', T: 'İzin Talepleri Raporu'};
+  const DOSYA_TUR = {A: 'EKİP Personel Listesi', B: 'Personel Listesi Raporu', I: 'Personel İzin-Muafiyet Raporu', N: 'Nöbet Listesi / Hareket Raporu', T: 'İzin ve Rapor Bilgileri'};
   async function yuklemeKaydet(dosyalar) {
     const l = (await depo.get('yuklemeler')) || [], t = Date.now();
     dosyalar.forEach(d => {
