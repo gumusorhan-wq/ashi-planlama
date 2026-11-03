@@ -1723,7 +1723,7 @@ function mount(root, opts = {}) {
     if (S.plan) veri[ayAnahtari()] = proje(S.plan);
     S.takipVeri = veri;
   }
-  const takipDurum = () => S.takip = S.takip || {yil: [], ay: [], ist: [], sekme: 'izin', ara: '', sadece: true};
+  const takipDurum = () => S.takip = S.takip || {yil: [S.y], ay: [S.m], ist: [], sekme: 'izin', ara: '', sadece: true};   // açılışta seçili planın yılı ve ayı (temizlenince tümü)
   const takipKisa = a => `${AY_KISA[+a.slice(5) - 1]} ${a.slice(2, 4)}`;
   function takipHazirla() {
     const T = takipDurum(), D = durumlar(), veri = S.takipVeri || {}, aylar = Object.keys(veri).sort().filter(a => (!T.yil.length || T.yil.includes(+a.slice(0, 4))) && (!T.ay.length || T.ay.includes(+a.slice(5))));
