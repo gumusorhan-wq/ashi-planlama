@@ -1286,9 +1286,11 @@ function mount(root, opts = {}) {
       if (!gelen) son = k.sinif;
       const renk = gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), eng = C.gorevlendirmeEngeli(k, ayIlk());
       const dis = duz ? '' : 'disabled';
-      const fark = s ? sayi(k.planlanan) - s.hedef : 0;
+      // Hedef ekranda 2 ondalıkla gösterilir (104 sa ÷ 24 = 4,33); planlanan bu yuvarlanmış hedefe ulaşıyorsa mesai tamam sayılır
+      const r2 = v => Math.round(v * 100) / 100, hedefTam = s ? sayi(k.planlanan) >= r2(s.hedef) - 1e-9 : false;
+      const fark = s ? r2(sayi(k.planlanan) - r2(s.hedef)) : 0;
       // mesai saatini tamamlayamama: memur/doktor planlanan×24 saat < mesai; işçi 12 saatlik nöbet başına sistemden düşülen saat (hedefin altında kalan nöbet sayısı × düşülen saat)
-      const saatEksik = s && !s.nobetYok && !gelen && k.planlanan != null ? (k.sinif === 'isci' ? Math.max(0, (s.hedef - sayi(k.planlanan)) / C.ADIM * (S.ayar.isciDusulen || 11)) : Math.max(0, s.mesai - sayi(k.planlanan) * 24)) : 0, eksikMesai = saatEksik > 0.01;
+      const saatEksik = s && !s.nobetYok && !gelen && k.planlanan != null && !hedefTam ? (k.sinif === 'isci' ? Math.max(0, (s.hedef - sayi(k.planlanan)) / C.ADIM * (S.ayar.isciDusulen || 11)) : Math.max(0, s.mesai - sayi(k.planlanan) * 24)) : 0, eksikMesai = saatEksik > 0.01;
       if (eksikMesai) mesEksik.push(`${k.ad} (−${fmt(Math.round(saatEksik * 10) / 10)} saat)`);
       rows += `<tr class="c${eksikMesai ? ' mes-eksik' : ''}" title="${eksikMesai ? 'Mesai saatini tamamlayamıyor: planlanan nöbet mesai saatinin altında kalıyor' : ''}" style="${renk ? 'background:' + renk : ''}">
         <td><input class="ap-in w" data-id="${k.id}" data-f="ad" value="${esc(k.ad)}" ${dis}>${idariNobetVar(k) ? `<span class="ap-tag ap-t-ok" title="Nöbet Listesi Raporunda ${esc(k.idariNobet.birim)} nöbeti kaydı var (son 6 ay)">nöbet tutar</span>` : ''}</td>
