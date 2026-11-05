@@ -550,7 +550,7 @@
     const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)).filter(k => !gizliKisi(k)).sort(nobetSirala(sm));      // aile hekimliği / uzmanlık eğitimi çıktılarda yer almaz; branş sırası istasyon sayfasıyla aynı
     return kis.map(k => {
       const gelen = k.birim !== b.ad;
-      return {k, gelen, renk: gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), sinif: k.sinif,
+      return {k, gelen, renk: satirRenk(k, gelen), sinif: k.sinif,
         hucre: [k.ad, unvanKisa(k), gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), izinAyGun(k) ? fmt(izinAyGun(k)) : '', izinAyGun(k) ? izinTur(k) : '', gelen ? `${k.birim} NOLU ASHİ ${AYLAR[S.m].toLocaleUpperCase('tr-TR')}` : cikGorev(k), (k.gorev && k.gorev.yolluk) || ''],
         tahmini: (sm.get(k.id) && !sm.get(k.id).nobetYok && k.planlanan != null) ? k.planlanan : '', idari: idariNobetVar(k) ? 'NÖBET TUTAR' : '', aciklama: k.aciklama || ''};
     });
@@ -604,7 +604,7 @@
     const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [22.8, 14.8, 10.8, 12.8, 22.8, 9.8, 16.8, 16.8, 28, 18.8, 9.8, 12.8, 36].map(wch => ({wch})); return ws;
   }
   // ---------- Toplu Excel (planlama biriminin aylık dosya düzeni: Personel Bilgileri, İstatistik, Kurum Dışına Giden/Gelen, KKM, Başhekimlik, ilçe sırasıyla istasyonlar) ----------
-  const XL_RENK = {gelen: '8DB4E2', giden: 'C0504D', izin: 'FFFF00', rapor: 'A6A6A6', analik: 'B1A0C7', uzun: '9BBB59', sep: '002060', baslik: 'FFFF00', ozet: 'B7DEE8'};
+  const XL_RENK = {...Object.fromEntries(Object.entries(RENK).map(([a, b]) => [a, b.slice(1)])), sep: '002060', baslik: 'FFFF00', ozet: 'B7DEE8'};
   const XL_LEJANT = [['1 AYLIK GELEN PERSONEL', 'gelen'], ['GİDEN PERSONEL', 'giden'], ['YILLIK İZİNLİ PERSONEL', 'izin'], ['RAPORLU PERSONEL', 'rapor'], ['ANALIK HAKKINDAKİ PERSONEL', 'analik'], ['UZUN SÜRELİ GÖREVLENDİRME 3 AY VE ÜZERİ', 'uzun']];
   const ILCE_SIRA = ['YUNUSEMRE', 'SEHZADELER', 'SARUHANLI', 'AKHISAR', 'SOMA', 'GOLMARMARA', 'KIRKAGAC', 'GORDES', 'DEMIRCI', 'KOPRUBASI', 'AHMETLI', 'TURGUTLU', 'SALIHLI', 'ALASEHIR', 'SARIGOL', 'KULA', 'SELENDI'];
   const xlTarihler = metin => [...String(metin || '').matchAll(/(\d{2}\.\d{2}\.\d{4})/g)].map(x => x[1]);
@@ -620,17 +620,7 @@
     if (xlIsci(k)) return `${Math.floor(mesai / 12 + 1e-9)} Nöbet`;
     const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`;
   }
-  function xlSatirRenk(k, gelen) {
-    const D = durumlar(), d = k.durum || '';
-    if (gelen) return XL_RENK.gelen;
-    if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[d] || {}).disarida) return xlUzunGorev(k.gorev) ? XL_RENK.uzun : XL_RENK.giden;
-    if (/RAPORLU/.test(d)) return XL_RENK.rapor;
-    if (/ANALIK|DOĞUM|GEBE|GEBELİK/.test(d) || k.sut > 0) return XL_RENK.analik;
-    if (d === 'GEÇİCİ GÖREVLİ') return XL_RENK.gelen;
-    if (D[d] && D[d].renk) return hex(D[d].renk);
-    if (izinAyGun(k) > 0) return XL_RENK.izin;
-    return '';
-  }
+  const xlSatirRenk = (k, gelen) => { const r = satirRenk(k, gelen); return r ? hex(r) : ''; };
   // Hücre biçimi: Times New Roman, ince kenarlık; başlık kalın ve ortalı
   const XL_SINIR = {top: {style: 'thin'}, bottom: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'}};
   function xlSayfa(aoa, ops) {

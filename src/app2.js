@@ -170,8 +170,8 @@
   }
 
   function lejant() {
-    const D = durumlar(), ek = [['#FFFF00', 'Yıllık izin'], ['#95B3D7', 'Geçici görevli + izin']];
-    const set = new Map(); Object.entries(D).forEach(([k, v]) => { if (v.renk && !v.pasif) { const t = set.get(v.renk) || []; t.push(k); set.set(v.renk, t); } });
+    const D = durumlar(), ek = RENK_LEJANT.map(([r, t]) => [RENK[r], t]), kapsanan = k => k === 'GEÇİCİ GÖREVDE' || k === 'GEÇİCİ GÖREVLİ' || /RAPORLU|ANALIK|DOĞUM|GEBE|GEBELİK/.test(k);
+    const set = new Map(); Object.entries(D).forEach(([k, v]) => { if (v.renk && !v.pasif && !kapsanan(k)) { const t = set.get(v.renk) || []; t.push(k); set.set(v.renk, t); } });
     return `<div class="ap-legend">${ek.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join('')}${[...set].map(([c, t]) => `<span><i style="background:${c}"></i>${t.join(' / ')}</span>`).join('')}</div>`;
   }
 
@@ -240,7 +240,7 @@
       const gelen = k.birim !== b.ad, s = satirMap.get(k.id), dt = D[k.durum] || {};
       if (!gelen && son && k.sinif !== son) rows += '<tr class="sep"><td colspan="17"></td></tr>';
       if (!gelen) son = k.sinif;
-      const renk = gelen ? D['GEÇİCİ GÖREVLİ'].renk : satirRenk(k), eng = C.gorevlendirmeEngeli(k, ayIlk());
+      const renk = satirRenk(k, gelen), eng = C.gorevlendirmeEngeli(k, ayIlk());
       const dis = duz ? '' : 'disabled';
       // Hedef ekranda 2 ondalıkla gösterilir (104 sa ÷ 24 = 4,33); planlanan bu yuvarlanmış hedefe ulaşıyorsa mesai tamam sayılır
       const r2 = v => Math.round(v * 100) / 100, hedefTam = s ? sayi(k.planlanan) >= r2(s.hedef) - 1e-9 : false;

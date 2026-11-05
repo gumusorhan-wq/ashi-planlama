@@ -160,12 +160,17 @@ function mount(root, opts = {}) {
   const planlananToplam = (hesap) => hesap.satir.filter(s => !s.nobetYok).reduce((a, s) => a + sayi(s.k.planlanan), 0);
 
   // ---------- görünüm yardımcıları ----------
-  function satirRenk(k) {
-    const D = durumlar(), dt = D[k.durum] || {}, izin = izinAyGun(k) > 0;
-    if (k.gorev && k.gorev.hedef && dt.disarida) return D['GEÇİCİ GÖREVDE'].renk;
-    if (k.durum === 'GEÇİCİ GÖREVLİ' && izin) return '#95B3D7';
-    if (dt.renk) return dt.renk;
-    if (izin) return '#FFFF00';
+  // Satır rengi: ekran, PNG ve Excel'de aynı (planlama biriminin aylık dosyasındaki renk açıklaması)
+  const RENK = {gelen: '#8DB4E2', giden: '#C0504D', izin: '#FFFF00', rapor: '#A6A6A6', analik: '#B1A0C7', uzun: '#9BBB59'};
+  const RENK_LEJANT = [['gelen', '1 aylık gelen personel'], ['giden', 'Giden personel'], ['izin', 'Yıllık izinli personel'], ['rapor', 'Raporlu personel'], ['analik', 'Analık hakkındaki personel (doğum, gebe, süt izni)'], ['uzun', 'Uzun süreli görevlendirme (3 ay ve üzeri)']];
+  function satirRenk(k, gelen) {
+    const D = durumlar(), d = k.durum || '';
+    if (gelen || d === 'GEÇİCİ GÖREVLİ') return RENK.gelen;
+    if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[d] || {}).disarida) return xlUzunGorev(k.gorev) ? RENK.uzun : RENK.giden;
+    if (/RAPORLU/.test(d)) return RENK.rapor;
+    if (/ANALIK|DOĞUM|GEBE|GEBELİK/.test(d) || k.sut > 0) return RENK.analik;
+    if (D[d] && D[d].renk) return D[d].renk;
+    if (izinAyGun(k) > 0) return RENK.izin;
     return '';
   }
   // Kişinin izninin plan ayına düşen takvim günü: tarihli (ASOS) izinlerde yalnız bu aya taşan günler, tarihsiz izinlerde girilen gün sayısı
