@@ -284,6 +284,7 @@
       case 'yan1': S.modul = S.rol === 'istasyon' ? 2 : 1; S.sayfa = v; if (v === 'takip') S.takipVeri = null; S.yanAcik = false; break;      // gömülü sol menü: Modül 1 sayfası
       case 'yan2': S.modul = 2; S.n2.sekme = v; S.n2.altSekme = ''; S.yanAcik = false; break;          // gömülü sol menü: Modül 2 sekmesi
       case 'yan-ac': S.yanAcik = !S.yanAcik; break;
+      case 'yan-dar': S.yanDar = !S.yanDar; try { localStorage.setItem('ap_yan_dar', S.yanDar ? '1' : '0'); } catch (er) {} break;      // gömülü sol menü: daralt / genişlet (bu tarayıcıda saklanır)
       case 'n2-sekme': S.n2.sekme = v; S.n2.altSekme = ''; break;
       case 'n2-gonder': {
         const T = n2TeklifOzet(b); if (!n2Duzenlenir(b.ad)) break;
@@ -338,7 +339,8 @@
       case 'takip-ilce': { const T = S.takip, l = istAdlari().filter(x => C.ilceAdi(x) === v), hepsi = l.every(x => T.ist.includes(x)); T.ist = hepsi ? T.ist.filter(x => !l.includes(x)) : [...new Set([...T.ist, ...l])]; break; }
       case 'takip-temizle': S.takip[v] = []; break;
       case 'takip-tumu': S.takip[v] = [...new Set(Object.keys(S.takipVeri || {}).map(a => +a.slice(0, 4)))]; break;
-      case 'takip-sekme': S.takip.sekme = v; break;
+      case 'takip-sekme': S.takip.sekme = v; S.takipPop = ''; break;
+      case 'takip-gpop': S.takipPop = S.takipPop === v ? '' : v; break;      // geçici görev hücresi: yer / tarih açılır kutusu
       case 'takip-yenile': S.takipVeri = null; break;
       case 'takip-excel': takipExcel(); return true;
       case 'arsiv-ay-sil': if (planlamaRol() && confirm(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`)) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;

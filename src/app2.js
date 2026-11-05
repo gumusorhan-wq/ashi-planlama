@@ -26,19 +26,22 @@
   const YAN_VERI = ['arsiv', 'arstat', 'ayar'];
   function yanHtml() {
     const d = S.plan ? S.plan.durum : '', m1 = S.rol !== 'istasyon';
-    const it = (on, act, v, ad, ikon, ek) => `<button type="button" class="ap-yit ${on ? 'on' : ''}" data-act="${act}" data-v="${v}">${yanIc(ikon)}<span class="ap-ytx">${ad}</span>${ek || ''}</button>`;
+    const it = (on, act, v, ad, ikon, ek) => `<button type="button" class="ap-yit ${on ? 'on' : ''}" data-act="${act}" data-v="${v}" title="${esc(ad)}">${yanIc(ikon)}<span class="ap-ytx">${ad}</span>${ek || ''}</button>`;
     const sp = sayfaListesi(), m1Sec = sp.filter(([k]) => !YAN_VERI.includes(k)), veri = sp.filter(([k]) => YAN_VERI.includes(k));
     const s1 = ([k, t]) => it(S.modul !== 2 && S.sayfa === k, 'yan1', k, t, k, k === 'talep' && talepSay() ? `<span class="ap-ysay">${talepSay()}</span>` : '');
     const n2s = n2Acik() ? S.n2.sekme : 'plan', s2 = N2_SEKME.filter(([k]) => k === 'plan' || n2Acik()).map(([k, t]) => it(S.modul === 2 && n2s === k, 'yan2', k, t, 'n2-' + k)).join('');
     const aktif = S.modul === 2 ? (N2_SEKME.find(x => x[0] === n2s) || [, ''])[1] : (SAYFALAR.find(x => x[0] === S.sayfa) || [, ''])[1];
-    return `<nav class="ap-yan ${S.yanAcik ? 'acik' : ''}" aria-label="Planlama menüsü">
+    const kisaAy = `${AYLAR[S.m].slice(0, 3)} ${String(S.y).slice(2)}`;
+    return `<nav class="ap-yan ${S.yanAcik ? 'acik' : ''} ${S.yanDar ? 'dar' : ''}" aria-label="Planlama menüsü">
       <div class="ap-yanbas"><img class="ap-ylogo" src="${AP_LOGO}" alt=""><div class="ap-ybaslik"><b>ASHİ Planlama</b><span>${S.modul === 2 ? 'Modül 2' : 'Modül 1'} · ${esc(aktif)}</span></div><button type="button" class="ap-yanac" data-act="yan-ac" aria-label="Menüyü aç / kapat">${S.yanAcik ? '✕' : '☰'}</button></div>
+      <div class="ap-ykisa" title="${esc(ayEtiket())}"><button class="ap-ykok" data-act="ay-" title="Önceki ay">‹</button><b>${kisaAy}</b><button class="ap-ykok" data-act="ay+" title="Sonraki ay">›</button></div>
       <div class="ap-yanust"><div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><b>${ayEtiket()}</b><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
         ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>${guncelAy() && planlamaRol() ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir (istasyonlara gönder)'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}</div>` : ''}
         ${opts.kullanici ? '' : `<select class="ap-sel" data-act="rol" title="Rol (demo)">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select>`}</div>
       <div class="ap-yanic">${m1 ? `<div class="ap-ysec">MODÜL 1 · PLANLAMA</div>${m1Sec.map(s1).join('')}` : ''}
         <div class="ap-ysec">MODÜL 2 · NÖBET LİSTESİ</div>${s2}
-        ${m1 && veri.length ? `<div class="ap-ysec">VERİ</div>${veri.map(s1).join('')}` : ''}</div></nav>`;
+        ${m1 && veri.length ? `<div class="ap-ysec">VERİ</div>${veri.map(s1).join('')}` : ''}</div>
+      <button type="button" class="ap-ydar" data-act="yan-dar" title="${S.yanDar ? 'Menüyü genişlet' : 'Menüyü daralt'}" aria-label="${S.yanDar ? 'Menüyü genişlet' : 'Menüyü daralt'}">${S.yanDar ? '›' : '‹'}<span class="ap-ytx">${S.yanDar ? '' : 'Menüyü daralt'}</span></button></nav>`;
   }
 
   function bosHtml() {
@@ -129,7 +132,10 @@
         : '<span class="ap-tag ap-t-ok">Dengede</span>';
       return kartHtml(b, h, p, etiket, plFark, oran, dengeli, isciTam);
     });
-    const f = S.panoFiltre || '', gosterilen = liste.filter((_, i) => !f || kat[ists[i].ad] === f), kartlar = gosterilen.join('');
+    // Ekip arama (büyük/küçük harf ve Türkçe karakter duyarsız): kartlar yalnız görünümde süzülür; üstteki sayı kartları tüm istasyonları sayar
+    const araQ = C.TR(S.panoAra || '').trim(), sar = (h, b) => `<div class="ap-stsar" data-ara="${esc(C.TR(b.ad))}" style="display:${araQ && !C.TR(b.ad).includes(araQ) ? 'none' : 'contents'}">${h}</div>`;
+    const f = S.panoFiltre || '', gosterilenI = ists.map((b, i) => i).filter(i => !f || kat[ists[i].ad] === f), gosterilen = gosterilenI.map(i => liste[i]), kartlar = gosterilenI.map(i => sar(liste[i], ists[i])).join('');
+    const araGorunen = gosterilenI.filter(i => !araQ || C.TR(ists[i].ad).includes(araQ)).length;
     const FILTRE_AD = {oner: 'Personel önerilen istasyonlar', icerde: 'Fazla nöbetle kendi içinde dönen istasyonlar', elle: 'Elle karar gerektiren istasyonlar', fazla: S.ayar.panoMod === 'mesai' ? 'Mesai tamamlayamayan istasyonlar' : 'Fazlalığı olan istasyonlar', of: 'Ekip OF (kapalı) istasyonlar'};
     const tk = (v, sayi, renk, etiket, ek) => `<div class="ap-click ${f === v ? 'on' : ''}" data-act="pano-filtre" data-v="${v}" title="Tıklayınca bu istasyonlar gösterilir" tabindex="0"><b style="color:${renk}">${sayi}</b><span>${etiket}${ek || ''}</span></div>`;
     const aktif = S.plan.kayitlar.filter(k => !(durumlar()[k.durum] || {}).pasif && !aileHek(k)).length;
@@ -152,12 +158,13 @@
       <div><b>${ih}</b><span>Toplam ihtiyaç (nöbet)</span></div><div><b>${fmt(S.ayar.panoMod === 'mesai' ? kap : azk)}</b><span>${S.ayar.panoMod === 'mesai' ? 'Kapasite (mesai karşılığı)' : `Kapasite (en çok ${fmt(S.ayar.azamiMemur)} nöbet)`}</span></div>
       <div><b>${fmt(pl)}</b><span>Planlanan</span></div>${tk('oner', acik, 'var(--ap-bad)', 'Personel önerilen istasyon', ` (toplam ${kisiOner} kişi)`)}${S.ayar.panoMod === 'mesai' ? '' : tk('icerde', fm, 'var(--ap-warn)', 'Fazla nöbetle kendi içinde dönen')}${tk('elle', elle, '#9a3412', S.ayar.panoMod === 'mesai' ? 'Açık kalan (kişiye yetmeyen)' : 'Elle karar gerektiren')}${tk('fazla', fazla, 'var(--ap-warn)', S.ayar.panoMod === 'mesai' ? 'Mesai tamamlayamayan' : 'Fazlalığı olan (fazla mesaili)')}</div>
       ${f ? `<div class="ap-row"><b>${FILTRE_AD[f]}: ${gosterilen.length}</b><button class="ap-btn sm" data-act="pano-filtre" data-v="">✕ Filtreyi kaldır</button><span class="ap-note">Kartlara tıklayarak istasyonu açabilirsiniz.</span></div>` : ''}
-      <div class="ap-toolbar ap-noprint"><button class="ap-btn pri" data-act="tum-plan" ${salt() ? 'disabled' : ''} title="Geri çağırma, nöbet hesabı ve rotasyon görevlendirmelerini tek seferde yapar">Tüm planlamayı oluştur</button><button class="ap-btn dng" data-act="plan-sifirla" ${salt() || !planlamaRol() ? 'disabled' : ''} title="Bu ayın planını tamamen siler (arşiv etkilenmez)">Bu ayın planını sıfırla</button><button class="ap-btn" data-act="oner-hepsi" title="Tüm istasyonlarda planlanan nöbetleri yeniden hesaplar">Planlananı yeniden hesapla</button>
+      <div class="ap-toolbar ap-noprint" data-ust><button class="ap-btn pri" data-act="tum-plan" ${salt() ? 'disabled' : ''} title="Geri çağırma, nöbet hesabı ve rotasyon görevlendirmelerini tek seferde yapar">Tüm planlamayı oluştur</button><button class="ap-btn dng" data-act="plan-sifirla" ${salt() || !planlamaRol() ? 'disabled' : ''} title="Bu ayın planını tamamen siler (arşiv etkilenmez)">Bu ayın planını sıfırla</button><button class="ap-btn" data-act="oner-hepsi" title="Tüm istasyonlarda planlanan nöbetleri yeniden hesaplar">Planlananı yeniden hesapla</button>
       <button class="ap-btn" data-act="excel-toplu" title="Tüm istasyonlar, her biri ayrı sayfada, tek Excel dosyasında (planlama biriminin Excel düzeni; tahmini nöbet mesai saatinden)">Tüm istasyonlar Excel (tek dosya)</button>
       <span class="ap-seg" title="Mesai karşılığı: herkes yalnız mesaisini tamamlayacak kadar nöbet tutar. Fazla mesaili: DOKTOR-AABT-ATT'ye yazdığınız nöbet sayısına kadar fazla nöbet yazılabilir."><button class="${S.ayar.panoMod === 'mesai' ? 'on' : ''}" data-act="pano-mod" data-v="mesai">Mesai karşılığı</button><button class="${S.ayar.panoMod !== 'mesai' ? 'on' : ''}" data-act="pano-mod" data-v="fazla">Fazla mesaili</button></span>
       <label class="ap-note ap-azami ${S.ayar.panoMod === 'mesai' ? 'off' : ''}" title="DOKTOR-AABT-ATT'ye bir ayda yazılabilecek en çok 24 saatlik nöbet sayısı. Yazdığınız sayıya göre pano yeniden hesaplanır (istasyon sayfasından istasyona özel değiştirilebilir).">DOKTOR-AABT-ATT en çok <input class="ap-in n" type="number" min="0" step="0.5" data-pano-azami value="${S.ayar.azamiMemur}" ${S.ayar.panoMod === 'mesai' || salt() ? 'disabled' : ''}> nöbet</label>
       <span class="ap-note">${AYLAR[S.m]}: ${C.gunSayisi(S.y, S.m)} gün × ${C.YUVA_VARSAYILAN} nöbet branşı = ${C.gunSayisi(S.y, S.m) * C.YUVA_VARSAYILAN} nöbet/istasyon · memur ${fmt(C.ayMesai(S.y, S.m, false, ozel()))} sa., işçi ${fmt(C.ayMesai(S.y, S.m, true, ozel()))} sa.</span></div>
-      <div class="ap-grid">${kartlar || `<div class="ap-empty">${f ? 'Bu grupta istasyon yok' : 'İstasyon yok'}</div>`}</div>`;
+      <div class="ap-row ap-noprint ap-pano-ara" data-ust><input id="ap-pano-ara" class="ap-in" type="search" placeholder="Ekip ara…" value="${esc(S.panoAra || '')}" aria-label="Ekip (istasyon) ara" autocomplete="off"><span class="ap-note" id="ap-pano-ara-say">${araQ ? `${araGorunen} / ${gosterilenI.length} istasyon gösteriliyor (üstteki sayılar tüm istasyonlar içindir)` : ''}</span></div>
+      <div class="ap-grid">${kartlar || `<div class="ap-empty">${f ? 'Bu grupta istasyon yok' : 'İstasyon yok'}</div>`}<div class="ap-empty" id="ap-pano-ara-yok" style="display:${araQ && !araGorunen && kartlar ? '' : 'none'}">Aramaya uyan istasyon yok</div></div>`;
   }
 
   function lejant() {
@@ -246,7 +253,7 @@
       <label class="ap-note" title="Boş bırakırsanız Pano'daki mod geçerli olur (Mesai karşılığı: fazla nöbet yazılmaz; Fazla mesaili: genel ${fmt(S.ayar.azamiMemur)} nöbet). Bir sayı yazarsanız bu istasyon, Pano modundan bağımsız olarak o sayıyla fazla mesaili hesaplanır.">Bu istasyonda azami nöbet (DOKTOR-AABT-ATT) <input class="ap-in n" type="number" step="0.5" min="0" data-ib="${esc(b.ad)}" value="${b.azamiMemur != null ? b.azamiMemur : ''}" placeholder="${fmt(S.ayar.azamiMemur)}" ${duz ? '' : 'disabled'}></label>
       ${planTam ? '<span class="ap-tag ap-t-ok">İstasyon tam: ihtiyaç karşılandı</span>' : `${h.ihtiyacTur === 'oner' ? `<span class="ap-tag ap-t-ih">Personel öner: ${h.ihtiyacKisi} kişi (hedefle ${fmt(h.hedefAcik)} nöbet açık${h.kalanAcik > 0 ? ', ' + fmt(h.kalanAcik) + ' nöbet fazla nöbetle' : ''})</span>` : h.ihtiyacTur === 'icerde' ? `<span class="ap-tag ap-t-fz">Fazla nöbetle kendi içinde döner: hedefin ${fmt(h.hedefAcik)} nöbet üstü yazılıyor, personel önerilmez</span>` : h.ihtiyacTur === 'elle' ? `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Elle karar: ${fmt(-h.farkAzami)} nöbet açık kalıyor; gelen kişi mesaisini tamamlayamaz</span>` : ''}${h.durum === 'fazla' ? `<span class="ap-tag ap-t-fz">Mesai tamamlayamama ${fmt(h.fazlaH)}</span>` : ''}`}
       </div>${slotOzet(h)}<div class="ap-note">İhtiyaç = ${h.gun} gün × ${b.yuva || 3} nöbet branşı${b.tip ? ` · İstasyon tipi ${esc(b.tip)}${b.tip === 'A1' ? ' (doktorlu)' : ''}` : ''}. Doktor yalnızca ekip şefi nöbet branşını (${h.gun}) doldurur; işçi sürücü nöbet branşında 12 saatlik nöbet tutar (en çok ${h.gun}); kalanı memur karşılar. DOKTOR-AABT-ATT hedefin üstünde en çok ${fmt(b.azamiMemur != null ? b.azamiMemur : S.ayar.azamiMemur)} nöbet yazılır; işçi hedefin üstünde nöbet tutmaz.</div></div>` : '';
-    return `<div class="ap-row ap-noprint"><select class="ap-sel" data-act="ist-sec">${birimler.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select>
+    return `<div class="ap-row ap-noprint" data-ust><select class="ap-sel" data-act="ist-sec">${birimler.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select>
       <button class="ap-btn" data-act="ist-onceki">‹</button><button class="ap-btn" data-act="ist-sonraki">›</button>
       ${istas ? `<button class="ap-btn pri" data-act="oner" ${duz ? '' : 'disabled'} title="Plan her değişiklikte otomatik hesaplanır; bu düğme kilitli olmayan değerleri yeniden hesaplar">Yeniden hesapla</button>` : ''}
       ${istas ? `<button class="ap-btn" data-act="ist-onayla" data-v="1" ${duz ? '' : 'disabled'} title="Bu istasyonda yazılı tüm planlanan nöbetleri onaylar: elle değiştirdiğiniz değerler gibi kilitlenir, otomatik hesap bunları değiştirmez">Planı onayla (kilitle)</button><button class="ap-btn" data-act="ist-onayla" data-v="0" ${duz ? '' : 'disabled'} title="Bu istasyondaki tüm kilitleri açar; değerler yeniden otomatik hesaplanır">Kilitleri aç</button>` : ''}
@@ -345,7 +352,7 @@
       return `<div class="ap-pager ap-noprint">${dugme(0, '«', false, p === 0)}${dugme(p - 1, '‹ Önceki', false, p === 0)}${nums.join('')}${dugme(p + 1, 'Sonraki ›', false, p >= sayfaSay - 1)}${dugme(sayfaSay - 1, '»', false, p >= sayfaSay - 1)}
         <span class="ap-note">${liste.length ? bas + 1 : 0}–${Math.min(liste.length, bas + boyut)} / ${liste.length} · Sayfa ${p + 1}/${sayfaSay}</span>
         <select class="ap-sel" data-act="p-boyut">${[25, 50, 100, 200].map(n => `<option value="${n}" ${n === boyut ? 'selected' : ''}>${n} / sayfa</option>`).join('')}</select></div>`; };
-    return `<div class="ap-row ap-noprint"><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''} title="Personel Listesi Raporu ve EKİP listesini birlikte seçebilirsiniz">Personel listelerini yükle</button>
+    return `<div class="ap-row ap-noprint" data-ust><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''} title="Personel Listesi Raporu ve EKİP listesini birlikte seçebilirsiniz">Personel listelerini yükle</button>
       <input class="ap-in" data-act="f-q" placeholder="Ad veya TC ara" value="${esc(f.q)}">
       <select class="ap-sel" data-act="f-birim"><option value="">Tüm birimler</option>${S.plan.birimler.map(b => `<option ${b.ad === f.birim ? 'selected' : ''}>${esc(b.ad)}</option>`).join('')}</select>
       <select class="ap-sel" data-act="f-sinif"><option value="">Tüm sınıflar</option>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === f.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select>
@@ -437,14 +444,29 @@
     const l = root.querySelectorAll(PLAN_KUTU), i = S.odakSonraki; S.odakSonraki = null;
     const h = l[i] || l[l.length - 1]; if (h) { h.focus({preventScroll: false}); try { h.select(); } catch (e) {} }
   }
+  // Gömülü mod: sayfa başlığı + "Son kayıt" + sayfanın data-ust işaretli düğme / süzgeç satırları içerik kutusunun üstünde yapışık bölüme (.ap-ust) taşınır;
+  // tablo başlıkları (thead) tablonun kendi kaydırma kutusunda yapışık durur. Dar ekranda (≤760 px) CSS yapışkanlığı kapatır, düzen değişmez.
+  let ustGozcu = null;
+  function ustYerlestir() {
+    const ust = root.querySelector('.ap-ust'); if (!ust) return;
+    const main = ust.parentNode, bas = main.querySelector(':scope > .ap-sbas');
+    if (bas) ust.appendChild(bas);
+    main.querySelectorAll('[data-ust]').forEach(x => { if (!ust.contains(x)) ust.appendChild(x); });
+    if (!ust.children.length) { ust.remove(); return; }
+    const olc = () => { const ic = root.querySelector('.ap-icerik'); if (ic) ic.style.setProperty('--ap-ust-h', ust.offsetHeight + 'px'); };
+    // Yatay taşmayan tablolar kendi kutusunda kaydırılmaz: başlıkları doğrudan sabit üst bölümün altına yapışır; taşanlar (ör. İstasyon tablosu) kutusunda kalır
+    const sinifla = () => root.querySelectorAll('.ap-icerik .ap-tw').forEach(tw => { const t = tw.querySelector('table'); if (t) tw.classList.toggle('ap-tw-acik', t.scrollWidth <= tw.clientWidth + 1); });
+    olc(); sinifla();
+    if (typeof ResizeObserver === 'function') { if (ustGozcu) ustGozcu.disconnect(); ustGozcu = new ResizeObserver(() => { olc(); sinifla(); }); ustGozcu.observe(ust); const ic = root.querySelector('.ap-icerik'); if (ic) ustGozcu.observe(ic); }
+  }
   function render() {
-    const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0;
+    const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0, ic0 = root.querySelector('.ap-icerik'), isy = ic0 ? ic0.scrollTop : 0;
     const koyu = !opts.gomulu && S.ayar && (S.ayar.tema === 'koyu' || (S.ayar.tema === 'sistem' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
     root.className = 'ap-root' + (koyu ? ' ap-dark' : '') + (opts.gomulu ? ' ap-gomulu' : ''); document.body.style.background = koyu ? '#0f1720' : opts.gomulu ? '#f8fafc' : '#f4f6f9';      // gömülü modda tema her zaman açık: koyu modu ana uygulama verir
     if (S.rol === 'istasyon') S.modul = 2;
     kilitGuncelle();
     const bant = (kilitBende() ? '' : `<div class="ap-oku"><b>${esc(kilitMesaj())}</b> O kişi çıkınca düzenleme kendiliğinden açılır.</div>`) + (guncelAy() ? '' : `<div class="ap-oku"><b>Arşiv görünümü — ${ayEtiket()} salt okunur.</b> Geçmiş aylar yalnızca görüntülenir, değiştirilemez. <button class="ap-btn sm" data-act="guncel-ay">Güncel aya dön (${AYLAR[GUNCEL_M]} ${GUNCEL_Y})</button></div>`);
-    root.innerHTML = (opts.gomulu ? `<div class="ap-yanlay">${yanHtml()}<div class="ap-icerik">${bant}<div class="ap-main">${sayfaHtml()}</div></div></div>` : ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + bant + `<div class="ap-main">${sayfaHtml()}</div>`) + (S.modal ? S.modal() : '');
+    root.innerHTML = (opts.gomulu ? `<div class="ap-yanlay">${yanHtml()}<div class="ap-icerik">${bant}<div class="ap-main"><div class="ap-ust"></div>${sayfaHtml()}</div></div></div>` : ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + bant + `<div class="ap-main">${sayfaHtml()}</div>`) + (S.modal ? S.modal() : '');
     // Sayı sütunları: tüm hücreleri sayı olan sütunun başlığı ve hücreleri sağa yaslanır (başlık ile sayı aynı hizada)
     root.querySelectorAll('table').forEach(t => {
       const ths = [...t.querySelectorAll('thead th')]; if (!ths.length) return;
@@ -457,7 +479,8 @@
       });
     });
     toastCiz();
+    ustYerlestir();
     const tw2 = root.querySelector('.ap-tw'); if (tw2) { tw2.scrollLeft = sl; tw2.scrollTop = st; }
-    window.scrollTo(0, sy);
+    window.scrollTo(0, sy); const ic1 = root.querySelector('.ap-icerik'); if (ic1) ic1.scrollTop = isy;
     odakUygula();
   }

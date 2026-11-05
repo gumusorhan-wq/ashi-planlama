@@ -166,6 +166,92 @@
     });
     return out;
   }
+  // ---------- İK (ASHİ Nöbet Sayım) kurum arşivinden alma (gömülü mod, opts.ik) ----------
+  // İK ay paketi: slots.{sonu|basi}.allData.{ef,ysp,sur}[] kişi {tc, ad, soyad, kadro_brans, nobetler[{ist, saat (null = mesai/diğer), sure_raw, basRaw, startMs}]},
+  // slots.*.specialDutyLists.{komuta,bashekimlik}[] kişi {tc, ad, soyad, brans, records[{ist, saat, sure_raw, basRaw, startMs}]},
+  // izin / izinBasi: {records[{tc, name, type, startMs, endMs, days, saat?}]}. Burada asosParseN / asosParseI çıktısıyla aynı satırlar üretilir.
+  const IK_ROL = {ef: 'es', ysp: 'ysp', sur: 'sur'};
+  const ikOncekiAylar = (n = 6) => { const out = []; for (let i = 1; i <= n; i++) { let y = S.y, m = S.m - i; while (m < 1) { m += 12; y--; } out.push(`${y}-${C.pad(m)}`); } return out; };
+  // "En son yüklenen" kuralı: bir ayın Ay Başı / Ay Sonu nöbet kayıtlarından savedAt'i en yeni olan (eşitse Ay Sonu); izinde izin / izinBasi'den savedAt'i en yeni olan
+  const ikEnYeni = l => l.filter(Boolean).reduce((a, b) => !a || String(b.savedAt || '') > String(a.savedAt || '') ? b : a, null);
+  const ikSlot = p => (p && p.slots && ikEnYeni([p.slots.sonu, p.slots.basi].filter(x => x && x.allData))) || null;
+  const ikIzin = p => (p && ikEnYeni([p.izin, p.izinBasi].filter(x => x && Array.isArray(x.records)))) || null;
+  function ikNobetSatirlari(paketler) {      // paketler: [{ym, paket}] → Nöbet raporu satırları (tur N)
+    const out = [], gor = new Set(), aylar = new Set(paketler.map(x => x.ym));
+    const tani = {satir: 0, tcYok: 0, istasyonDisi: 0, ambulansDisi: 0, rolYok: {}, sureYok: {}, ok: 0, baslik: 'İK arşivi (ASHİ Nöbet Sayım) ay paketleri: ' + [...aylar].sort().join(', '), gorevler: {}};
+    const say = (o, v) => { o[v] = (o[v] || 0) + 1; };
+    const ayBul = (n, saat, ym) => {      // nöbetin ayı: süresinin ortası, 09:00 nöbet günü başlangıcına göre (İK'nın ay tanımı); getirilmeyen aya düşerse paketin ayı
+      if (!Number.isFinite(n.startMs)) return ym;
+      const a = new Date(n.startMs + ((saat || 0) / 2 - 9) * 36e5).toISOString().slice(0, 7);
+      return aylar.has(a) ? a : ym;
+    };
+    const sure = n => { if (Number(n.saat) > 0) return {saat: Number(n.saat), mesai: false}; if (/mesai/i.test(String(n.sure_raw || ''))) return {saat: 8, mesai: true}; say(tani.sureYok, String(n.sure_raw || '(boş)')); return {saat: 1, mesai: false}; };
+    paketler.forEach(({ym, paket}) => {
+      const sl = ikSlot(paket); if (!sl) return;
+      Object.entries(IK_ROL).forEach(([g, rol]) => (sl.allData[g] || []).forEach(p => {
+        const tc = String(p.tc || '').replace(/\D/g, ''), ad = `${p.ad || ''} ${p.soyad || ''}`.trim().toLocaleUpperCase('tr-TR').replace(/\s+/g, ' ');
+        (p.nobetler || []).forEach(n => {
+          tani.satir++; if (!tc) { tani.tcYok++; return; }
+          const s = sure(n), bas = String(n.basRaw || n.bas || ''), k = `${tc}|${bas}|${rol}`;
+          if (bas && gor.has(k)) return; gor.add(k);      // komşu ayların paketlerinde aynı nöbet iki kez sayılmaz
+          say(tani.gorevler, {es: 'Ekip Sorumlusu', ysp: 'Yardımcı Sağlık Personeli', sur: 'Sürücü'}[rol]); tani.ok++;
+          out.push({tc, rol, saat: s.saat, ad, brans: String(p.kadro_brans || ''), birimMetin: String(n.ist || p.asilIst || ''), mesai: s.mesai, bas, ay: ayBul(n, s.saat, ym)});
+        });
+      }));
+      const ozel = sl.specialDutyLists || {};
+      [['bashekimlik', 'bh'], ['komuta', 'kkm']].forEach(([alan, idari]) => (ozel[alan] || []).forEach(p => {
+        const tc = String(p.tc || '').replace(/\D/g, ''), ad = `${p.ad || ''} ${p.soyad || ''}`.trim().toLocaleUpperCase('tr-TR').replace(/\s+/g, ' ');
+        (p.records || []).forEach(n => {
+          tani.satir++; if (!tc) { tani.tcYok++; return; }
+          const s = sure(n), bas = String(n.basRaw || ''), k = `${tc}|${bas}|${idari}`;
+          if (bas && gor.has(k)) return; gor.add(k); tani.idari = (tani.idari || 0) + 1;
+          out.push({tc, rol: '', idari, saat: s.saat, ad, brans: String(n.brans || p.brans || ''), birimMetin: String(n.ist || (idari === 'bh' ? BH_AD : KKM_AD)), mesai: s.mesai, bas, ay: ayBul(n, s.saat, ym)});
+        });
+      }));
+    });
+    out.tani = tani; return out;
+  }
+  function ikIzinSatirlari(paketler) {      // İzin-Muafiyet satırları (tur I): yalnız plan ayına denk gelen kayıtlar (rapordaki kişilerin ASOS izni yenilendiği için eski kayıtlar alınmaz)
+    const ilk = ayIlk(), son = gunSon(), gor = new Set(), out = [];
+    const tarih = ms => Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : '';
+    paketler.forEach(({paket}) => [ikIzin(paket)].forEach(iz => ((iz && iz.records) || []).forEach(r => {
+      const tc = String(r.tc || '').replace(/\D/g, ''), bas = tarih(r.startMs), bit = tarih(r.endMs); if (!tc || !bas || !bit) return;
+      if (bit < ilk || bas > son) return;
+      const tip = String(r.type || '').trim(), k = `${tc}|${C.TR(tip)}|${bas}|${bit}`; if (gor.has(k)) return; gor.add(k);
+      const T = C.TR(tip), muaf = /MUAFIYET|SUT IZN/.test(T);
+      let izin = null, mu = [];
+      if (muaf) { const s = T.match(/(\d+(?:[.,]\d+)?)\s*SAAT/); mu = [/NOBET MUAF/.test(T) ? {tur: 'nobet', bas, bit} : /SUT IZN/.test(T) ? {tur: 'sut', bas, bit, saat: s ? parseFloat(s[1].replace(',', '.')) : (Number(r.saat) || 0)} : {tur: 'diger', bas, bit, ad: tip}]; }
+      else izin = {tip, bas, bit, gun: sayi(r.days)};
+      out.push({tur: 'I', tc, ad: String(r.name || '').toLocaleUpperCase('tr-TR').replace(/\s+/g, ' ').trim(), izin, muaf: mu});
+    })));
+    return out;
+  }
+  // İK'daki ay listesi (önbellekli; Arşiv durum tablosu için)
+  async function ikAylariGetir(zorla) {
+    if (!opts.ik) return [];
+    if (!zorla && Array.isArray(S.ikAylar)) return S.ikAylar;
+    try { const l = ((await opts.ik.aylar()) || []).filter(x => x && /^\d{4}-\d{2}$/.test(x.ym || '')); S.ikAylar = l.map(x => x.ym); S.ikMod = Object.fromEntries(l.map(x => [x.ym, String(x.mod || '')])); S.ikSlotlu = new Set(l.filter(x => !Array.isArray(x.slotlar) || x.slotlar.length).map(x => x.ym)); S.ikIzinli = new Set(l.filter(x => x.izin !== false).map(x => x.ym)); } catch (er) { S.ikAylar = []; S.ikMod = {}; }
+    return S.ikAylar;
+  }
+  // turler: ['N'] / ['I'] / ['N', 'I']. Nöbet: plan ayından önceki son 6 ay; izin: aynı aylar + plan ayı. Sonuç olağan önizlemeye düşer (Uygula ile işlenir).
+  async function ikdenAl(turler) {
+    if (!opts.ik) { toast('İK bağlantısı yok.'); return; }
+    if (salt()) { toast('Bu ay düzenlemeye kapalı.'); return; }
+    const var_ = new Set(await ikAylariGetir(true)), nAy = ikOncekiAylar().filter(a => var_.has(a) && (!S.ikSlotlu || S.ikSlotlu.has(a))), iAy = [ayAnahtari(), ...ikOncekiAylar()].filter(a => var_.has(a) && (!S.ikIzinli || S.ikIzinli.has(a)));
+    const gerek = [...new Set([...(turler.includes('N') ? nAy : []), ...(turler.includes('I') ? iAy : [])])];
+    if (!gerek.length) { toast(`İK'da ${turler.includes('N') ? 'son 6 ayın' : 'bu dönemin'} verisi yok — dosya yükleyin.`); render(); return; }
+    S.modal = () => '<div class="ap-modal"><div><h2>İK arşivinden alınıyor…</h2><p class="ap-note">' + gerek.map(ayAd).join(', ') + '</p></div></div>'; render();
+    const paketler = [], hatali = [];
+    for (const ym of gerek.sort()) { try { const p = await opts.ik.ay(ym); if (p && p.slots) paketler.push({ym, paket: p}); else hatali.push(ym); } catch (er) { hatali.push(ym); } }
+    const kisa = l => l.map(a => { const [y, m] = a.split('-'); return `${AYLAR[+m].slice(0, 3)} ${y}`; }).join(', ');
+    const l = [];
+    if (turler.includes('N')) { const pk = paketler.filter(x => nAy.includes(x.ym) && ikSlot(x.paket)); const s = ikNobetSatirlari(pk); if (s.length) l.push({ad: `İK'dan alındı (${kisa(pk.map(x => x.ym))})`, tur: 'N', satirlar: s, kaynak: 'ik', ikMod: Object.fromEntries(pk.map(x => [x.ym, (S.ikMod || {})[x.ym] || '']))}); }
+    if (turler.includes('I')) { const pk = paketler.filter(x => iAy.includes(x.ym) && ikIzin(x.paket)); const s = ikIzinSatirlari(pk); if (s.length) l.push({ad: `İK'dan alındı (izin: ${kisa(pk.map(x => x.ym))})`, tur: 'I', satirlar: s, kaynak: 'ik', ikMod: Object.fromEntries(pk.map(x => [x.ym, (S.ikMod || {})[x.ym] || '']))}); }
+    S.modal = null;
+    if (!l.length) { toast(`İK'da ${turler.length > 1 ? 'nöbet / izin' : turler[0] === 'N' ? 'nöbet' : 'bu aya denk gelen izin'} kaydı yok — dosya yükleyin.${hatali.length ? ' (Okunamayan: ' + kisa(hatali) + ')' : ''}`); render(); return; }
+    if (hatali.length) toast('İK\'dan okunamayan aylar: ' + kisa(hatali));
+    await asosDosyalariIsle(l);
+  }
   function asosParseB(rows, hi) {
     const sec = rows[Math.max(0, hi - 1)] || [], ix = {}; let cur = '';
     rows[hi].forEach((h, i) => { if (hi > 0 && sec[i]) cur = C.TR(sec[i]).slice(0, 8); const k = cur + '|' + C.TR(h); if (ix[k] === undefined) ix[k] = i; });
@@ -388,7 +474,7 @@
       try {
         if (f.tur && Array.isArray(f.satirlar)) {
           if (!f.satirlar.length) throw new Error('Veride satır yok.');
-          sonuc.push({ad, tur: f.tur, p: {tur: f.tur, satirlar: f.satirlar}, boyut: 0}); continue;
+          sonuc.push({ad, tur: f.tur, p: {tur: f.tur, satirlar: f.satirlar}, boyut: 0, kaynak: f.kaynak || '', ikMod: f.ikMod}); continue;
         }
         if (!/\.(xls|xlsx)$/i.test(ad)) throw new Error('Yalnızca .xls / .xlsx dosyaları yüklenebilir.');
         const p = asosParse(f.veri ? XLSX.read(f.veri instanceof Uint8Array ? f.veri : new Uint8Array(f.veri), {type: 'array', cellDates: false}) : await xlsOku(f));
@@ -740,6 +826,7 @@
           const l = await opts.veriKaynagi({ay: ayAnahtari(), turler: ['N', 'I']}); if (!l || !l.length) { toast('ASHİ\'den veri gelmedi.'); break; }
           await asosDosyalariIsle(l); return;
         }
+        case 'ik-al': await ikdenAl(v ? v.split(',') : ['N', 'I']); return;      // İK (ASHİ Nöbet Sayım) arşivinden nöbet / izin verisi
         case 'ist-kmp': S.istKmp = !S.istKmp; break;
         case 'rot-sekme': S.rotSekme = v; break;
         case 'ozet-sekme': S.ozetSekme = v; break;
@@ -875,6 +962,12 @@
   // Görevlendirmeler listesini yazdıkça süz (yeniden çizmeden)
   root.addEventListener('input', e => {
     const t = e.target;
+    if (t && t.id === 'ap-pano-ara') {      // Pano: ekip arama — kartlar istasyon adına göre süzülür (yeniden çizim yok; odak korunur)
+      S.panoAra = t.value; const q = C.TR(t.value).trim(); let n = 0, top = 0;
+      root.querySelectorAll('.ap-stsar[data-ara]').forEach(x => { top++; const g = !q || x.dataset.ara.includes(q); x.style.display = g ? 'contents' : 'none'; if (g) n++; });
+      const say = root.querySelector('#ap-pano-ara-say'); if (say) say.textContent = q ? `${n} / ${top} istasyon gösteriliyor (üstteki sayılar tüm istasyonlar içindir)` : '';
+      const yok = root.querySelector('#ap-pano-ara-yok'); if (yok) yok.style.display = q && !n && top ? '' : 'none'; return;
+    }
     if (t && t.id === 'ap-ist-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(); root.querySelectorAll('.ap-pop-ist [data-ara]').forEach(x => { x.style.display = !q || x.dataset.ara.includes(q) ? '' : 'none'; }); return; }
     if (t && (t.id === 'ap-d-kisi' || t.id === 'ap-d-ist')) {      // İstasyon dışı görevliler: aynı süzgeç, durum yeniden çizimde korunur
       S.disAra = (root.querySelector('#ap-d-kisi') || {}).value || ''; S.disIst = (root.querySelector('#ap-d-ist') || {}).value || '';
