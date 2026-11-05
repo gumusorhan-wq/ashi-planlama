@@ -124,5 +124,58 @@ table.tk td{text-align:center;font-size:12.5px}table.tk td:first-child,table.tk 
 .ap-ist th,.ap-ist td{padding-left:5px;padding-right:5px}
 .ap-toolbar .ap-btn{padding:5px 11px;font-size:13px}.ap-toolbar .ap-in.n{width:54px;padding:4px 6px}
 /* İzin açıklaması: izin günü ve izin türü kutularının altında, iki sütun boyunca tek satır */
-.ap-ist td.iz-g,.ap-ist td.iz-t{vertical-align:top}
 .ap-ist td .ap-note.iz-not{white-space:nowrap;width:max-content;position:relative;z-index:1;margin-top:3px;overflow-wrap:normal}
+
+/* İstasyon tablosu hizası: tüm kutular (izin günü, izin türü, durum, rol, geçici görev yeri/tarihi, plan) aynı yükseklikte ve satırın aynı çizgisinde;
+   altlarındaki küçük notlar satırı uzatsa da ana çizgi kaymaz (önceden bazı hücreler üste, bazıları ortaya hizalıydı) */
+.ap-ist td{vertical-align:top;padding-top:6px;padding-bottom:6px}
+.ap-ist .ap-in,.ap-ist .ap-sel{height:28px;line-height:18px;padding-top:4px;padding-bottom:4px;vertical-align:top;margin:0}
+.ap-ist .ap-gh .ap-in{margin-top:4px}
+.ap-ist td.num,.ap-ist td.fk{line-height:28px}.ap-ist td.num .ap-note,.ap-ist td.fk .ap-note{line-height:1.2}
+.ap-ist td>input[type=checkbox]{margin:7px 0 0;width:15px;height:15px;vertical-align:top}
+.ap-ist .ap-hd{display:inline-block;padding-top:5px;line-height:1.35}
+.ap-ist .ap-stb{height:28px;justify-content:space-between}.ap-ist .ap-stb button{height:13.5px;line-height:11px}
+.ap-ist td:last-child .ap-btn{margin:3px 0 0}
+.ap-ist td .ap-note{margin-top:3px}
+.ap-ist td .ap-tag{display:inline-block;margin-top:3px}
+.ap-damga{font-size:12px;color:var(--ap-mut);font-weight:400;margin-top:2px}
+.ap-sbas{margin:0 0 12px}
+.ap-sbas h2{margin:0;font-size:19px;font-weight:700;color:var(--ap-ink);letter-spacing:-.01em}
+table.tk th.tk-ay{text-align:center;min-width:52px}table.tk th.tk-yok{color:var(--ap-mut);font-weight:500;background:#f1f5f9}
+
+/* ---- Gömülü mod (112stoktakip): sol menü ve ana uygulamanın görsel dili (birincil #0055A4, IBM Plex Sans / Manrope, keskin köşeler) ---- */
+.ap-root.ap-gomulu{--ap-pri:#0055a4;--ap-pri2:#eff6ff;--ap-bg:#f8fafc;--ap-line:#e2e8f0;font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;overflow-x:visible}
+.ap-gomulu h1,.ap-gomulu h2,.ap-gomulu h3,.ap-gomulu .ap-ybaslik b{font-family:'Manrope','IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.ap-gomulu .ap-card,.ap-gomulu .ap-st,.ap-gomulu .ap-sum div,.ap-gomulu .ap-tw,.ap-gomulu .ap-ek,.ap-gomulu .ap-pop,.ap-gomulu .ap-modal>div{border-radius:4px}
+.ap-gomulu .ap-btn,.ap-gomulu .ap-in,.ap-gomulu .ap-sel,.ap-gomulu .ap-subnav button,.ap-gomulu .ap-seg,.ap-gomulu .ap-chip,.ap-gomulu .ap-aybtn{border-radius:3px}
+.ap-gomulu .ap-badge,.ap-gomulu .ap-tag{border-radius:2px}
+.ap-gomulu .ap-main{max-width:none;margin:0;padding:18px 22px}
+.ap-yanlay{display:flex;align-items:flex-start;min-height:100vh}
+.ap-icerik{flex:1;min-width:0}
+.ap-yan{width:240px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto;background:#fff;border-right:1px solid #e2e8f0;color:#334155;display:flex;flex-direction:column}
+.ap-yanbas{display:flex;align-items:center;gap:10px;padding:14px 14px 12px;border-bottom:1px solid #e2e8f0}
+.ap-ylogo{width:34px;height:34px;flex:none;border:1px solid #e2e8f0;background:#fff;padding:2px;object-fit:contain}
+.ap-ybaslik{flex:1;min-width:0}.ap-ybaslik b{display:block;font-size:14px;color:#0f172a;line-height:1.2}.ap-ybaslik span{display:block;font-size:11.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ap-yanac{display:none;font:inherit;font-size:16px;line-height:1;border:1px solid #cbd5e1;background:#fff;color:#334155;width:34px;height:34px;align-items:center;justify-content:center;cursor:pointer;border-radius:0}
+.ap-yanust{padding:10px 14px 12px;border-bottom:1px solid #e2e8f0;display:flex;flex-direction:column;gap:8px}
+.ap-yanust .ap-ay{justify-content:space-between}.ap-yanust .ap-ay b{flex:1;min-width:0;font-size:14px;text-align:center;color:#0f172a}
+.ap-ydurum{display:flex;gap:6px;align-items:center}.ap-ydurum .ap-sel{flex:1;min-width:0;font-size:12px;padding:4px 6px}
+.ap-yanust>.ap-sel{width:100%;font-size:12px}
+.ap-yanic{padding:4px 0 18px}
+.ap-ysec{font-size:10.5px;letter-spacing:.09em;color:#94a3b8;font-weight:700;padding:14px 16px 4px}
+.ap-yit{display:flex;align-items:center;gap:10px;width:100%;padding:8px 14px 8px 13px;border:0;border-left:3px solid transparent;border-radius:0;background:none;color:#334155;font:inherit;font-size:13px;font-weight:600;cursor:pointer;text-align:left}
+.ap-yit:hover{background:#f1f5f9;color:#0f172a}
+.ap-yit.on{background:#eff6ff;color:#0055a4;border-left-color:#0055a4;font-weight:700}
+.ap-yic{width:16px;height:16px;flex:none;display:inline-flex}.ap-yic svg{width:16px;height:16px}
+.ap-ytx{flex:1;min-width:0}
+.ap-ysay{background:var(--ap-badbg);color:var(--ap-bad);font-size:11px;font-weight:700;padding:0 6px;border-radius:2px}
+.ap-gomulu .ap-oku{padding:8px 22px}
+@media (max-width:760px){
+  .ap-yanlay{display:block}
+  .ap-yan{width:100%;height:auto;max-height:100vh;z-index:20;border-right:0;border-bottom:1px solid #e2e8f0}
+  .ap-yanac{display:inline-flex}
+  .ap-yan:not(.acik) .ap-yanust,.ap-yan:not(.acik) .ap-yanic{display:none}
+  .ap-gomulu .ap-main{padding:12px}
+}
+@media print{.ap-yan{display:none!important}}
+.ap-ist td.num+td:not(.num),.ap-ist th.num+th:not(.num),.ap-ist td.num,.ap-ist th.num{padding-left:5px}

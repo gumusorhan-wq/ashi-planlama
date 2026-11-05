@@ -66,14 +66,28 @@ function mount(root, opts = {}) {
   const salt = () => S.rol === 'salt_okur' || !guncelAy() || (S.plan && S.plan.durum === 'kilitli') || (S.modul !== 2 && !kilitBende());
   let kaydetZamani = null;
   const kaydet = () => { S.kaydetBekliyor = true; clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { S.kaydetBekliyor = false; if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
-  const ayarKaydet = () => { const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
+  const ayarKaydet = () => { if (S.sayfa === 'ayar' && S.modul !== 2) S.ayar.damga = {ad: (opts.kullanici && opts.kullanici.ad) || ROLLER[S.rol] || S.rol, t: Date.now()}; const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
   const HESAP_SURUM = 9;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
   function toast(t) { const id = uid(); S.toastlar.push({id, t}); toastCiz(); setTimeout(() => { S.toastlar = S.toastlar.filter(x => x.id !== id); toastCiz(); }, 5000); }
   function toastCiz() { root.querySelectorAll('.ap-toast').forEach(e => e.remove()); S.toastlar.forEach((x, i) => { const e = document.createElement('div'); e.className = 'ap-toast'; e.style.bottom = (14 + i * 46) + 'px'; e.textContent = x.t; root.appendChild(e); }); }
   function logla(islem, detay) { if (!S.plan) return; (S.plan.log = S.plan.log || []).unshift({t: Date.now(), rol: S.rol, islem, detay: detay || ''}); if (S.plan.log.length > 1500) S.plan.log.length = 1500; }
+  // Sayfa bazlı "Son kayıt" damgası (112stoktakip Depo modülündeki gibi): değişiklik hangi sayfadan yapıldıysa o sayfanın damgası güncellenir.
+  // Modül 1: plan.damga['sayfa:<sayfa>'], istasyon sayfasında istasyon bazında plan.damga['ist:<istasyon>'];
+  // Modül 2: istasyonun nöbet verisinde plan.nobet[istasyon].damga (ana uygulamada istasyon başına ayrı parça olarak saklanır); Ayarlar: S.ayar.damga
+  const damgaAd = () => (opts.kullanici && opts.kullanici.ad) || ROLLER[S.rol] || S.rol;
+  const damgaYeni = () => ({ad: damgaAd(), t: Date.now()});
+  const damgaAnahtar = () => S.sayfa === 'ist' ? 'ist:' + S.ist : 'sayfa:' + (S.sayfa || 'pano');
+  function damgala() {
+    if (!S.plan || S.modul === 2) return;
+    const d = S.plan.damga = (S.plan.damga && typeof S.plan.damga === 'object') ? S.plan.damga : {};
+    d[damgaAnahtar()] = damgaYeni();
+  }
+  const p2 = n => String(n).padStart(2, '0');
+  const damgaZaman = t => { const d = new Date(t); return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+  const damgaHtml = d => d && d.t ? `<div class="ap-damga" title="Bu sayfada son değişikliği yapan kişi ve zamanı">Son kayıt: ${esc(d.ad || '')} · ${damgaZaman(d.t)}</div>` : '';
   function mut(fn, islem, detay) {
     if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur (arşiv görünümü). Güncel aya dönün.' : S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
-    fn(); if (!S.toplu) otoHesapla(); if (islem) logla(islem, detay); kaydet(); return true;
+    fn(); if (!S.toplu) otoHesapla(); if (islem) logla(islem, detay); damgala(); kaydet(); return true;
   }
 
   async function ayarYukle() {
@@ -149,13 +163,21 @@ function mount(root, opts = {}) {
   const gorevGosterim = k => (k.durum === 'GEÇİCİ GÖREVLİ' && k._gelen ? (k.birim + ' kadrosundan') : gorevMetin(k));
   const durumGosterim = k => k.durumMetin || k.durum || '';
 
-  // İstasyon listesi sırası: ekip şefi (doktor, AABT) üstte, YSP (ATT) ortada, sürücü (işçi) en altta
-  const NB_SIRA = {dok: 0, ke: 1, ka: 1, ysp: 2, sy: 3, isci: 4};
-  const nbSira = (k, satirMap) => { const s = satirMap && satirMap.get(k.id); return s ? NB_SIRA[s.grup] : k.sinif === 'doktor' ? 0 : k.sinif === 'isci' ? 4 : (C.kadroTip(k) === 'AABT' ? 1 : 2); };
+  // Branş sırası (tüm kişi listeleri, PNG ve Excel çıktıları): doktor (tabip) → memur [AABT → ATT → diğer memur unvanları → sürücü olarak çalışan ATT
+  // (nöbet rolü sürücü)] → işçi. Grup (doktor / memur / işçi) ayrımı korunur; aynı branşta ASOS sırası, sonra ad.
+  const ATT_RE = /\bATT\b|ACIL TIP TEKNISYEN|SAGLIK MEMUR|SAGLIK TEKNISYEN/;
+  const surEsikleri = () => ({sur: ((S.ayar && S.ayar.surEsik) ?? 70) / 100, degil: ((S.ayar && S.ayar.surDegilEsik) ?? 15) / 100});
+  function bransSira(k, grup) {
+    if (k.sinif === 'doktor') return 0;
+    if (k.sinif === 'isci') return 9;
+    const g = grup || C.grupBelirle(k, surEsikleri(), S.ayar);
+    if (g === 'ke' || g === 'ka') return 1;      // AABT (sürücü teyitli AABT de AABT sırasında kalır)
+    if (g === 'sy') return 4;                     // nöbet rolü sürücü olan ATT: memurların en altı
+    return ATT_RE.test(C.TR((k.unvan || '') + ' ' + (k.kadroBrans || ''))) ? 2 : 3;
+  }
+  // satirMap: istasyon hesabındaki satırlar (id → {grup}); verilmezse grup kişiden hesaplanır
+  const kisiSirala = satirMap => (a, b) => (gizliKisi(a) - gizliKisi(b)) || (bransSira(a, satirMap && satirMap.get(a.id) && satirMap.get(a.id).grup) - bransSira(b, satirMap && satirMap.get(b.id) && satirMap.get(b.id).grup)) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad || '', b.ad || '');
+  const nobetSirala = kisiSirala;
+  const personelSirala = kisiSirala(null);
   // Başhekimlik / KKM nöbeti: Nöbet Listesi Raporunun İdari / Komuta satırlarından; son 6 ayda nöbet kaydı olan kişi "nöbet tutar" sayılır
   const idariNobetVar = k => { if (!k || !k.idariNobet || !k.idariNobet.aylar) return false; const t = S.y * 12 + S.m - 1; return Object.keys(k.idariNobet.aylar).some(a => { const x = (+a.slice(0, 4)) * 12 + (+a.slice(5)) - 1; return x <= t && x > t - 6; }); };
-  const nobetSirala = satirMap => (a, b) => (gizliKisi(a) - gizliKisi(b)) || (nbSira(a, satirMap) - nbSira(b, satirMap)) || personelSirala(a, b);
-  function personelSirala(a, b) {
-    const sg = {doktor: 0, memur: 1, isci: 2};
-    return (sg[a.sinif] - sg[b.sinif]) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad, b.ad);
-  }

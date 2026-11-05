@@ -14,17 +14,19 @@
   const n2Duz = () => S.rol !== 'salt_okur' && guncelAy() && !(S.plan && S.plan.durum === 'kilitli') && kilitBende();
   function mut2(fn, islem, detay) {
     if (!n2Duz()) { toast(S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
-    fn(); S.n2.oneri = null; if (islem) logla(islem, detay); kaydet(); return true;
+    const ist = n2Ist();
+    fn(); S.n2.oneri = null; if (islem) logla(islem, detay); if (ist) n2Depo(ist).damga = damgaYeni(); kaydet(); return true;
   }
   // Kişi listesi: Modül 1 planından (planlama tarafı) ya da paketle gelen kayıtlardan (istasyon tarafı)
   function n2Kisiler(b) {
     const dp = n2Depo(b.ad);
     if (dp.kisiler && !S.plan.kayitlar.some(k => k.birim === b.ad)) return dp.kisiler;
-    return hesapla(b).satir.filter(s => !s.nobetYok).map(s => {
+    const sat = hesapla(b).satir.filter(s => !s.nobetYok), sm = new Map(sat.map(s => [s.k.id, s])), sira = nobetSirala(sm);
+    return sat.sort((x, y) => sira(x.k, y.k)).map(s => {
       const k = s.k, azami = Math.floor(s.azami + 1e-9);
       return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), planlanan: sayi(k.planlanan), ust: k.sinif === 'isci' ? null : azami, gelen: !!k._gelen,
         izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
-    }).sort((a, c) => (NB_SIRA[a.grup] - NB_SIRA[c.grup]) || trCollator.compare(a.ad, c.ad));
+    });      // branş sırası: doktor → AABT → ATT → diğer memur → sürücü ATT → işçi
   }
   function n2Girdi(b) {
     const dp = n2Depo(b.ad), ks = n2Kisiler(b).map(k => ({...k, izin: [...(k.izin || []), ...(dp.izin[k.id] || [])], istek: dp.istek[k.id] || []}));
@@ -37,7 +39,7 @@
   function n2UstHtml(b) {
     const kisit = n2Kendi(), ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (kisit === null || x.ad === kisit));
     return `<div class="ap-card"><div class="ap-row"><label>İstasyon <select class="ap-sel" data-n2="ist">${ists.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select></label>
-      <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span></div></div>`;
+      <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span></div>${damgaHtml(((S.plan.nobet || {})[b.ad] || {}).damga)}</div>`;
   }
   function n2Html() {
     if (!S.plan) return `<div class="ap-card ap-empty"><h2>Modül 2 — İstasyon nöbet listesi</h2><p>Bu ay için plan yok. Önce Modül 1'den personel listelerini yükleyin.</p></div>`;
@@ -58,7 +60,7 @@
   function n2TeklifOzet(b) {
     const h = hesapla(b), o = n2OnayOku(b.ad), D = durumlar();
     const satir = h.satir.filter(s => !gizliKisi(s.k)).map(s => { const k = s.k, tutar = !s.nobetYok && !((D[k.durum] || {}).disarida), mevcut = sayi(k.planlanan), tek = tutar ? (o.teklif[k.id] != null ? sayi(o.teklif[k.id]) : mevcut) : 0, ust = s.azami > 0 ? s.azami : (k.sinif === 'isci' ? s.hedef : 0);
-      return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => (NB_SIRA[x.s.grup] - NB_SIRA[y.s.grup]) || personelSirala(x.k, y.k));
+      return {s, k, tutar, mevcut, tek, ust, asim: tutar && tek > ust + 1e-9, degisti: tutar && Math.abs(tek - mevcut) > 1e-9}; }).sort((x, y) => (gizliKisi(x.k) - gizliKisi(y.k)) || (bransSira(x.k, x.s.grup) - bransSira(y.k, y.s.grup)) || personelSirala(x.k, y.k));
     const toplam = satir.reduce((a, x) => a + x.tek, 0), mevcutT = satir.reduce((a, x) => a + (x.tutar ? x.mevcut : 0), 0);
     return {h, o, satir, toplam, mevcutT, fark: Math.abs(toplam - h.ihtiyac) < 0.05 ? 0 : Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
   }
@@ -114,7 +116,7 @@
     }
     finally { S.toplu = false; }
     o.durum = 'gonderildi'; o.onayZaman = null; o.onceki = null;
-    logla('İstasyon planı onayı geri alındı', `${b.ad}: ${n} kişi eski değerine döndü`); otoHesapla(); kaydet();
+    logla('İstasyon planı onayı geri alındı', `${b.ad}: ${n} kişi eski değerine döndü`); damgala(); otoHesapla(); kaydet();
     return n;
   }
   // Onay: istasyonun önerdiği nöbet sayıları kesin plana işlenir ve kilitlenir
@@ -124,7 +126,7 @@
     try { T.satir.forEach(x => { if (!x.tutar) return; const k = S.plan.kayitlar.find(y => y.id === x.k.id); if (!k) return; o.onceki[k.id] = {planlanan: k.planlanan, kilit: !!k.kilit}; k.planlanan = x.tek; k.kilit = true; n++; }); }
     finally { S.toplu = false; }
     o.durum = 'onaylandi'; o.onayZaman = Date.now(); o.ret = '';
-    logla('İstasyon planı onaylandı', `${b.ad}: ${n} kişi, ${T.degisenSay} değişiklik`); otoHesapla(); kaydet();
+    logla('İstasyon planı onaylandı', `${b.ad}: ${n} kişi, ${T.degisenSay} değişiklik`); damgala(); otoHesapla(); kaydet();
   }
 
   // ---- istek takvimi: kişi × gün matrisi ----
@@ -269,16 +271,19 @@
         <li><b>Arşiv istatistikleri:</b> ay ve istasyon seçerek (açılır, çoklu seçim, ilçe bazlı toplu seçim) seyir, istasyon özeti, gelen/çıkan personel, fazla nöbet ve gerçekleşen nöbet raporları. Sayıdaki düğmeye tıklayınca hangi aylar olduğu görünür.</li></ul>`)}
       ${b('11. Dosyalar: hangisi ne işe yarar', `<ul><li><b>EKİP Personel Listesi (zorunlu):</b> kişi, kadro birimi, unvan, çalışma durumu. Birimi değişen personel için 1 yıllık görevlendirme engeli buradan başlar.</li><li><b>Personel Listesi Raporu (zorunlu):</b> izin, muafiyet ve geçici görev tarihleri.</li><li><b>Nöbet Listesi Raporu (zorunlu):</b> ATT'lerin sürücü olup olmadığı ve gerçekleşen nöbetler. Rapordaki <b>İdari (Başhekimlik)</b> ve <b>Komuta (KKM)</b> nöbet satırları da okunur: son 6 ayda nöbet kaydı olan Başhekimlik / KKM personeli İstasyon sayfasında "nöbet tutar" etiketi alır, birimin PNG/Excel çıktısında NÖBET sütununda işaretlenir ve Arşiv istatistiklerindeki gerçekleşen nöbete BAŞHEKİMLİK ve KOMUTA KONTROL MERKEZİ satırı olarak girer. Yüklenmezse sürücüler "doğrulanmadı" kalır, sürücü nöbet branşı eksik hesaplanır.</li><li><b>İzin ve Rapor Bilgileri (en son yüklenir):</b> ASOS'taki yıllık izin talepleri (TC, ad, kurum, talep edilen başlangıç ve bitiş tarihi, gün, talep durumu). Aynı yükleme düğmesiyle seçilir; kişiler TC ile (TC yoksa ad ve kurumla) eşleşir. <b>Onaylanan ve beklemedeki</b> talepler (isteğe bağlı: talep aşamasındakiler) plan ayına yakın tarihler için raporundaki başlangıç–bitiş aralığıyla izin olarak eklenir; vazgeçilen, reddedilen ve iptal edilenler alınmaz. Mevcut izinle aynı günlere denk gelenler tekrar eklenmez; rapor yeniden yüklenince önceki talep kaynaklı izinler yenilenir. Eski "İzin Talepleri Raporu" (yalnız bitiş tarihli) da okunur; onda başlangıç, bitişten geriye iş günü sayılarak bulunur.</li><li><b>İzin-Muafiyet Raporu (isteğe bağlı):</b> izin ve muafiyet tarihlerini kesinleştirir.</li></ul>`)}
       ${b('12. Yedek, güvenlik ve ASHİ bağlantısı', `<ul><li>${opts.gomulu ? 'Veriler kurum sunucusunda tutulur ve sunucu yedeğine girer. <b>Ayarlar › Yedek</b> ile ayrıca JSON yedeği alınabilir; yedekte kişisel veri bulunur, güvenli saklayın.' : 'Veriler yalnızca bu tarayıcıda (IndexedDB) tutulur. <b>Ayarlar › Yedek</b> ile JSON yedeği alın; yedekte kişisel veri bulunur, güvenli saklayın.'}</li><li>Ayarlar sayfasında durum tablosu (nöbet/mesai etkisi), hesap ayarları (ATT sürücü eşiği, genel azami nöbet, işçi düşülen saat, otomatik hesap) bulunur; yalnızca yönetici değiştirebilir.</li><li><b>ASHİ bağlantısı hazırlığı:</b> Nöbet Listesi ve İzin-Muafiyet raporları ASHİ tarafından güncel okunabilecek şekilde hazırdır (<code>veriKaynagi</code> / <code>dosyaVer</code>); bağlantı kurulduğunda bu raporları elle yüklemek gerekmeyecek.</li></ul>`)}
-      ${b('13. İpuçları', `<ul><li>Değişiklikler otomatik kaydedilir; ayrı bir kaydet düğmesi yoktur.</li><li>Her değişiklik <b>Değişiklik günlüğü</b>ne yazılır.</li><li>Renkler: kırmızı satır = geçici görevde, sarı = yıllık izin, mor = doğum/analık, gri = rapor/ücretsiz izin vb. (sayfanın üstündeki renk açıklamasına bakın).</li><li>Bir sorun varsa önce Denetim ve Pano'daki uyarılara bakın; çoğu zaman nedeni (eksik kadro, 4/B, kadro değişikliği, izin) orada yazar.</li></ul>`)}
+      ${b('13. İpuçları', `<ul><li>Değişiklikler otomatik kaydedilir; ayrı bir kaydet düğmesi yoktur.</li><li>Her sayfanın başlığı altında o sayfada son değişikliği yapan kişi ve zaman görünür (<b>Son kayıt</b>; istasyon sayfasında ve Modül 2'de o istasyonun).</li><li>Renkler: kırmızı satır = geçici görevde, sarı = yıllık izin, mor = doğum/analık, gri = rapor/ücretsiz izin vb. (sayfanın üstündeki renk açıklamasına bakın).</li><li>Bir sorun varsa önce Denetim ve Pano'daki uyarılara bakın; çoğu zaman nedeni (eksik kadro, 4/B, kadro değişikliği, izin) orada yazar.</li></ul>`)}
     </div></div>`;
   }
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && !a.startsWith('takip-') && a !== 'modul') return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && !a.startsWith('takip-') && a !== 'modul' && !a.startsWith('yan')) return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
+      case 'yan1': S.modul = S.rol === 'istasyon' ? 2 : 1; S.sayfa = v; if (v === 'takip') S.takipVeri = null; S.yanAcik = false; break;      // gömülü sol menü: Modül 1 sayfası
+      case 'yan2': S.modul = 2; S.n2.sekme = v; S.n2.altSekme = ''; S.yanAcik = false; break;          // gömülü sol menü: Modül 2 sekmesi
+      case 'yan-ac': S.yanAcik = !S.yanAcik; break;
       case 'n2-sekme': S.n2.sekme = v; S.n2.altSekme = ''; break;
       case 'n2-gonder': {
         const T = n2TeklifOzet(b); if (!n2Duzenlenir(b.ad)) break;
@@ -330,10 +335,9 @@
       case 'arstat-aylar': S.arstatAc = S.arstatAc === 'ayno' && S.arstatAyAc === v ? '' : 'ayno'; S.arstatAyAc = v; break;
       case 'takip-pop': S.arstatAc = S.arstatAc === 'tk-' + v ? '' : 'tk-' + v; break;
       case 'takip-yil': { const T = S.takip, y = +v; T.yil = T.yil.includes(y) ? T.yil.filter(x => x !== y) : [...T.yil, y]; break; }
-      case 'takip-ay': { const T = S.takip, m = +v; T.ay = T.ay.includes(m) ? T.ay.filter(x => x !== m) : [...T.ay, m]; break; }
       case 'takip-ilce': { const T = S.takip, l = istAdlari().filter(x => C.ilceAdi(x) === v), hepsi = l.every(x => T.ist.includes(x)); T.ist = hepsi ? T.ist.filter(x => !l.includes(x)) : [...new Set([...T.ist, ...l])]; break; }
       case 'takip-temizle': S.takip[v] = []; break;
-      case 'takip-tumu': S.takip[v] = v === 'ay' ? AY_KISA.map((_, i) => i + 1) : [...new Set(Object.keys(S.takipVeri || {}).map(a => +a.slice(0, 4)))]; break;
+      case 'takip-tumu': S.takip[v] = [...new Set(Object.keys(S.takipVeri || {}).map(a => +a.slice(0, 4)))]; break;
       case 'takip-sekme': S.takip.sekme = v; break;
       case 'takip-yenile': S.takipVeri = null; break;
       case 'takip-excel': takipExcel(); return true;

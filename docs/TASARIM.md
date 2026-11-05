@@ -82,7 +82,13 @@ Uygulama sonradan başka bir uygulamanın içine eklenecek. Bunun için baştan:
 - **Bağımsız ve gömülü mod aynı kodla** çalışır, tek fark adaptörlerdir. Gömülü modda ana uygulama yalnızca **salt okur** görünüm verebilir (`salt_okur: true`); düzenleme yetkisi planlama birimi ve idarecide kalır.
 - **Şimdilik tek dosyalı HTML** olarak geliştirilir; modül sözleşmesi baştan koda yerleştirilir, paketleme (ES modülü / web bileşeni) ana uygulama belli olunca seçilir.
 
-Ortak özellikler her iki modda aynıdır: roller, değişiklik günlüğü, ay kilidi, güncelleme.
+Ortak özellikler her iki modda aynıdır: roller, "Son kayıt" damgası, ay kilidi, güncelleme.
+
+**Gömülü mod arayüzü (112stoktakip):** üst çubuk ve sekmeler yerine solda dikey menü (bölümler: MODÜL 1 · PLANLAMA, MODÜL 2 · NÖBET LİSTESİ, VERİ; ay seçimi ve plan durumu menünün üstünde; 760 px altında açılır-kapanır). Görsel dil ana uygulamayla aynıdır (birincil #0055A4, IBM Plex Sans / Manrope, keskin köşeler). Kullanım kılavuzu ve tema seçici gösterilmez (ana uygulamanın isim menüsündedir); tema her zaman açıktır, koyu modu ana uygulama verir. Bağımsız sürümde üst çubuk düzeni korunur.
+
+**Son kayıt damgası:** değişiklik günlüğü sekmesi yoktur (günlük arka planda `plan.log`'da tutulmaya devam eder). Her sayfanın başlığı altında o sayfada son değişikliği yapan kişi ve zaman görünür: "Son kayıt: Ad Soyad · GG.AA.YYYY SS:DD". Veri yeri: Modül 1'de `plan.damga['sayfa:<sayfa>']`, istasyon sayfasında istasyon bazında `plan.damga['ist:<istasyon>']`; Modül 2'de istasyonun kendi nöbet parçasında `plan.nobet[<istasyon>].damga` (ana uygulamada istasyon başına ayrı saklandığı için Modül 2 `plan.damga`'ya yazmaz); Ayarlar sayfasında `ayar.damga`. Ad `opts.kullanici.ad`, yoksa rol adı. Değişiklik hangi sayfadan yapıldıysa o sayfanın damgası güncellenir.
+
+**Kişi sırası (tüm listeler, istasyon tablosu, PNG, Excel, Modül 2):** doktor (tabip) → memur [AABT → ATT → diğer memur unvanları → nöbet rolü sürücü olan ATT] → işçi; aynı branşta ASOS sırası, sonra ad. Doktor / memur / işçi grup çizgileri korunur. Tek yardımcı: `bransSira` / `kisiSirala` (app1.js).
 
 ## 5. Veri modeli
 
@@ -233,7 +239,8 @@ Kural: **bir istasyondan her ay bir kişi çıkar; sırayla gider, ancak kişi i
 - **Başka istasyona görevli kişi:** planlanan nöbeti hedef istasyonda hesaplanır; eski istasyonun hesabı bu değeri silmez.
 - **Birim tanıma:** yalnızca "Acil Sağlık Hizmetleri İstasyonu / ASHİ" adlı birimler istasyon sayılır; aile hekimliği birimi, hastane ve sağlık müdürlüğü geçici görev yeri olarak kalır (ör. "TURGUTLU 16 NOLU AİLE HEKİMLİĞİ BİRİMİ" istasyon değildir).
 - **Ekip OF (kapalı ekip):** istasyon sayfasından işaretlenir. İhtiyaç 0 olur, planlanan nöbet hesaplanmaz, kapalı ekibe görevlendirme yapılamaz; personeli rotasyonda tamamen dağıtılabilir olur. Pano, PNG ve Excel'de "EKİP OF" etiketi görünür.
-- **Tema:** varsayılan açık; koyu ve sistem teması üst çubuktan seçilir.
+- **Tema:** varsayılan açık; koyu ve sistem teması üst çubuktan seçilir (yalnız bağımsız sürümde; gömülü modda tema her zaman açık).
+- **İzin / görev takibi:** seçili yılın 12 ayı (Oca … Ara) sütun olarak birlikte görünür; planı olmayan aylar boş sütundur. Yıl süzgeci varsayılan olarak içinde bulunulan yıldır; ay süzgeci yoktur. Excel aynı düzende aktarılır.
 
 ### 6.11 Yuvalar, kadro tipi ve yuva yetenekleri
 Her istasyonda üç yuva vardır: **ekip şefi (ES)**, **yardımcı sağlık personeli (YSP)**, **sürücü**; her biri ay günü kadar nöbet (Kasım: 30). Kim hangi yuvayı doldurabilir:
