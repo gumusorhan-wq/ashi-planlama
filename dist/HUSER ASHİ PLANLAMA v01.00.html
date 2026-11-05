@@ -2982,7 +2982,7 @@ function mount(root, opts = {}) {
         k.calisma = a.calisma; if (a.yillikKalan != null) k.yillikKalan = a.yillikKalan; if (a.memBas && !k.atamaBas) k.memBas = a.memBas;
         k.durumA = asosDurumA(a);
         if (k.gorevSonaErdi && k.durumA === 'GEÇİCİ GÖREVDE') k.durumA = '';      // Personel Listesi Raporu'na göre görevi plan ayından önce bitiyor (ör. 01.10–01.11): kadrosuna döner
-        if (/KADROSUNUN OLDUGU YERDE/.test(C.TR(a.calisma))) k.durumMetinA = ''; else k.durumMetinA = a.calisma;
+        if (/KADROSUNUN OLDUGU YERDE/.test(C.TR(a.calisma)) || (k.gorevSonaErdi && /GECICI GOREV/.test(C.TR(a.calisma)))) k.durumMetinA = ''; else k.durumMetinA = a.calisma;
         if (a.gecici.ad && !k.gorevSonaErdi && (!k.gorev || k.gorev.kaynak !== 'manuel') && !(k.gorev && k.gorev.bas)) k.gorev = {yer: a.gecici.ad, hedef: birimCoz(plan, a.gecici.ad), kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
         else if (!a.gecici.ad && k.gorev && k.gorev.kaynak === 'asos' && !k.gorev.bas) k.gorev = null;
         if (k.durumA === 'GEÇİCİ GÖREVDE' && !k.gorev) k.gorev = {yer: '', hedef: null, kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
@@ -3092,7 +3092,7 @@ function mount(root, opts = {}) {
     return durumGosterim(k).toLocaleUpperCase('tr-TR');
   }
   function cikGorev(k) {
-    const g = k.gorev; if (!g) return k.durumMetin && !C.durumAnahtar(k.durumMetin) ? k.durumMetin : '';
+    const g = k.gorev; if (!g) return k.durumMetin && !C.durumAnahtar(k.durumMetin) && !/GECICI GOREV/.test(C.TR(k.durumMetin)) ? k.durumMetin : '';
     const istasyon = g.hedef && S.plan.birimler.some(b => b.ad === g.hedef && b.tur === 'istasyon');
     if (istasyon) return `${g.hedef} NOLU ASHİ ${AYLAR[S.m].toLocaleUpperCase('tr-TR')}`;
     const ozelGerekce = g.gerekce && !/PERSONEL İHTİYACI|MESAİ TAMAMLAYAMAMA/.test(g.gerekce) ? g.gerekce + ' ' : '';
@@ -3199,6 +3199,8 @@ function mount(root, opts = {}) {
   function bitenGorevleriKapat() {
     if (!S.plan || salt()) return 0;
     const ilk = ayIlk(), biten = S.plan.kayitlar.filter(k => { if (!k.gorev || k.istek === 'devam' || k.gorev.uzun) return false; const t = gorevTarihleri(k.gorev); return t.bit && t.bit <= ilk && !(t.bas && t.bas >= ilk); });
+    const D0 = durumlar(), artik = S.plan.kayitlar.filter(k => !k.gorev && !(D0[k.durum] || {}).disarida && k.durum !== 'GEÇİCİ GÖREVLİ' && /GECICI GOREV/.test(C.TR(k.durumMetin || '')));
+    if (artik.length) { artik.forEach(k => { k.durumMetin = ''; if (k.durumMetinA && /GECICI GOREV/.test(C.TR(k.durumMetinA))) k.durumMetinA = ''; }); logla('Görevi bitmiş personelde kalan "geçici görevli" notu silindi', `${artik.length} kişi`); if (!biten.length) { damgala(); kaydet(); } }
     if (!biten.length) return 0;
     biten.forEach(k => { const yer = k.gorev.hedef || k.gorev.yer || ''; k.gorev = null; k.gorevSonaErdi = true; if (/GEÇİCİ GÖREVDE/.test(k.durum || '')) k.durum = ''; if (/GECICI GOREV/.test(C.TR(k.durumMetin || ''))) k.durumMetin = ''; k.durumManuel = false; logla('Geçici görev süresi bitti, kadrosuna döndü', `${k.ad}: ${yer} → ${k.birim}`); });
     otoHesapla(); damgala(); kaydet(); toast(`${biten.length} personelin geçici görevi bu aydan önce bittiği için kadro istasyonuna döndürüldü.`); return biten.length;
