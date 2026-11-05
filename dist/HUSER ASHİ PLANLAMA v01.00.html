@@ -1025,16 +1025,34 @@ function mount(root, opts = {}) {
 
   const anahtar = (y, m) => `plan:${y}-${C.pad(m)}`;
   const durumlar = () => S.ayar.durumlar;
-  const salt = () => S.rol === 'salt_okur' || !guncelAy() || (S.plan && S.plan.durum === 'kilitli');
+  // Gömülü mod düzenleme kilidi (opts.kilit, ana uygulamadan): Modül 1'de ay başına bir planlayıcı, Modül 2'de istasyon başına bir kişi düzenler
+  const kilitVar = !!(opts.kilit && opts.kilit.iste);
+  S.kilit = {kapsam: null, bende: !kilitVar, kim: ''};
+  const kilitBende = () => !kilitVar || !S.kilit.kapsam || S.kilit.bende;
+  const kilitMesaj = () => S.kilit.kim ? `${S.kilit.kim} şu an ${S.modul === 2 ? 'bu istasyonu' : 'planlamayı'} düzenliyor; siz salt okunur görüyorsunuz.` : 'Düzenleme izni bekleniyor…';
+  function kilitKapsam() {
+    if (!kilitVar || !S.plan || !guncelAy() || S.rol === 'salt_okur' || S.plan.durum === 'kilitli') return null;
+    const ay = `${S.y}-${C.pad(S.m)}`;
+    if (S.modul === 2) { const i = typeof n2Ist === 'function' ? n2Ist() : ''; return i ? `${ay}|ist|${i}` : null; }
+    return S.rol === 'istasyon' ? null : `${ay}|ana`;
+  }
+  function kilitGuncelle() { if (!kilitVar) return; const k = kilitKapsam(); if (k === S.kilit.kapsam) return; S.kilit = {kapsam: k, bende: false, kim: ''}; opts.kilit.iste(k); }
+  if (kilitVar) opts.kilit.onDegis = async d => {
+    if (!d || d.kapsam !== S.kilit.kapsam) return;
+    const once = S.kilit.bende; S.kilit = {kapsam: d.kapsam, bende: !!d.bende, kim: d.kim || ''};
+    if (S.kilit.bende && !once && !S.kaydetBekliyor) { const ist = S.ist, n2 = S.n2 && S.n2.ist; await planYukle(); S.ist = ist || S.ist; if (n2 && S.n2) S.n2.ist = n2; }   // düzenleme izni gelince güncel planı sunucudan al
+    render();
+  };
+  const salt = () => S.rol === 'salt_okur' || !guncelAy() || (S.plan && S.plan.durum === 'kilitli') || (S.modul !== 2 && !kilitBende());
   let kaydetZamani = null;
-  const kaydet = () => { clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
+  const kaydet = () => { S.kaydetBekliyor = true; clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { S.kaydetBekliyor = false; if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
   const ayarKaydet = () => { const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
   const HESAP_SURUM = 9;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
   function toast(t) { const id = uid(); S.toastlar.push({id, t}); toastCiz(); setTimeout(() => { S.toastlar = S.toastlar.filter(x => x.id !== id); toastCiz(); }, 5000); }
   function toastCiz() { root.querySelectorAll('.ap-toast').forEach(e => e.remove()); S.toastlar.forEach((x, i) => { const e = document.createElement('div'); e.className = 'ap-toast'; e.style.bottom = (14 + i * 46) + 'px'; e.textContent = x.t; root.appendChild(e); }); }
   function logla(islem, detay) { if (!S.plan) return; (S.plan.log = S.plan.log || []).unshift({t: Date.now(), rol: S.rol, islem, detay: detay || ''}); if (S.plan.log.length > 1500) S.plan.log.length = 1500; }
   function mut(fn, islem, detay) {
-    if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur (arşiv görünümü). Güncel aya dönün.' : S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : 'Salt okur modundasınız.'); return false; }
+    if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur (arşiv görünümü). Güncel aya dönün.' : S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
     fn(); if (!S.toplu) otoHesapla(); if (islem) logla(islem, detay); kaydet(); return true;
   }
 
@@ -1530,7 +1548,8 @@ function mount(root, opts = {}) {
     const koyu = S.ayar && (S.ayar.tema === 'koyu' || (S.ayar.tema === 'sistem' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
     root.className = 'ap-root' + (koyu ? ' ap-dark' : ''); document.body.style.background = koyu ? '#0f1720' : '#f4f6f9';
     if (S.rol === 'istasyon') S.modul = 2;
-    root.innerHTML = ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + (guncelAy() ? '' : `<div class="ap-oku"><b>Arşiv görünümü — ${ayEtiket()} salt okunur.</b> Geçmiş aylar yalnızca görüntülenir, değiştirilemez. <button class="ap-btn sm" data-act="guncel-ay">Güncel aya dön (${AYLAR[GUNCEL_M]} ${GUNCEL_Y})</button></div>`) + `<div class="ap-main">${sayfaHtml()}</div>` + (S.modal ? S.modal() : '');
+    kilitGuncelle();
+    root.innerHTML = ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + (kilitBende() ? '' : `<div class="ap-oku"><b>${esc(kilitMesaj())}</b> O kişi çıkınca düzenleme kendiliğinden açılır.</div>`) + (guncelAy() ? '' : `<div class="ap-oku"><b>Arşiv görünümü — ${ayEtiket()} salt okunur.</b> Geçmiş aylar yalnızca görüntülenir, değiştirilemez. <button class="ap-btn sm" data-act="guncel-ay">Güncel aya dön (${AYLAR[GUNCEL_M]} ${GUNCEL_Y})</button></div>`) + `<div class="ap-main">${sayfaHtml()}</div>` + (S.modal ? S.modal() : '');
     // Sayı sütunları: tüm hücreleri sayı olan sütunun başlığı ve hücreleri sağa yaslanır (başlık ile sayı aynı hizada)
     root.querySelectorAll('table').forEach(t => {
       const ths = [...t.querySelectorAll('thead th')]; if (!ths.length) return;
@@ -1853,12 +1872,13 @@ function mount(root, opts = {}) {
   // İstasyon sorumlusu, planlama onaylanmadan (Kesinleştir / Ayı kilitle) kendi istasyonunun planlamasını ve nöbet listesi araçlarını göremez
   const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
   const n2Acik = () => S.rol !== 'istasyon' || n2Onayli();
-  const n2Ist = () => S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
+  const n2Kendi = () => { const kisit = S.rol === 'istasyon' && opts.kullanici && opts.kullanici.birim; if (!kisit || !S.plan) return null; const a = C.istAnahtar(kisit); const b = S.plan.birimler.find(x => x.tur === 'istasyon' && (x.ad === kisit || (a && C.istAnahtar(x.ad) === a))); return b ? b.ad : ''; };
+  const n2Ist = () => n2Kendi() !== null ? (S.n2.ist = n2Kendi()) : S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
   const n2Birim = () => S.plan && S.plan.birimler.find(b => b.ad === n2Ist());
   function n2Depo(ad) { const N = (S.plan.nobet = S.plan.nobet || {}); return N[ad] = N[ad] || {istek: {}, izin: {}, liste: null, kural: {}, kisiler: null}; }
-  const n2Duz = () => S.rol !== 'salt_okur' && guncelAy() && !(S.plan && S.plan.durum === 'kilitli');
+  const n2Duz = () => S.rol !== 'salt_okur' && guncelAy() && !(S.plan && S.plan.durum === 'kilitli') && kilitBende();
   function mut2(fn, islem, detay) {
-    if (!n2Duz()) { toast(S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : 'Salt okur modundasınız.'); return false; }
+    if (!n2Duz()) { toast(S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
     fn(); S.n2.oneri = null; if (islem) logla(islem, detay); kaydet(); return true;
   }
   // Kişi listesi: Modül 1 planından (planlama tarafı) ya da paketle gelen kayıtlardan (istasyon tarafı)
@@ -1880,7 +1900,7 @@ function mount(root, opts = {}) {
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
   function n2UstHtml(b) {
-    const kisit = S.rol === 'istasyon' && opts.kullanici && opts.kullanici.birim, ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (!kisit || x.ad === kisit));
+    const kisit = n2Kendi(), ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (kisit === null || x.ad === kisit));
     return `<div class="ap-card"><div class="ap-row"><label>İstasyon <select class="ap-sel" data-n2="ist">${ists.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select></label>
       <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span></div></div>`;
   }

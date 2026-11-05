@@ -7,12 +7,13 @@
   // İstasyon sorumlusu, planlama onaylanmadan (Kesinleştir / Ayı kilitle) kendi istasyonunun planlamasını ve nöbet listesi araçlarını göremez
   const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
   const n2Acik = () => S.rol !== 'istasyon' || n2Onayli();
-  const n2Ist = () => S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
+  const n2Kendi = () => { const kisit = S.rol === 'istasyon' && opts.kullanici && opts.kullanici.birim; if (!kisit || !S.plan) return null; const a = C.istAnahtar(kisit); const b = S.plan.birimler.find(x => x.tur === 'istasyon' && (x.ad === kisit || (a && C.istAnahtar(x.ad) === a))); return b ? b.ad : ''; };
+  const n2Ist = () => n2Kendi() !== null ? (S.n2.ist = n2Kendi()) : S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
   const n2Birim = () => S.plan && S.plan.birimler.find(b => b.ad === n2Ist());
   function n2Depo(ad) { const N = (S.plan.nobet = S.plan.nobet || {}); return N[ad] = N[ad] || {istek: {}, izin: {}, liste: null, kural: {}, kisiler: null}; }
-  const n2Duz = () => S.rol !== 'salt_okur' && guncelAy() && !(S.plan && S.plan.durum === 'kilitli');
+  const n2Duz = () => S.rol !== 'salt_okur' && guncelAy() && !(S.plan && S.plan.durum === 'kilitli') && kilitBende();
   function mut2(fn, islem, detay) {
-    if (!n2Duz()) { toast(S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : 'Salt okur modundasınız.'); return false; }
+    if (!n2Duz()) { toast(S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
     fn(); S.n2.oneri = null; if (islem) logla(islem, detay); kaydet(); return true;
   }
   // Kişi listesi: Modül 1 planından (planlama tarafı) ya da paketle gelen kayıtlardan (istasyon tarafı)
@@ -34,7 +35,7 @@
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
   function n2UstHtml(b) {
-    const kisit = S.rol === 'istasyon' && opts.kullanici && opts.kullanici.birim, ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (!kisit || x.ad === kisit));
+    const kisit = n2Kendi(), ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (kisit === null || x.ad === kisit));
     return `<div class="ap-card"><div class="ap-row"><label>İstasyon <select class="ap-sel" data-n2="ist">${ists.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select></label>
       <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span></div></div>`;
   }

@@ -407,7 +407,8 @@
     const koyu = S.ayar && (S.ayar.tema === 'koyu' || (S.ayar.tema === 'sistem' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
     root.className = 'ap-root' + (koyu ? ' ap-dark' : ''); document.body.style.background = koyu ? '#0f1720' : '#f4f6f9';
     if (S.rol === 'istasyon') S.modul = 2;
-    root.innerHTML = ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + (guncelAy() ? '' : `<div class="ap-oku"><b>Arşiv görünümü — ${ayEtiket()} salt okunur.</b> Geçmiş aylar yalnızca görüntülenir, değiştirilemez. <button class="ap-btn sm" data-act="guncel-ay">Güncel aya dön (${AYLAR[GUNCEL_M]} ${GUNCEL_Y})</button></div>`) + `<div class="ap-main">${sayfaHtml()}</div>` + (S.modal ? S.modal() : '');
+    kilitGuncelle();
+    root.innerHTML = ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + (kilitBende() ? '' : `<div class="ap-oku"><b>${esc(kilitMesaj())}</b> O kişi çıkınca düzenleme kendiliğinden açılır.</div>`) + (guncelAy() ? '' : `<div class="ap-oku"><b>Arşiv görünümü — ${ayEtiket()} salt okunur.</b> Geçmiş aylar yalnızca görüntülenir, değiştirilemez. <button class="ap-btn sm" data-act="guncel-ay">Güncel aya dön (${AYLAR[GUNCEL_M]} ${GUNCEL_Y})</button></div>`) + `<div class="ap-main">${sayfaHtml()}</div>` + (S.modal ? S.modal() : '');
     // Sayı sütunları: tüm hücreleri sayı olan sütunun başlığı ve hücreleri sağa yaslanır (başlık ile sayı aynı hizada)
     root.querySelectorAll('table').forEach(t => {
       const ths = [...t.querySelectorAll('thead th')]; if (!ths.length) return;

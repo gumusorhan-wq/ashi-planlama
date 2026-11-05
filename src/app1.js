@@ -45,16 +45,34 @@ function mount(root, opts = {}) {
 
   const anahtar = (y, m) => `plan:${y}-${C.pad(m)}`;
   const durumlar = () => S.ayar.durumlar;
-  const salt = () => S.rol === 'salt_okur' || !guncelAy() || (S.plan && S.plan.durum === 'kilitli');
+  // Gömülü mod düzenleme kilidi (opts.kilit, ana uygulamadan): Modül 1'de ay başına bir planlayıcı, Modül 2'de istasyon başına bir kişi düzenler
+  const kilitVar = !!(opts.kilit && opts.kilit.iste);
+  S.kilit = {kapsam: null, bende: !kilitVar, kim: ''};
+  const kilitBende = () => !kilitVar || !S.kilit.kapsam || S.kilit.bende;
+  const kilitMesaj = () => S.kilit.kim ? `${S.kilit.kim} şu an ${S.modul === 2 ? 'bu istasyonu' : 'planlamayı'} düzenliyor; siz salt okunur görüyorsunuz.` : 'Düzenleme izni bekleniyor…';
+  function kilitKapsam() {
+    if (!kilitVar || !S.plan || !guncelAy() || S.rol === 'salt_okur' || S.plan.durum === 'kilitli') return null;
+    const ay = `${S.y}-${C.pad(S.m)}`;
+    if (S.modul === 2) { const i = typeof n2Ist === 'function' ? n2Ist() : ''; return i ? `${ay}|ist|${i}` : null; }
+    return S.rol === 'istasyon' ? null : `${ay}|ana`;
+  }
+  function kilitGuncelle() { if (!kilitVar) return; const k = kilitKapsam(); if (k === S.kilit.kapsam) return; S.kilit = {kapsam: k, bende: false, kim: ''}; opts.kilit.iste(k); }
+  if (kilitVar) opts.kilit.onDegis = async d => {
+    if (!d || d.kapsam !== S.kilit.kapsam) return;
+    const once = S.kilit.bende; S.kilit = {kapsam: d.kapsam, bende: !!d.bende, kim: d.kim || ''};
+    if (S.kilit.bende && !once && !S.kaydetBekliyor) { const ist = S.ist, n2 = S.n2 && S.n2.ist; await planYukle(); S.ist = ist || S.ist; if (n2 && S.n2) S.n2.ist = n2; }   // düzenleme izni gelince güncel planı sunucudan al
+    render();
+  };
+  const salt = () => S.rol === 'salt_okur' || !guncelAy() || (S.plan && S.plan.durum === 'kilitli') || (S.modul !== 2 && !kilitBende());
   let kaydetZamani = null;
-  const kaydet = () => { clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
+  const kaydet = () => { S.kaydetBekliyor = true; clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { S.kaydetBekliyor = false; if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
   const ayarKaydet = () => { const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
   const HESAP_SURUM = 9;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
   function toast(t) { const id = uid(); S.toastlar.push({id, t}); toastCiz(); setTimeout(() => { S.toastlar = S.toastlar.filter(x => x.id !== id); toastCiz(); }, 5000); }
   function toastCiz() { root.querySelectorAll('.ap-toast').forEach(e => e.remove()); S.toastlar.forEach((x, i) => { const e = document.createElement('div'); e.className = 'ap-toast'; e.style.bottom = (14 + i * 46) + 'px'; e.textContent = x.t; root.appendChild(e); }); }
   function logla(islem, detay) { if (!S.plan) return; (S.plan.log = S.plan.log || []).unshift({t: Date.now(), rol: S.rol, islem, detay: detay || ''}); if (S.plan.log.length > 1500) S.plan.log.length = 1500; }
   function mut(fn, islem, detay) {
-    if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur (arşiv görünümü). Güncel aya dönün.' : S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : 'Salt okur modundasınız.'); return false; }
+    if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur (arşiv görünümü). Güncel aya dönün.' : S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
     fn(); if (!S.toplu) otoHesapla(); if (islem) logla(islem, detay); kaydet(); return true;
   }
 
