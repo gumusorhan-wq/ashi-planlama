@@ -55,13 +55,18 @@ Diğer sayfalar: **Personel Bilgileri** (analık hakkı ve süt izni takibi: 6+6
 
 ## 3. Kullanıcılar ve yetkiler
 
-Planlama verisini **yalnızca planlama birimi ve idareci** görür ve işlem yapar. **İstasyon sorumluları uygulamayı görmez.** Çıktılar (istasyon görüntüsü/Excel) onlara dışarıdan, bugünkü gibi dağıtılır.
+Planlama verisini (Modül 1) **yalnızca planlama birimi ve idareci** görür ve işlem yapar.
+
+- **Bağımsız sürüm (tek HTML):** İstasyon sorumluları uygulamayı görmez. Çıktılar (istasyon görüntüsü/Excel) onlara dışarıdan, bugünkü gibi dağıtılır.
+- **Gömülü sürüm (HUSER Yönetim Sistemi / 112stoktakip içinde):** İstasyon sorumlusu (`istasyon` rolü) uygulamaya girer ama **yalnız Modül 2'de ve yalnız kendi istasyonunu** görür (istasyon, kullanıcının birimiyle ad anahtarı üzerinden eşleşir). Plan kesinleşince kendi istasyonunun nöbet listesini düzenler, kime kaç nöbet yazılacağını değiştirip planlamaya talep olarak gönderir; Modül 1'i, diğer istasyonları, arşivi ve ayarları göremez. Düzenleme istasyon başına kilitle tek kişiye açıktır; ana planlama belgesine yazamaz (yalnız kendi istasyonunun `#nobet#` / `#onay#` parçasına yazar).
+- Gömülü sürümde açık sayfa, güncel ay için sunucudaki planı 30 sn'de bir (sekme görünürken) yeniden okur: istasyon talepleri ve başka istasyonların nöbet listeleri sayfa yenilenmeden görünür; bu sekmenin düzenlediği kısma dokunulmaz.
 
 | Rol | Yapabildiği |
 |---|---|
 | Yönetici (idareci) | Her şey: ay kilidi, kullanıcı ve parola yönetimi, kural ayarları, onay |
 | Planlayıcı (planlama birimi) | Tüm istasyonlarda düzenleme, görevlendirme, personel yükleme, çıktı alma |
-| Salt okur | Yalnızca modül modunda ve ileride: ana uygulamaya gömüldüğünde görüntüleme (ana uygulama tarafından verilir) |
+| İstasyon sorumlusu | Yalnız gömülü sürümde: Modül 2'de kendi istasyonu (nöbet listesi, planlamaya talep gönderme) |
+| Salt okur | Yalnızca görüntüleme (gömülü sürümde rol ana uygulama tarafından verilir) |
 
 Sağlık ve gebelik bilgileri (rapor, doğum, analık, gebe mesai) özel nitelikli veridir; yalnızca bu iki rol görür. Kişisel veri aktarımda ve saklamada şifrelidir.
 
@@ -307,11 +312,11 @@ Her istasyonda üç yuva vardır: **ekip şefi (ES)**, **yardımcı sağlık per
 - TC, ad, soyad, telefon ve sağlık durumu (gebelik, rapor, analık) özel/kişisel veridir. Yerelde ve arşivde şifreli saklanır; kimlik tablosu ayrı parolayla şifrelenir.
 - Depoya Excel, personel listesi, parola veya erişim anahtarı yüklenmez.
 - Çıktılarda yalnızca ihtiyaç duyulan alanlar yer alır; sağlık ayrıntısı olmayan "durum etiketi" kullanılır, rol bazında kapatılabilir.
-- Her değişiklik kullanıcı ve zaman damgasıyla günlüğe yazılır. Kilitlenen ay salt okunur olur.
+- Her değişiklik kullanıcı ve zaman damgasıyla günlüğe yazılır. Kilitlenen ay salt okunur olur; kilidi yalnız yönetici açabilir ("Kilidi aç", onaylı; plan Kesinleşti durumuna döner, günlüğe yazılır).
 
 ## 11. Netleşenler ve kalan noktalar
 
-Netleşenler: formüller ve yuvarlama, memur 12 saat, doktor yalnızca ekip şefi, istasyon sorumluları uygulamayı görmez, HTML ile devam, iki ASOS raporu, 4/B (atama başlayış tarihi, dolum günü uygun), rotasyon kuralları (kota 1/otomatik 2-3, sıra, mesafe önceliği, doktor kısıtı, doktor ve işçi dahil), KKM/Başhekimlik görevleri rotasyon dışı, tahmini nöbet çıktıda görünür, her değişiklikte otomatik hesap.
+Netleşenler: formüller ve yuvarlama, memur 12 saat, doktor yalnızca ekip şefi, istasyon sorumluları uygulamayı görmez (bağımsız sürüm; gömülü sürümde yalnız Modül 2'de kendi istasyonu), HTML ile devam, iki ASOS raporu, 4/B (atama başlayış tarihi, dolum günü uygun), rotasyon kuralları (kota 1/otomatik 2-3, sıra, mesafe önceliği, doktor kısıtı, doktor ve işçi dahil), KKM/Başhekimlik görevleri rotasyon dışı, tahmini nöbet çıktıda görünür, her değişiklikte otomatik hesap.
 
 Kalanlar:
 1. **Kota otomatiği:** fazlalık / istasyondaki ortalama hedef nöbet ≈ kişi sayısı (1-3). Başka bir ölçüt (ör. mesaisini tamamlayamayan kişi sayısı) istenirse değiştirilir.

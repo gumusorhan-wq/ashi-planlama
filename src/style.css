@@ -229,3 +229,9 @@ table.tk td.tk-gr.tk-soluk{background:rgba(220,38,38,.06)}
   .ap-gomulu table.tk td:first-child,.ap-gomulu table.tk th:first-child{position:sticky;left:0;z-index:2;background:#fff}
   .ap-gomulu table.tk thead th:first-child{z-index:4;background:var(--ap-pri2)}
 }
+/* İstasyon tablosu: Başhekimlik / KKM "nöbet tutar" etiketi — elle seçim */
+.ap-idn-yok{opacity:.55;text-decoration:line-through}
+.ap-elle{font-size:8.5px;font-weight:700;margin-left:3px;text-transform:uppercase;letter-spacing:.3px;vertical-align:super;line-height:0}
+.ap-ist .ap-idn-ek{background:transparent;color:var(--ap-mut);font-weight:600;opacity:0;transition:opacity .12s}
+.ap-ist tr:hover .ap-idn-ek,.ap-ist .ap-idn-ek:focus-visible{opacity:.75}
+.ap-idn-sec{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}.ap-idn-sec .ap-btn{font-size:11px;padding:2px 6px}

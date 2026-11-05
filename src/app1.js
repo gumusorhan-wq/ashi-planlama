@@ -52,8 +52,9 @@ function mount(root, opts = {}) {
   const kilitBende = () => !kilitVar || !S.kilit.kapsam || S.kilit.bende;
   const kilitMesaj = () => S.kilit.kim ? `${S.kilit.kim} şu an ${S.modul === 2 ? 'bu istasyonu' : 'planlamayı'} düzenliyor; siz salt okunur görüyorsunuz.` : 'Düzenleme izni bekleniyor…';
   function kilitKapsam() {
-    if (!kilitVar || !S.plan || !guncelAy() || S.rol === 'salt_okur' || S.plan.durum === 'kilitli') return null;
+    if (!kilitVar || !S.plan || !guncelAy() || S.rol === 'salt_okur') return null;
     const ay = `${S.y}-${C.pad(S.m)}`;
+    if (S.plan.durum === 'kilitli') return S.kilitAcBekle && S.rol === 'yonetici' ? `${ay}|ana` : null;      // kilitli ay: yalnız yönetici "Kilidi aç" dediğinde planlama kilidi istenir
     if (S.modul === 2) { if (S.rol === 'istasyon' && S.plan.durum !== 'kesin') return null; const i = typeof n2Ist === 'function' ? n2Ist() : ''; return i ? `${ay}|ist|${i}` : null; }   // istasyon, plan kesinleşmeden düzenleyemez: kilit almaz
     return S.rol === 'istasyon' ? null : `${ay}|ana`;
   }
@@ -62,11 +63,36 @@ function mount(root, opts = {}) {
     if (!d || d.kapsam !== S.kilit.kapsam) return;
     const once = S.kilit.bende; S.kilit = {kapsam: d.kapsam, bende: !!d.bende, kim: d.kim || ''};
     if (S.kilit.bende && !once && !S.kaydetBekliyor) { const ist = S.ist, n2 = S.n2 && S.n2.ist; await planYukle(); S.ist = ist || S.ist; if (n2 && S.n2) S.n2.ist = n2; }   // düzenleme izni gelince güncel planı sunucudan al
+    if (S.kilitAcBekle && S.kilit.kapsam && S.kilit.kapsam.endsWith('|ana')) {      // "Kilidi aç" planlama kilidini bekliyordu
+      if (S.kilit.bende) { await ayKilidiAc(); return; }
+      if (S.kilit.kim) { S.kilitAcBekle = false; toast(`${S.kilit.kim} şu an planlamayı düzenliyor; ay kilidi şimdi açılamadı.`); }
+    }
     render();
   };
   const salt = () => S.rol === 'salt_okur' || !guncelAy() || (S.plan && S.plan.durum === 'kilitli') || (S.modul !== 2 && !kilitBende());
   let kaydetZamani = null;
-  const kaydet = () => { S.kaydetBekliyor = true; clearTimeout(kaydetZamani); kaydetZamani = setTimeout(async () => { S.kaydetBekliyor = false; if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } }, 300); };
+  // Kayıt sürerken (bekleme + sunucuya yazma) S.kaydetBekliyor açık kalır; S.yazNo her kayıt isteğinde artar (gömülü moddaki periyodik yenileme bunlara bakar)
+  S.yazNo = 0;
+  let yaziliyor = 0;
+  const planYaz = async () => { S.yazNo++; S.kaydetBekliyor = true; yaziliyor++; try { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } } finally { yaziliyor--; if (!kaydetZamani && !yaziliyor) S.kaydetBekliyor = false; } };
+  const kaydetIptal = () => { clearTimeout(kaydetZamani); kaydetZamani = null; if (!yaziliyor) S.kaydetBekliyor = false; };
+  const kaydet = () => { S.yazNo++; S.kaydetBekliyor = true; clearTimeout(kaydetZamani); kaydetZamani = setTimeout(() => { kaydetZamani = null; planYaz().catch(e => console.error(e)); }, 300); };
+  // Ay kilidini açma (yalnız yönetici): kilitli ay mut() ile değiştirilemediğinden bu işlem salt() engelini bilinçli olarak aşar; plan 'kesin' durumuna döner.
+  // Gömülü modda önce planlama ('ana') kilidi alınır (ana belge yalnız o kilit bu sekmedeyken sunucuya yazılır), sonra durum hemen yazılır.
+  async function ayKilidiAc() {
+    S.kilitAcBekle = false;
+    if (S.rol !== 'yonetici' || !S.plan || S.plan.durum !== 'kilitli' || !guncelAy()) { render(); return; }
+    S.plan.durum = 'kesin'; logla('Ay kilidi açıldı', 'kilitli → kesin'); damgala();
+    kaydetIptal(); await planYaz();
+    toast(`${ayEtiket()} kilidi açıldı; plan "Kesinleşti" durumunda.`); render();
+  }
+  function ayKilidiAcIste() {
+    if (S.rol !== 'yonetici') { toast('Ay kilidini yalnızca yönetici açabilir.'); return; }
+    if (!S.plan || S.plan.durum !== 'kilitli' || !guncelAy()) return;
+    if (!confirm(`${ayEtiket()} ayının kilidi açılsın mı?\n\nPlan "Kesinleşti" durumuna döner ve yeniden düzenlenebilir. İşlem günlüğe yazılır.`)) { render(); return; }
+    if (!kilitVar) { ayKilidiAc(); return; }
+    S.kilitAcBekle = true; render();      // render → kilitGuncelle: 'ana' kilidi istenir; izin gelince onDegis ayKilidiAc'ı çağırır
+  }
   const ayarKaydet = () => { if (S.sayfa === 'ayar' && S.modul !== 2) S.ayar.damga = {ad: (opts.kullanici && opts.kullanici.ad) || ROLLER[S.rol] || S.rol, t: Date.now()}; const r = depo.put('ayar', S.ayar); setTimeout(() => arsivArkaPlan(), 800); return r; };     // hesap ayarı değişirse arşiv arka planda yenilenir
   const HESAP_SURUM = 9;      // hesaplama yöntemi (formüller, yuva kuralları, görev/izin yorumu) değiştikçe artırılır
   function toast(t) { const id = uid(); S.toastlar.push({id, t}); toastCiz(); setTimeout(() => { S.toastlar = S.toastlar.filter(x => x.id !== id); toastCiz(); }, 5000); }
@@ -87,7 +113,7 @@ function mount(root, opts = {}) {
   const damgaZaman = t => { const d = new Date(t); return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
   const damgaHtml = d => d && d.t ? `<div class="ap-damga" title="Bu sayfada son değişikliği yapan kişi ve zamanı">Son kayıt: ${esc(d.ad || '')} · ${damgaZaman(d.t)}</div>` : '';
   function mut(fn, islem, detay) {
-    if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur (arşiv görünümü). Güncel aya dönün.' : S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
+    if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur (arşiv görünümü). Güncel aya dönün.' : S.plan && S.plan.durum === 'kilitli' ? (S.rol === 'yonetici' ? 'Bu ay kilitli; değiştirmek için önce "Kilidi aç".' : 'Bu ay kilitli.') : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
     fn(); if (!S.toplu) otoHesapla(); if (islem) logla(islem, detay); damgala(); kaydet(); return true;
   }
 
@@ -181,4 +207,6 @@ function mount(root, opts = {}) {
   const nobetSirala = kisiSirala;
   const personelSirala = kisiSirala(null);
   // Başhekimlik / KKM nöbeti: Nöbet Listesi Raporunun İdari / Komuta satırlarından; son 6 ayda nöbet kaydı olan kişi "nöbet tutar" sayılır
-  const idariNobetVar = k => { if (!k || !k.idariNobet || !k.idariNobet.aylar) return false; const t = S.y * 12 + S.m - 1; return Object.keys(k.idariNobet.aylar).some(a => { const x = (+a.slice(0, 4)) * 12 + (+a.slice(5)) - 1; return x <= t && x > t - 6; }); };
+  // Planlama yetkilisi bu durumu elle değiştirebilir: k.idariNobetElle true (nöbet tutar) / false (nöbet tutmaz); alan yoksa rapordan otomatik
+  const idariNobetOto = k => { if (!k || !k.idariNobet || !k.idariNobet.aylar) return false; const t = S.y * 12 + S.m - 1; return Object.keys(k.idariNobet.aylar).some(a => { const x = (+a.slice(0, 4)) * 12 + (+a.slice(5)) - 1; return x <= t && x > t - 6; }); };
+  const idariNobetVar = k => !!k && (typeof k.idariNobetElle === 'boolean' ? k.idariNobetElle : idariNobetOto(k));

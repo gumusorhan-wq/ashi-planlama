@@ -852,11 +852,11 @@
         }
         case 'plan-sifirla': {      // bu ayın planını tamamen siler; sayfa "bu ay için plan yok" durumuna döner
           if (!planlamaRol()) { toast('Planı sıfırlama yetkiniz yok.'); break; }
-          if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur; sıfırlanamaz.' : 'Bu ay kilitli; önce kilidi açın.'); break; }
+          if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur; sıfırlanamaz.' : S.plan && S.plan.durum === 'kilitli' ? (S.rol === 'yonetici' ? 'Bu ay kilitli; önce "Kilidi aç" ile kilidi açın.' : 'Bu ay kilitli; kilidi yalnız yönetici açabilir.') : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); break; }
           // Ay sıfırdan başlar: plan + bu plan ayına yüklenen dosyaların kayıtları + onlardan gelen gerçekleşen nöbet verileri (başka bir ayın yüklemesinde de kullanılan nöbet ayı korunur)
           const ayK = ayAnahtari(), yl = (await depo.get('yuklemeler')) || [], buAy = yl.filter(x => x.ay === ayK), kalan = yl.filter(x => x.ay !== ayK), nAy = nAylari(buAy);
           if (!confirm(`${ayEtiket()} planı TAMAMEN silinsin mi?\n\nPlan, bu aya yüklenen dosyalar (${buAy.length} kayıt) ve onlardan gelen nöbet verileri silinecek: kişiler, nöbet sayıları, görevlendirmeler, istasyon onayları, Modül 2 nöbet listeleri ve yükleme kayıtları${nAy.length ? `; gerçekleşen nöbet kayıtları (${[...new Set(nAy)].map(ayAd).join(', ')}) — başka bir ayın yüklemesinde de kullanılanlar korunur` : ''}. Arşiv kaydı ve diğer aylar etkilenmez. Bu işlem geri alınamaz (önce Ayarlar'dan JSON yedeği alabilirsiniz).`)) break;
-          clearTimeout(kaydetZamani); await depo.del(anahtar(S.y, S.m));
+          kaydetIptal(); await depo.del(anahtar(S.y, S.m));
           if (buAy.length) { await depo.put('yuklemeler', kalan); S.yuklemeler = kalan; await gercekTemizle(nAy, kalan); } S.plan = null; S.planAnahtarlari = (S.planAnahtarlari || []).filter(k => k !== anahtar(S.y, S.m)); S.ist = ''; S.sayfa = 'pano'; S.takipVeri = null; S.asos = null;
           toast(`${ayEtiket()} planı sıfırlandı.`); break;
         }
@@ -864,12 +864,20 @@
           if (S.rol !== 'yonetici') { toast('Yalnızca yönetici tüm verileri sıfırlayabilir.'); break; }
           if (!confirm('TÜM aylık planlar, arşiv kayıtları, gerçekleşen nöbet verisi ve yükleme günlüğü silinecek (Ayarlar korunur). Bu işlem geri alınamaz.\n\nDevam edilsin mi?')) break;
           if ((prompt('Onaylamak için SIFIRLA yazın:') || '').trim().toLocaleUpperCase('tr-TR') !== 'SIFIRLA') { toast('Vazgeçildi.'); break; }
-          clearTimeout(kaydetZamani); const ks = ((await depo.keys()) || []).map(String).filter(k => /^(plan|arsiv|gercek):/.test(k) || k === 'yuklemeler'); for (const k of ks) await depo.del(k);
+          kaydetIptal(); const ks = ((await depo.keys()) || []).map(String).filter(k => /^(plan|arsiv|gercek):/.test(k) || k === 'yuklemeler'); for (const k of ks) await depo.del(k);
           S.plan = null; S.planAnahtarlari = []; S.arsivVeri = null; S.gercekVeri = null; S.yuklemeler = []; S.takipVeri = null; S.ist = ''; S.sayfa = 'pano'; S.asos = null; S.oncePlanBirim = new Map();
           toast(`${ks.length} kayıt silindi; uygulama sıfırlandı.`); break;
         }
         case 'oner-hepsi': mut(() => S.plan.birimler.forEach(b => oner(b.ad)), 'Tüm istasyonlarda planlanan önerildi', ''); toast('Planlanan nöbetler önerildi (kilitli olanlar korundu).'); break;
         case 'kisi-ekle': { const ad = prompt('Ad Soyad:'); if (!ad) break; const un = prompt('Ünvan (ör. ATT, DOKTOR, SÜREKLİ İŞÇİ):', 'ATT') || 'ATT'; mut(() => S.plan.kayitlar.push({id: uid(), ad: ad.toLocaleUpperCase('tr-TR'), tc: '', unvan: un, sinif: C.sinifTespit(un) || 'memur', birim: S.ist, durum: '', durumMetin: '', izin: [], planlanan: null, kilit: false, gorev: null, dortB: C.dortB(un), memBas: ''}), 'Kişi eklendi', `${ad} → ${S.ist}`); break; }
+        case 'idari-ac': S.idariAc = S.idariAc === t.dataset.id ? '' : t.dataset.id; break;
+        case 'idari-sec': {      // Başhekimlik / KKM nöbeti: otomatik (rapordan) / elle tutar / elle tutmaz
+          if (!planlamaRol()) { toast('Bu durumu yalnız planlama yetkilileri değiştirebilir.'); break; }
+          const k = kayit(t.dataset.id); if (!k) break;
+          if (mut(() => { if (v === 'oto') delete k.idariNobetElle; else k.idariNobetElle = v === '1'; }, 'İdari nöbet durumu', `${k.ad}: ${v === 'oto' ? 'otomatik (rapordan)' : v === '1' ? 'nöbet tutar (elle)' : 'nöbet tutmaz (elle)'}`)) S.idariAc = '';
+          break;
+        }
+        case 'kilit-ac': ayKilidiAcIste(); return;
         case 'kisi-sil': { const k = kayit(t.dataset.id); if (k && confirm(`${k.ad} kaydı silinsin mi?`)) mut(() => { (S.plan.silinen = S.plan.silinen || []).unshift({...JSON.parse(JSON.stringify(k)), _silZaman: Date.now(), _silBirim: k.birim}); S.plan.silinen.length = Math.min(S.plan.silinen.length, 200); S.plan.kayitlar = S.plan.kayitlar.filter(x => x.id !== k.id); }, 'Kişi silindi', k.ad); break; }
         case 'kisi-geri': { const sl = (S.plan.silinen || []).find(x => x.id === t.dataset.id); if (!sl) break; if (S.plan.kayitlar.some(x => x.id === sl.id || (sl.tc && x.tc === sl.tc))) { toast('Bu kişi zaten listede.'); break; } const {_silZaman, _silBirim, ...k0} = sl; mut(() => { S.plan.kayitlar.push(k0); S.plan.silinen = S.plan.silinen.filter(x => x.id !== sl.id); }, 'Silinen kişi geri getirildi', `${k0.ad} → ${k0.birim}`); toast(`${k0.ad} geri getirildi.`); break; }
         case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); break; }
@@ -1020,9 +1028,51 @@
   root.addEventListener('dragover', e => { if (e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files')) e.preventDefault(); });
   root.addEventListener('drop', e => { if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); if (salt()) { toast('Düzenleme yetkiniz yok / ay kilitli / geçmiş ay salt okunur.'); return; } asosDosyalariIsle([...e.dataTransfer.files]); });
 
+  // Gömülü mod: güncel ay açıkken sunucudaki plan periyodik olarak (30 sn, sekme görünürken) yeniden okunur; başkalarının değiştirebildiği kısımlar güncellenir.
+  // İstasyon parçaları (plan.nobet / plan.onay) her zaman; bu sekmenin düzenlediği istasyonun parçasına (kilit bende) dokunulmaz.
+  // Bu sekme planlama ('ana') kilidini tutmuyorsa ana belge de tümden yenilenir. Kayıt bekliyorken / yazılırken, form alanında yazılırken ya da pencere açıkken atlanır.
+  // Yenileme kaydetme tetiklemez (yalnız render); host get sırasında son bilinen metinleri günceller.
+  const TAZELE_MS = 30000;
+  let tazeleSuruyor = false; const tazeSon = {};      // tazeSon: düzenlenen istasyon parçalarının son okunan sunucu metni
+  async function planTazele(zorla) {
+    if (!opts.gomulu || tazeleSuruyor || !S.ayar || !guncelAy()) return false;
+    if (!zorla && typeof document !== 'undefined' && document.visibilityState === 'hidden') return false;
+    const yaziyor = () => S.kaydetBekliyor || S.modal || S.kilitAcBekle || (() => { const a = typeof document !== 'undefined' && document.activeElement; return !!a && root.contains(a) && (/^(TEXTAREA)$/.test(a.tagName) || (a.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|file)$/.test(a.type))); })();
+    if (yaziyor()) return false;
+    const y = S.y, m = S.m, no = S.yazNo; tazeleSuruyor = true;
+    try {
+      const yeni = await depo.get(anahtar(y, m));
+      if (S.y !== y || S.m !== m || S.yazNo !== no || yaziyor()) return false;      // bu arada ay değişti / değişiklik yapıldı: bu tur atlanır
+      const anaBende = kilitVar && S.kilit.bende && S.kilit.kapsam === `${y}-${C.pad(m)}|ana`;
+      const kendi = kilitVar && S.kilit.bende && S.kilit.kapsam && S.kilit.kapsam.startsWith(`${y}-${C.pad(m)}|ist|`) ? S.kilit.kapsam.split('|ist|')[1] : null;
+      if (!yeni) { if (S.plan && !anaBende) { S.plan = null; render(); return true; } return false; }
+      const onceMetin = JSON.stringify(S.plan);
+      let p;
+      if (anaBende && S.plan) p = {...S.plan};      // Modül 1 verisi bu sekmede: yalnız istasyon parçaları sunucudan
+      else { p = {...yeni}; ofUygula(p); }
+      ['nobet', 'onay'].forEach(t => {
+        const o = {...((yeni && yeni[t]) || {})};
+        if (kendi) {      // bu sekmenin düzenlediği istasyon: yerel parça korunur; ancak bu sekme parçayı son okumadan beri değiştirmediyse sunucudaki (ör. planlamanın onay/iade yanıtı) alınır
+          const yerel = S.plan && S.plan[t] && S.plan[t][kendi], sk = `${y}-${m}#${t}#${kendi}`, sunucu = JSON.stringify(o[kendi]), degismedi = tazeSon[sk] !== undefined && JSON.stringify(yerel) === tazeSon[sk];
+          tazeSon[sk] = sunucu;
+          if (!degismedi) { if (yerel !== undefined) o[kendi] = yerel; else delete o[kendi]; }
+        }
+        if (Object.keys(o).length) p[t] = o; else delete p[t];
+      });
+      if (JSON.stringify(p) === onceMetin) return false;
+      S.plan = p;
+      if (S.ist && !p.birimler.some(b => b.ad === S.ist)) S.ist = (p.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
+      if (!S.ist) S.ist = (p.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
+      render(); return true;
+    } catch (er) { return false; } finally { tazeleSuruyor = false; }
+  }
+  let tazeleZaman = null;
+  const gorunurOlunca = () => { if (document.visibilityState === 'visible') planTazele(); };
+  if (opts.gomulu) { tazeleZaman = setInterval(() => { planTazele(); }, opts.tazeleMs || TAZELE_MS); if (typeof document !== 'undefined') document.addEventListener('visibilitychange', gorunurOlunca); }
+
   // başlangıç
   const hazir = (async () => { await ayarYukle(); await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); logla('Plan onarıldı', 'Hatalı tanınan istasyon birimleri temizlendi'); kaydet(); } render(); setTimeout(() => arsivArkaPlan(), 1200); })();
-  return {getState: () => S, hazir, yenile: render, dosyaVer: asosDosyalariIsle, unmount: () => { root.innerHTML = ''; }};
+  return {getState: () => S, hazir, yenile: render, tazele: () => planTazele(true), dosyaVer: asosDosyalariIsle, unmount: () => { clearInterval(tazeleZaman); if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', gorunurOlunca); root.innerHTML = ''; }};
 }
 return {mount, VERSION};
 })();

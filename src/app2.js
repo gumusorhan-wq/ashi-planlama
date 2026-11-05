@@ -2,6 +2,8 @@
   // ---------- sayfalar ----------
   const ayEtiket = () => `${AYLAR[S.m]} ${S.y}`;
   const ayIlk = () => C.iso(S.y, S.m, 1);
+  // Plan durumu seçimi; kilitli ayda seçim yerine (yalnız yönetici) "Kilidi aç" düğmesi — onaylı, plan 'kesin' durumuna döner
+  const durumSecHtml = d => d === 'kilitli' ? (S.rol === 'yonetici' ? `<button class="ap-btn sm" data-act="kilit-ac" ${S.kilitAcBekle ? 'disabled' : ''} title="Ayın kilidini açar: plan Kesinleşti durumuna döner ve yeniden düzenlenebilir (günlüğe yazılır)">${S.kilitAcBekle ? 'Kilit açılıyor…' : 'Kilidi aç'}</button>` : '') : `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir (istasyonlara gönder)'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>`;
   function ustHtml() {
     const d = S.plan ? S.plan.durum : '';
     return `<div class="ap-top"><img class="ap-logo" src="${AP_LOGO}" alt="HUSER" title="HUSER"><h1>HUSER ASHİ PLANLAMA <span class="ap-note">v${VERSION}</span></h1>
@@ -11,7 +13,7 @@
       <span class="ap-sp"></span>
       ${opts.gomulu ? '' : `<button class="ap-btn sm" data-act="kilavuz" title="Programın kullanımı">Kullanım kılavuzu</button>
       <label class="ap-note" title="Tema"><select class="ap-sel" data-act="tema"><option value="acik" ${S.ayar.tema !== 'koyu' && S.ayar.tema !== 'sistem' ? 'selected' : ''}>Açık</option><option value="koyu" ${S.ayar.tema === 'koyu' ? 'selected' : ''}>Koyu</option><option value="sistem" ${S.ayar.tema === 'sistem' ? 'selected' : ''}>Sistem</option></select></label>`}
-      ${S.plan && guncelAy() && (S.rol === 'yonetici' || S.rol === 'planlayici') ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir (istasyonlara gönder)'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}
+      ${S.plan && guncelAy() && (S.rol === 'yonetici' || S.rol === 'planlayici') ? durumSecHtml(d) : ''}
       ${opts.kullanici ? '' : `<label class="ap-note" title="Rol (demo)"><select class="ap-sel" data-act="rol">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`}</div>`;
   }
   const SAYFALAR = [['pano', 'Pano'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['talep', 'İstasyon talepleri'], ['personel', 'Personel'], ['takip', 'İzin / görev takibi'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['ayar', 'Ayarlar']];
@@ -36,7 +38,7 @@
       <div class="ap-yanbas"><img class="ap-ylogo" src="${AP_LOGO}" alt=""><div class="ap-ybaslik"><b>ASHİ Planlama</b><span>${S.modul === 2 ? 'Modül 2' : 'Modül 1'} · ${esc(aktif)}</span></div><button type="button" class="ap-yanac" data-act="yan-ac" aria-label="Menüyü aç / kapat">${S.yanAcik ? '✕' : '☰'}</button></div>
       <div class="ap-ykisa" title="${esc(ayEtiket())}"><button class="ap-ykok" data-act="ay-" title="Önceki ay">‹</button><b>${kisaAy}</b><button class="ap-ykok" data-act="ay+" title="Sonraki ay">›</button></div>
       <div class="ap-yanust"><div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><b>${ayEtiket()}</b><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
-        ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>${guncelAy() && planlamaRol() ? `<select class="ap-sel" data-act="plan-durum" title="Plan durumu">${[['taslak', 'Taslak'], ['kesin', 'Kesinleştir (istasyonlara gönder)'], ['kilitli', 'Ayı kilitle']].map(([v, t]) => `<option value="${v}" ${v === d ? 'selected' : ''} ${v === 'kilitli' && S.rol !== 'yonetici' ? 'disabled' : ''}>${t}</option>`).join('')}</select>` : ''}</div>` : ''}
+        ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>${guncelAy() && planlamaRol() ? durumSecHtml(d) : ''}</div>` : ''}
         ${opts.kullanici ? '' : `<select class="ap-sel" data-act="rol" title="Rol (demo)">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select>`}</div>
       <div class="ap-yanic">${m1 ? `<div class="ap-ysec">MODÜL 1 · PLANLAMA</div>${m1Sec.map(s1).join('')}` : ''}
         <div class="ap-ysec">MODÜL 2 · NÖBET LİSTESİ</div>${s2}
@@ -204,6 +206,22 @@
     const diger = !!g && !g.hedef && (g.diger || !!g.yer);
     return `<div class="ap-gh"><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${dis} title="Nereye görevlendirildi? İstasyon, Başhekimlik ve KKM listeden; diğer yerler için Diğer'i seçip yazın"><option value="">— yer seç —</option>${birimler.filter(x => x.ad !== b.ad).map(x => `<option ${g && x.ad === g.hedef ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}<option value="__diger__" ${diger ? 'selected' : ''}>Diğer (yaz)…</option></select>${diger ? `<input class="ap-in w" data-id="${k.id}" data-f="gYer" value="${esc(g.diger && g.yer === 'Diğer' ? '' : g.yer || '')}" placeholder="İlçe Sağlık Müd., Devlet Hastanesi…" ${dis}>` : ''}${g && (g.hedef || g.yer) && g.tarih ? `<div class="ap-note">${esc(g.tarih)}</div>` : ''}</div>`;
   }
+  // İstasyon tablosu, ad altındaki "nöbet tutar" etiketi (Başhekimlik / KKM nöbeti). Planlama yetkilisi etikete tıklayıp seçer:
+  // Otomatik (rapordan) / Nöbet tutar / Nöbet tutmaz. Elle seçim k.idariNobetElle'de saklanır; "nöbet tutmaz" soluk ve üstü çizili görünür.
+  function idariEtiket(k, duz) {
+    const elle = typeof k.idariNobetElle === 'boolean', var_ = idariNobetVar(k), oto = idariNobetOto(k), ed = duz && planlamaRol();
+    const kay = k.idariNobet && k.idariNobet.birim ? `Nöbet Listesi Raporunda ${k.idariNobet.birim} nöbeti kaydı var (son 6 ay)` : 'Nöbet Listesi Raporunda son 6 ayda Başhekimlik / KKM nöbeti kaydı yok';
+    const bil = elle ? `Elle seçildi: ${var_ ? 'nöbet tutar' : 'nöbet tutmaz'} (rapora göre: ${oto ? 'tutar' : 'tutmaz'})` : kay;
+    const ic = `nöbet tutar${elle ? '<sup class="ap-elle">elle</sup>' : ''}`, sinif = `ap-tag ap-t-ok${elle && !var_ ? ' ap-idn-yok' : ''}`;
+    let h = '';
+    if (var_ || elle) h = ed ? `<button type="button" class="${sinif} ap-tagbtn" data-act="idari-ac" data-id="${k.id}" title="${esc(bil)} — değiştirmek için tıklayın">${ic}</button>` : `<span class="${sinif}" title="${esc(bil)}">${ic}</span>`;
+    else if (ed) h = `<button type="button" class="ap-tag ap-tagbtn ap-idn-ek" data-act="idari-ac" data-id="${k.id}" title="${esc(kay)} — Başhekimlik / KKM nöbet durumunu elle belirlemek için tıklayın">idari nöbet…</button>`;
+    if (ed && S.idariAc === k.id) {
+      const sec = elle ? (k.idariNobetElle ? '1' : '0') : 'oto';
+      h += `<div class="ap-idn-sec" role="group" aria-label="Başhekimlik / KKM nöbeti">${[['oto', `Otomatik (rapordan: ${oto ? 'tutar' : 'tutmaz'})`], ['1', 'Nöbet tutar'], ['0', 'Nöbet tutmaz']].map(([v, t]) => `<button type="button" class="ap-btn sm${v === sec ? ' pri' : ''}" data-act="idari-sec" data-id="${k.id}" data-v="${v}">${t}</button>`).join('')}</div>`;
+    }
+    return h;
+  }
   function istHtml() {
     const birimler = S.plan.birimler;
     const b = birimler.find(x => x.ad === S.ist) || birimler[0];
@@ -231,7 +249,7 @@
       const saatEksik = s && !s.nobetYok && !gelen && k.planlanan != null && !hedefTam ? (k.sinif === 'isci' ? Math.max(0, (s.hedef - sayi(k.planlanan)) / C.ADIM * (S.ayar.isciDusulen || 11)) : Math.max(0, s.mesai - sayi(k.planlanan) * 24)) : 0, eksikMesai = saatEksik > 0.01;
       if (eksikMesai) mesEksik.push(`${k.ad} (−${fmt(Math.round(saatEksik * 10) / 10)} saat)`);
       rows += `<tr class="c${eksikMesai ? ' mes-eksik' : ''}" title="${eksikMesai ? 'Mesai saatini tamamlayamıyor: planlanan nöbet mesai saatinin altında kalıyor' : ''}" style="${renk ? 'background:' + renk : ''}">
-        <td><input class="ap-in w" data-id="${k.id}" data-f="ad" value="${esc(k.ad)}" ${dis}>${idariNobetVar(k) ? `<span class="ap-tag ap-t-ok" title="Nöbet Listesi Raporunda ${esc(k.idariNobet.birim)} nöbeti kaydı var (son 6 ay)">nöbet tutar</span>` : ''}</td>
+        <td><input class="ap-in w" data-id="${k.id}" data-f="ad" value="${esc(k.ad)}" ${dis}>${idariEtiket(k, duz)}</td>
         <td><input class="ap-in w" data-id="${k.id}" data-f="unvan" value="${esc(k.unvan)}" ${dis} title="${esc(k.dortB ? '4/B' : '')}">${k.dortB ? '<span class="ap-tag ap-t-fz" title="4/B personel">4/B</span>' : ''}${(() => { const y = C.kadroYilDurum(k.kadroTarih, ayIlk()); return y.yok || y.uygun ? '' : `<span class="ap-tag ap-t-fz" title="Kadro değişikliği (${esc(k.kadroTarih.split('-').reverse().join('.'))}): ${esc(y.dolum.split('-').reverse().join('.'))} tarihine kadar görevlendirilemez">kadro 1 yıl</span>`; })()}</td>
         <td class="gz"><select class="ap-sel" data-id="${k.id}" data-f="sinif" ${dis}>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === k.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
         <td>${k.sinif === 'memur' ? `${(() => { const sd = C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}); return `<select class="ap-sel" data-id="${k.id}" data-f="rolManuel" ${dis} title="Boş: nöbet listelerinden otomatik. AABT ve ATT sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa girer; ATT ekip şefi nöbet branşına girmez."><option value="">Oto: ${esc(s ? ({dok: 'Doktor', isci: 'İşçi', ke: 'AABT: ekip şefi+YSP', ka: 'AABT: sürücü dahil', ysp: 'Yalnız YSP', sy: 'Sürücü+YSP'})[s.grup] : '')}</option>${(s && s.kadroTip === 'AABT' ? [['ysp', 'Ekip şefi+YSP (sürücü değil)'], ['sur', 'Sürücü dahil']] : [['ysp', 'Yalnız YSP'], ['sur', 'Sürücü+YSP']]).map(([r, t]) => `<option value="${r}" ${(k.rolManuel === r || (r === 'sur' && k.rolManuel === 'karma')) ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="ap-note">${sd.kaynak === 'manuel' ? 'elle seçildi' : sd.kaynak === 'kayit' ? `sürücü %${Math.round(100 * sd.pay)}` : '<span style="color:var(--ap-warn)">doğrulanmadı</span>'}</div>`; })()}` : `<span class="ap-note ap-hd">${k.sinif === 'doktor' ? 'Ekip şefi' : 'Sürücü'}</span>`}</td>
@@ -412,7 +430,7 @@
       <div class="ap-row"><label><input type="checkbox" data-act="oto-oner" ${S.ayar.otoOner !== false ? 'checked' : ''} ${yon ? '' : 'disabled'}> Planlanan nöbeti her değişiklikte otomatik hesapla (kilitli değerler korunur)</label></div>
       <p class="ap-note">Yuvarlama: DOKTOR-AABT-ATT hedefi yukarı 0,5 adıma, işçi hedefi aşağı tam 12 saatlik nöbete yuvarlanır.</p></div>
       <div class="ap-card"><h2>Yedek ve sıfırlama</h2><div class="ap-row"><button class="ap-btn dng" data-act="tum-sifirla" ${S.rol === 'yonetici' ? '' : 'disabled'} title="Tüm aylık planlar, arşiv ve gerçekleşen nöbet verisini siler (ayarlar korunur)">Tüm planları ve arşivi sıfırla</button><button class="ap-btn" data-act="yedek-al">JSON yedeği al (bu ay)</button><button class="ap-btn" data-act="yedek-yukle" ${salt() ? 'disabled' : ''}>JSON yedeği yükle</button></div>
-      <p class="ap-note">Yedek dosyasında kişisel veri bulunur; güvenli yerde saklayın. Şifreli ortak Drive arşivi sonraki sürümde eklenecek.</p></div>`;
+      <p class="ap-note">${opts.gomulu ? 'Planlar, arşiv ve ayarlar kurum sunucusunda (HUSER Yönetim Sistemi) tutulur ve sunucu yedeğine girer. JSON yedeği ek bir kopyadır; dosyada kişisel veri bulunur, güvenli yerde saklayın.' : 'Yedek dosyasında kişisel veri bulunur; güvenli yerde saklayın. Şifreli ortak Drive arşivi sonraki sürümde eklenecek.'}</p></div>`;
     const p = tum.split(/(?=<div class="ap-card"><h2>)/), sek = [['durum', 'Durum tablosu'], ['hesap', 'Hesap ayarları'], ['yedek', 'Yedek']], a = sek.some(x => x[0] === S.ayarSekme) ? S.ayarSekme : 'durum';
     return `<div class="ap-subnav ap-noprint">${sek.map(([v, t]) => `<button class="${a === v ? 'on' : ''}" data-act="ayar-sekme" data-v="${v}">${t}</button>`).join('')}</div>` + p[sek.findIndex(x => x[0] === a)];
   }
