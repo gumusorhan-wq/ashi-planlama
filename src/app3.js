@@ -580,12 +580,15 @@
   }
   // Tüm istasyonlar tek Excel: her istasyon ayrı sayfa; sütunlar planlama biriminin kullandığı düzende (AD SOYAD … AÇIKLAMA).
   // TAHMİNİ NÖBET = personelin mesai saatinden: memur/doktor "7 Nöbet + 8 Saat" (24 saatlik nöbet + kalan saat), işçi "16 Nöbet" (12 saatlik nöbet). Planlanan nöbet sayısı yazılmaz.
+  // Excel'de unvan: sık kullanılan büyük harfli unvanlar planlama biriminin dosyasındaki yazımla; diğerleri olduğu gibi
+  const UNVAN_ESLE = {'SAĞLIK MEMURU': 'Sağlık Memuru', 'SAĞLIK TEKNİKERİ': 'Sağlık Teknikeri', 'SÜREKLİ İŞÇİ': 'Sürekli İşçi', 'HİZMETLİ': 'Hizmetli', 'ŞOFÖR': 'Şoför'};
+  const unvanYaz = u => { const t = String(u || '').trim(); return UNVAN_ESLE[t.toLocaleUpperCase('tr-TR')] || t; };
   function excelIstasyonSayfa(b) {
     const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
     // Kendi kadrosundaki (görevde dışarıda olanlar hariç) ve buraya geçici görevli gelen personel; branş sırasıyla (doktor → AABT → ATT → diğer memur → sürücü ATT → işçi)
     const kis = S.plan.kayitlar.filter(k => { if (gizliKisi(k)) return false; const giden = k.birim === b.ad && (D[k.durum] || {}).disarida && k.gorev && (k.gorev.hedef || k.gorev.yer) && k.gorev.hedef !== b.ad; return !giden && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)); }).sort(nobetSirala(sm));
     const mesaiK = k => { const s = sm.get(k.id); if (s) return s.nobetYok ? 0 : s.mesai; try { return C.kisiMesai(k, S.y, S.m, ozel(), D); } catch (e) { return 0; } };
-    const tahmini = k => { const mesai = mesaiK(k); if (!(mesai > 0)) return ''; if (isciK(k)) return `${Math.floor(mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
+    const tahmini = k => { const mesai = mesaiK(k); if (!(mesai > 0)) { const s = sm.get(k.id), dt = D[k.durum] || {}, du = k.durum ? ` (${k.durum})` : ''; if (izinAyGun(k) >= C.gunSayisi(S.y, S.m)) return 'İzinli/raporlu (tüm ay)'; if ((s && s.nobetYok) || dt.nobetYok) return 'Nöbet yok' + du; if (dt.mesaiYok) return 'Mesai yok' + du; return 'Mesai yok'; } if (isciK(k)) return `${Math.floor(mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
     const isciK = k => /ISCI/.test(C.TR((k.kadroTur || '') + ' ' + (k.unvan || ''))) || k.sinif === 'isci';
     const surucuK = k => isciK(k) || /SOFOR|SURUCU/.test(C.TR(k.unvan || ''));
     const brans = k => {      // işçi / şoför: Sürücü; doktor ve AABT: Ekip Şefi; ATT: ATT / Yrd. Sağlık Personeli (örnek dosyadaki düzen)
@@ -595,7 +598,7 @@
     const aoa = [['AD SOYAD', 'UNVAN', 'SRC YETKİSİ', 'KADRO TÜRÜ', 'BRANŞ', 'İZİN (GÜN)', 'TAHMİNİ NÖBET', 'G.GÖREV DURUMU', 'GELDİĞİ/GİTTİĞİ İSTASYON', 'NEDEN', 'KALAN AY', 'YOLLUK DURUMU', 'AÇIKLAMA']];
     kis.forEach(k => {
       const gelen = k.birim !== b.ad, u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
-      aoa.push([k.ad, (k.unvan || '').trim(), /\bSRC\b/.test(u) ? 'EVET' : '', /ISCI/.test(C.TR(k.kadroTur || '')) ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, tahmini(k),
+      aoa.push([k.ad, unvanYaz(k.unvan), /\bSRC\b/.test(u) ? 'EVET' : '', /ISCI/.test(C.TR(k.kadroTur || '')) ? 'İşçi' : '657 Memur', brans(k), izinAyGun(k) || 0, tahmini(k),
         gelen ? 'GEÇİCİ GÖREVLİ' : '', gelen ? `Geldiği istasyon: ${k.birim || 'Tanımsız İstasyon'}` : '', '', '', (k.gorev && k.gorev.yolluk) || '', k.aciklama || '']);      // NEDEN ve KALAN AY örnek dosyada boştur; planlama birimi elle doldurur
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [22.8, 14.8, 10.8, 12.8, 22.8, 9.8, 16.8, 16.8, 28, 18.8, 9.8, 12.8, 36].map(wch => ({wch})); return ws;
@@ -637,6 +640,16 @@
 
   // ---------- aylık rotasyon: her istasyondan ayda (kota) kişi çıkar; sırayla, kişi isteği varsa öncelikli / birkaç ay üst üste ----------
   const ayAnahtari = () => `${S.y}-${C.pad(S.m)}`;
+  // Görev bitiş tarihi: bit alanı, yoksa elle yazılan tarih metnindeki son tarih ("01.06.2026 – 30.11.2026"); tek tarih yalnız başlangıçtır
+  const gorevTarihleri = g => { const m = [...String((g && g.tarih) || '').matchAll(/(\d{2})\.(\d{2})\.(\d{4})/g)].map(x => `${x[3]}-${x[2]}-${x[1]}`); return {bas: (g && g.bas) || m[0] || '', bit: (g && g.bit) || (m.length > 1 ? m[m.length - 1] : '')}; };
+  // Plan ayının ilk günü ya da öncesinde biten geçici görevler kapatılır, kişi kadro istasyonuna döner ("devam" isteği olanlar hariç)
+  function bitenGorevleriKapat() {
+    if (!S.plan || salt()) return 0;
+    const ilk = ayIlk(), biten = S.plan.kayitlar.filter(k => { if (!k.gorev || k.istek === 'devam' || k.gorev.uzun) return false; const t = gorevTarihleri(k.gorev); return t.bit && t.bit <= ilk && !(t.bas && t.bas >= ilk); });
+    if (!biten.length) return 0;
+    biten.forEach(k => { const yer = k.gorev.hedef || k.gorev.yer || ''; k.gorev = null; k.gorevSonaErdi = true; if (/GEÇİCİ GÖREVDE/.test(k.durum || '')) k.durum = ''; if (/GECICI GOREV/.test(C.TR(k.durumMetin || ''))) k.durumMetin = ''; k.durumManuel = false; logla('Geçici görev süresi bitti, kadrosuna döndü', `${k.ad}: ${yer} → ${k.birim}`); });
+    otoHesapla(); damgala(); kaydet(); toast(`${biten.length} personelin geçici görevi bu aydan önce bittiği için kadro istasyonuna döndürüldü.`); return biten.length;
+  }
   const gorevAktif = g => !!g && !!(g.hedef || g.yer) && (!g.bit || g.bit > ayIlk() || (g.bas && g.bas >= ayIlk())) && (!g.bas || g.bas <= gunSon());
   const sonCikis = k => [...(k.gecmis || []), ...(k.gecmisAsos || [])].sort().pop() || '';
   const ISTEK = {'': 'Sırayla', git: 'Gitmek istiyor', devam: 'Devam etmek istiyor', gitmesin: 'Bu ay gitmesin'};
@@ -898,7 +911,7 @@
             }
             return y;
           });
-          otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); } logla('Önceki aydan kopyalandı', pk); kaydet(); S.sayfa = 'pano'; break;
+          otoHesapla(); bitenGorevleriKapat(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); } logla('Önceki aydan kopyalandı', pk); kaydet(); S.sayfa = 'pano'; break;
         }
         case 'plan-asos': { if (salt()) { toast(!guncelAy() ? 'Geçmiş aya dosya yüklenemez (salt okunur).' : 'Düzenleme yetkiniz yok / ay kilitli.'); break; } const f = await dosyaSec('.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', true); if (f.length) await asosDosyalariIsle(f); return; }
         case 'asos-uygula': {
@@ -906,7 +919,7 @@
           if (S.plan && salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
           const pasif = root.querySelector('#ap-asos-pasif') && root.querySelector('#ap-asos-pasif').checked, eksik = (A.raporlar.find(r => r.tur === 'A') || {eksik: []}).eksik;
           const yeni = A.plan; if (pasif) yeni.kayitlar.forEach(k => { if (eksik.some(e => e.id === k.id)) k.durum = 'PASİF'; });
-          S.plan = yeni; ofUygula(S.plan); otoHesapla(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
+          S.plan = yeni; ofUygula(S.plan); otoHesapla(); bitenGorevleriKapat(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | ')); damgala();
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
