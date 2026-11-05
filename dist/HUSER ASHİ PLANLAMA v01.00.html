@@ -1742,6 +1742,27 @@ function mount(root, opts = {}) {
     if (l.length > 500) l.length = 500;
     await depo.put('yuklemeler', l); S.yuklemeler = l;
   }
+  // Nöbet Listesi Raporu (N) yüklemesinden plana işlenen veriyi geri alır: kişilerin o aylara ait nöbet rolü sayıları (rolAy → rolSay, sürücülük
+  // doğrulaması), idari (Başhekimlik / KKM) nöbet kayıtları ve plan.nobetAylari
+  function nobetAylariniGeriAl(plan, aylar) {
+    if (!plan || !aylar.length) return 0; let n = 0;
+    (plan.kayitlar || []).forEach(k => {
+      if (k.rolAy && aylar.some(a => a in k.rolAy)) { k.rolAy = {...k.rolAy}; aylar.forEach(a => { delete k.rolAy[a]; }); k.rolSay = Object.keys(k.rolAy).length ? C.rolToplam(k.rolAy) : null; n++; }
+      if (k.idariNobet && k.idariNobet.aylar) { const ay = {...k.idariNobet.aylar}; aylar.forEach(a => { delete ay[a]; }); k.idariNobet = Object.keys(ay).length ? {...k.idariNobet, aylar: ay} : null; }
+    });
+    plan.nobetAylari = (plan.nobetAylari || []).filter(a => !aylar.includes(a));
+    return n;
+  }
+  // Silinen yüklemelerin gerçekleşen nöbet kayıtları (gercek:YYYY-AA): kalan hiçbir Nöbet raporu yüklemesi (hangi plan ayına yüklenmiş olursa olsun)
+  // o ayı kapsamıyorsa silinir; başka bir yüklemede de kullanılan ay korunur
+  async function gercekTemizle(aylar, kalan) {
+    const kullanilan = new Set(kalan.filter(x => x.tur === 'N').flatMap(x => String(x.aylar || '').split(',').filter(Boolean)));
+    const sil = [...new Set(aylar)].filter(a => !kullanilan.has(a));
+    for (const a of sil) { await depo.del('gercek:' + a); if (S.gercekVeri) delete S.gercekVeri[a]; }
+    return sil;
+  }
+  const nAylari = l => l.filter(x => x.tur === 'N').flatMap(x => String(x.aylar || '').split(',').filter(Boolean));
+
   async function arsivYukle() {
     S.yuklemeler = (await depo.get('yuklemeler')) || [];
     const anahtarlar = ((await depo.keys()) || []).filter(k => String(k).startsWith('arsiv:')).sort(), v = {};
@@ -1763,12 +1784,12 @@ function mount(root, opts = {}) {
   // Her ay yüklenecek dosyalar: en az sayıda ASOS dosyası (3 dosya) ve bu ay için durumu
   function dosyaDurumHtml() {
     const ay = ayAnahtari(), yl = (S.yuklemeler || []).filter(x => x.ay === ay), var_ = t => yl.some(x => x.tur === t);
-    const durum = ok => ok ? '<span class="ap-tag ap-t-ok">yüklendi</span>' : '<span class="ap-tag ap-t-ih">bekleniyor</span>';
+    const durum = ok => ok === 'once' ? '<span class="ap-tag ap-t-fz" title="Bu aya yükleme yok; önceki aydan kopyalanan nöbet ayları kullanılıyor">önceki aydan</span>' : ok ? '<span class="ap-tag ap-t-ok">yüklendi</span>' : '<span class="ap-tag ap-t-ih">bekleniyor</span>';      // durum bu ayın yükleme kayıtlarından türetilir
     const nobetAy = (S.plan && S.plan.nobetAylari) || [];
     const sat = [
       ['1', '<b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi</b>', 'Kim hangi istasyonda çalışıyor, çalışma durumu, yıllık izin bakiyesi. Doktorlar dahil tüm ekibi içerir: yalnız Personel Listesi Raporu ile ~58 kişi (çoğu doktor) eksik kalır.', var_('A')],
       ['2', '<b>Personel Listesi Raporu</b>', 'İzin, rapor, muafiyet, süt izni, geçici görev yeri ve tarihleri, atama başlangıç tarihi (4/B 4 yıl kuralı). İzin-Muafiyet Raporu aynı bilgiyi içerir; ayrıca yüklemeye gerek yok.', var_('B') || var_('I')],
-      ['3', '<b>Nöbet Listesi Raporu</b> (ya da Nöbet İçi Hareket Raporu)', `Kişinin ekip şefi / YSP / sürücü olarak tuttuğu nöbetler: sürücülük doğrulaması ve gerçekleşen nöbetler. İkisi aynı bilgiyi verir, <b>birini yüklemeniz yeterli</b>. Son 6 ay birlikte değerlendirilir; yüklü nöbet ayları: ${nobetAy.length ? nobetAy.map(a => ayAd(a)).join(', ') : 'yok'}.`, var_('N') || nobetAy.length > 0]];
+      ['3', '<b>Nöbet Listesi Raporu</b> (ya da Nöbet İçi Hareket Raporu)', `Kişinin ekip şefi / YSP / sürücü olarak tuttuğu nöbetler: sürücülük doğrulaması ve gerçekleşen nöbetler. İkisi aynı bilgiyi verir, <b>birini yüklemeniz yeterli</b>. Son 6 ay birlikte değerlendirilir; yüklü nöbet ayları: ${nobetAy.length ? nobetAy.map(a => ayAd(a)).join(', ') : 'yok'}.`, var_('N') || (nobetAy.length > 0 ? 'once' : false)]];
     return `<div class="ap-card"><h2>Her ay yüklenecek dosyalar — ${ayEtiket()}</h2><p class="ap-note">Sistem yalnızca <b>3 ASOS dosyasıyla</b> çalışır. Her ay planlama öncesi bu üçünü yenilemeniz yeterlidir; arşiv ve istatistikler bunlardan ve planlamadan otomatik üretilir.</p>
       ${tabloHtml(['#', 'Dosya', 'Ne için gerekli', 'Bu ay'], sat.map(r => [r[0], r[1], `<span class="ap-note">${r[2]}</span>`, durum(r[3])]))}
       <details style="margin-top:8px"><summary class="ap-note">Yüklemeniz gerekmeyen dosyalar</summary><ul class="ap-note" style="line-height:1.7"><li><b>Personel İzin-Muafiyet Raporu:</b> Personel Listesi Raporu ile aynı izin/muafiyet bilgisini verir. Yalnızca bir kişinin aynı ay içinde birden çok izni olduğunda ek ayrıntı sağlar (isteğe bağlı).</li><li><b>Nöbet İçi Hareket Raporu:</b> Nöbet Listesi Raporu ile aynı bilgiyi içerir; ikisini birden yüklemek gerekmez.</li><li><b>Nöbet Listesi Döküm Cetveli:</b> Gün gün saat bilgisi verir ama ekip şefi / YSP / sürücü bilgisini içermez; şu an kullanılmıyor (ileride fazla mesai bakiyesi için değerlendirilebilir).</li></ul></details></div>`;
@@ -2324,11 +2345,22 @@ function mount(root, opts = {}) {
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
       case 'yukleme-sil': {
+        // Yükleme kaydı silinince o kayda ait veriler de silinir: Nöbet raporunda plana işlenen nöbet rolü / sürücülük / idari nöbet bilgisi
+        // (yalnız o plan ayının aynı ayları kapsayan başka bir Nöbet yüklemesi yoksa) ve başka hiçbir yüklemede kullanılmayan gerçekleşen nöbet kayıtları.
+        // Personel listelerinin (EKİP, Personel Listesi, İzin) kişilere işlediği bilgiler ayrıştırılamadığı için geri alınmaz; durum tablosu yükleme kayıtlarından türetildiği için tutarlı kalır.
         const l = S.yuklemeler || [], x = l[+v]; if (!x || S.rol === 'salt_okur') break;
-        if (!confirm(`"${x.ad}" yükleme kaydı silinsin mi?\n\nNot: Dosyanın plana işlediği veriler (kişiler, izinler, nöbetler) geri alınmaz; yalnızca bu günlük kaydı silinir.`)) break;
-        l.splice(+v, 1); await depo.put('yuklemeler', l); S.yuklemeler = l;
-        if (x.tur === 'N' && x.aylar && confirm(`Bu dosyadan oluşturulan gerçekleşen nöbet kayıtları da (${x.aylar.split(',').map(ayAd).join(', ')}) silinsin mi?\n\nTamam: arşiv istatistiklerinden de kalkar. İptal: kayıtlar kalır.`)) { for (const ay of x.aylar.split(',')) { await depo.del('gercek:' + ay); if (S.gercekVeri) delete S.gercekVeri[ay]; } }
-        toast('Yükleme kaydı silindi.'); break;
+        const nAy = nAylari([x]), acik = !!S.plan && x.ay === ayAnahtari();
+        if (nAy.length && acik && salt()) { toast('Bu ayın planı salt okunur (kilitli ya da başkası düzenliyor); bu yükleme şimdi silinemez.'); break; }
+        if (!confirm(nAy.length ? `"${x.ad}" yükleme kaydı ve bu dosyadan gelen nöbet verileri silinsin mi?\n\n${ayAd(x.ay)} planındaki nöbet rolü / sürücülük bilgileri (${nAy.map(ayAd).join(', ')}) ve başka bir yüklemede kullanılmayan gerçekleşen nöbet kayıtları silinir.` : `"${x.ad}" yükleme kaydı silinsin mi?\n\nNot: Personel listelerinin plana işlediği kişi ve izin bilgileri geri alınmaz; yalnızca yükleme kaydı silinir (ayın dosya durumu "bekleniyor" olur).`)) break;
+        l.splice(+v, 1);
+        if (nAy.length) {
+          const ayniPlan = nAylari(l.filter(y => y.ay === x.ay)), geri = nAy.filter(a => !ayniPlan.includes(a));
+          if (geri.length && acik) { nobetAylariniGeriAl(S.plan, geri); otoHesapla(); logla('Nöbet raporu yüklemesi silindi', `${x.ad}: ${geri.join(', ')}`); damgala(); kaydet(); }
+          else if (geri.length) { const [py, pm] = x.ay.split('-').map(Number), p = py * 12 + pm >= MEVCUT ? await depo.get(anahtar(py, pm)) : null; if (p && p.durum !== 'kilitli') { nobetAylariniGeriAl(p, geri); await depo.put(anahtar(py, pm), p); } }      // geçmiş (salt okunur) ayların planına dokunulmaz
+          await gercekTemizle(nAy, l);
+        }
+        await depo.put('yuklemeler', l); S.yuklemeler = l;
+        toast(nAy.length ? 'Yükleme kaydı ve bu dosyadan gelen nöbet verileri silindi.' : 'Yükleme kaydı silindi.'); break;
       }
       case 'arsiv-yil': S.arsivYilAc = S.arsivYilAc || {}; S.arsivYilAc[v] = !(S.arsivYilAc[v] != null ? S.arsivYilAc[v] : +v === GUNCEL_Y); break;
       case 'ayar-sekme': S.ayarSekme = v; break;
@@ -3130,8 +3162,11 @@ function mount(root, opts = {}) {
         case 'plan-sifirla': {      // bu ayın planını tamamen siler; sayfa "bu ay için plan yok" durumuna döner
           if (!planlamaRol()) { toast('Planı sıfırlama yetkiniz yok.'); break; }
           if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur; sıfırlanamaz.' : 'Bu ay kilitli; önce kilidi açın.'); break; }
-          if (!confirm(`${ayEtiket()} planı TAMAMEN silinsin mi?\n\nKişiler, nöbet sayıları, görevlendirmeler, istasyon onayları ve Modül 2 nöbet listeleri silinir. Arşiv ve diğer aylar etkilenmez. Bu işlem geri alınamaz (önce Ayarlar'dan JSON yedeği alabilirsiniz).`)) break;
-          clearTimeout(kaydetZamani); await depo.del(anahtar(S.y, S.m)); S.plan = null; S.planAnahtarlari = (S.planAnahtarlari || []).filter(k => k !== anahtar(S.y, S.m)); S.ist = ''; S.sayfa = 'pano'; S.takipVeri = null; S.asos = null;
+          // Ay sıfırdan başlar: plan + bu plan ayına yüklenen dosyaların kayıtları + onlardan gelen gerçekleşen nöbet verileri (başka bir ayın yüklemesinde de kullanılan nöbet ayı korunur)
+          const ayK = ayAnahtari(), yl = (await depo.get('yuklemeler')) || [], buAy = yl.filter(x => x.ay === ayK), kalan = yl.filter(x => x.ay !== ayK), nAy = nAylari(buAy);
+          if (!confirm(`${ayEtiket()} planı TAMAMEN silinsin mi?\n\nPlan, bu aya yüklenen dosyalar (${buAy.length} kayıt) ve onlardan gelen nöbet verileri silinecek: kişiler, nöbet sayıları, görevlendirmeler, istasyon onayları, Modül 2 nöbet listeleri ve yükleme kayıtları${nAy.length ? `; gerçekleşen nöbet kayıtları (${[...new Set(nAy)].map(ayAd).join(', ')}) — başka bir ayın yüklemesinde de kullanılanlar korunur` : ''}. Arşiv kaydı ve diğer aylar etkilenmez. Bu işlem geri alınamaz (önce Ayarlar'dan JSON yedeği alabilirsiniz).`)) break;
+          clearTimeout(kaydetZamani); await depo.del(anahtar(S.y, S.m));
+          if (buAy.length) { await depo.put('yuklemeler', kalan); S.yuklemeler = kalan; await gercekTemizle(nAy, kalan); } S.plan = null; S.planAnahtarlari = (S.planAnahtarlari || []).filter(k => k !== anahtar(S.y, S.m)); S.ist = ''; S.sayfa = 'pano'; S.takipVeri = null; S.asos = null;
           toast(`${ayEtiket()} planı sıfırlandı.`); break;
         }
         case 'tum-sifirla': {      // tüm aylık planlar + arşiv + gerçekleşen nöbet + yükleme günlüğü (ayarlar korunur); yalnız yönetici

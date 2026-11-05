@@ -63,6 +63,27 @@
     if (l.length > 500) l.length = 500;
     await depo.put('yuklemeler', l); S.yuklemeler = l;
   }
+  // Nöbet Listesi Raporu (N) yüklemesinden plana işlenen veriyi geri alır: kişilerin o aylara ait nöbet rolü sayıları (rolAy → rolSay, sürücülük
+  // doğrulaması), idari (Başhekimlik / KKM) nöbet kayıtları ve plan.nobetAylari
+  function nobetAylariniGeriAl(plan, aylar) {
+    if (!plan || !aylar.length) return 0; let n = 0;
+    (plan.kayitlar || []).forEach(k => {
+      if (k.rolAy && aylar.some(a => a in k.rolAy)) { k.rolAy = {...k.rolAy}; aylar.forEach(a => { delete k.rolAy[a]; }); k.rolSay = Object.keys(k.rolAy).length ? C.rolToplam(k.rolAy) : null; n++; }
+      if (k.idariNobet && k.idariNobet.aylar) { const ay = {...k.idariNobet.aylar}; aylar.forEach(a => { delete ay[a]; }); k.idariNobet = Object.keys(ay).length ? {...k.idariNobet, aylar: ay} : null; }
+    });
+    plan.nobetAylari = (plan.nobetAylari || []).filter(a => !aylar.includes(a));
+    return n;
+  }
+  // Silinen yüklemelerin gerçekleşen nöbet kayıtları (gercek:YYYY-AA): kalan hiçbir Nöbet raporu yüklemesi (hangi plan ayına yüklenmiş olursa olsun)
+  // o ayı kapsamıyorsa silinir; başka bir yüklemede de kullanılan ay korunur
+  async function gercekTemizle(aylar, kalan) {
+    const kullanilan = new Set(kalan.filter(x => x.tur === 'N').flatMap(x => String(x.aylar || '').split(',').filter(Boolean)));
+    const sil = [...new Set(aylar)].filter(a => !kullanilan.has(a));
+    for (const a of sil) { await depo.del('gercek:' + a); if (S.gercekVeri) delete S.gercekVeri[a]; }
+    return sil;
+  }
+  const nAylari = l => l.filter(x => x.tur === 'N').flatMap(x => String(x.aylar || '').split(',').filter(Boolean));
+
   async function arsivYukle() {
     S.yuklemeler = (await depo.get('yuklemeler')) || [];
     const anahtarlar = ((await depo.keys()) || []).filter(k => String(k).startsWith('arsiv:')).sort(), v = {};
@@ -84,12 +105,12 @@
   // Her ay yüklenecek dosyalar: en az sayıda ASOS dosyası (3 dosya) ve bu ay için durumu
   function dosyaDurumHtml() {
     const ay = ayAnahtari(), yl = (S.yuklemeler || []).filter(x => x.ay === ay), var_ = t => yl.some(x => x.tur === t);
-    const durum = ok => ok ? '<span class="ap-tag ap-t-ok">yüklendi</span>' : '<span class="ap-tag ap-t-ih">bekleniyor</span>';
+    const durum = ok => ok === 'once' ? '<span class="ap-tag ap-t-fz" title="Bu aya yükleme yok; önceki aydan kopyalanan nöbet ayları kullanılıyor">önceki aydan</span>' : ok ? '<span class="ap-tag ap-t-ok">yüklendi</span>' : '<span class="ap-tag ap-t-ih">bekleniyor</span>';      // durum bu ayın yükleme kayıtlarından türetilir
     const nobetAy = (S.plan && S.plan.nobetAylari) || [];
     const sat = [
       ['1', '<b>EKİP — Başhekimlik / Komuta / İstasyon Personel Listesi</b>', 'Kim hangi istasyonda çalışıyor, çalışma durumu, yıllık izin bakiyesi. Doktorlar dahil tüm ekibi içerir: yalnız Personel Listesi Raporu ile ~58 kişi (çoğu doktor) eksik kalır.', var_('A')],
       ['2', '<b>Personel Listesi Raporu</b>', 'İzin, rapor, muafiyet, süt izni, geçici görev yeri ve tarihleri, atama başlangıç tarihi (4/B 4 yıl kuralı). İzin-Muafiyet Raporu aynı bilgiyi içerir; ayrıca yüklemeye gerek yok.', var_('B') || var_('I')],
-      ['3', '<b>Nöbet Listesi Raporu</b> (ya da Nöbet İçi Hareket Raporu)', `Kişinin ekip şefi / YSP / sürücü olarak tuttuğu nöbetler: sürücülük doğrulaması ve gerçekleşen nöbetler. İkisi aynı bilgiyi verir, <b>birini yüklemeniz yeterli</b>. Son 6 ay birlikte değerlendirilir; yüklü nöbet ayları: ${nobetAy.length ? nobetAy.map(a => ayAd(a)).join(', ') : 'yok'}.`, var_('N') || nobetAy.length > 0]];
+      ['3', '<b>Nöbet Listesi Raporu</b> (ya da Nöbet İçi Hareket Raporu)', `Kişinin ekip şefi / YSP / sürücü olarak tuttuğu nöbetler: sürücülük doğrulaması ve gerçekleşen nöbetler. İkisi aynı bilgiyi verir, <b>birini yüklemeniz yeterli</b>. Son 6 ay birlikte değerlendirilir; yüklü nöbet ayları: ${nobetAy.length ? nobetAy.map(a => ayAd(a)).join(', ') : 'yok'}.`, var_('N') || (nobetAy.length > 0 ? 'once' : false)]];
     return `<div class="ap-card"><h2>Her ay yüklenecek dosyalar — ${ayEtiket()}</h2><p class="ap-note">Sistem yalnızca <b>3 ASOS dosyasıyla</b> çalışır. Her ay planlama öncesi bu üçünü yenilemeniz yeterlidir; arşiv ve istatistikler bunlardan ve planlamadan otomatik üretilir.</p>
       ${tabloHtml(['#', 'Dosya', 'Ne için gerekli', 'Bu ay'], sat.map(r => [r[0], r[1], `<span class="ap-note">${r[2]}</span>`, durum(r[3])]))}
       <details style="margin-top:8px"><summary class="ap-note">Yüklemeniz gerekmeyen dosyalar</summary><ul class="ap-note" style="line-height:1.7"><li><b>Personel İzin-Muafiyet Raporu:</b> Personel Listesi Raporu ile aynı izin/muafiyet bilgisini verir. Yalnızca bir kişinin aynı ay içinde birden çok izni olduğunda ek ayrıntı sağlar (isteğe bağlı).</li><li><b>Nöbet İçi Hareket Raporu:</b> Nöbet Listesi Raporu ile aynı bilgiyi içerir; ikisini birden yüklemek gerekmez.</li><li><b>Nöbet Listesi Döküm Cetveli:</b> Gün gün saat bilgisi verir ama ekip şefi / YSP / sürücü bilgisini içermez; şu an kullanılmıyor (ileride fazla mesai bakiyesi için değerlendirilebilir).</li></ul></details></div>`;

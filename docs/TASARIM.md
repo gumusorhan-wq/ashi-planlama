@@ -90,6 +90,8 @@ Ortak özellikler her iki modda aynıdır: roller, "Son kayıt" damgası, ay kil
 
 **Kişi sırası (tüm listeler, istasyon tablosu, PNG, Excel, Modül 2):** doktor (tabip) → memur [AABT → ATT → diğer memur unvanları → nöbet rolü sürücü olan ATT] → işçi; aynı branşta ASOS sırası, sonra ad. Doktor / memur / işçi grup çizgileri korunur. Tek yardımcı: `bransSira` / `kisiSirala` (app1.js).
 
+**Yükleme kaydı silme ve ay sıfırlama:** Arşiv › Yüklenen dosyalar'dan bir Nöbet Listesi Raporu kaydı silinince o dosyanın plana işlediği nöbet rolü / sürücülük / idari nöbet bilgisi (o plan ayının aynı ayları kapsayan başka Nöbet yüklemesi yoksa) ve başka hiçbir yüklemenin kapsamadığı gerçekleşen nöbet kayıtları (`gercek:YYYY-AA`) silinir; geçmiş (salt okunur) ayların planına dokunulmaz. Personel listelerinin kişilere işlediği bilgiler geri alınmaz. "Her ay yüklenecek dosyalar" durumu o ayın yükleme kayıtlarından türetilir (yükleme yok ama önceki aydan kopyalanan nöbet ayları varsa "önceki aydan"). Pano'daki "Bu ayın planını sıfırla" planla birlikte bu plan ayına yüklenen dosya kayıtlarını ve onlardan gelen gerçekleşen nöbet kayıtlarını siler (başka bir ayın yüklemesinde de kullanılan nöbet ayı korunur); arşiv kaydı ve diğer aylar etkilenmez.
+
 ## 5. Veri modeli
 
 ```

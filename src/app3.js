@@ -766,8 +766,11 @@
         case 'plan-sifirla': {      // bu ayın planını tamamen siler; sayfa "bu ay için plan yok" durumuna döner
           if (!planlamaRol()) { toast('Planı sıfırlama yetkiniz yok.'); break; }
           if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur; sıfırlanamaz.' : 'Bu ay kilitli; önce kilidi açın.'); break; }
-          if (!confirm(`${ayEtiket()} planı TAMAMEN silinsin mi?\n\nKişiler, nöbet sayıları, görevlendirmeler, istasyon onayları ve Modül 2 nöbet listeleri silinir. Arşiv ve diğer aylar etkilenmez. Bu işlem geri alınamaz (önce Ayarlar'dan JSON yedeği alabilirsiniz).`)) break;
-          clearTimeout(kaydetZamani); await depo.del(anahtar(S.y, S.m)); S.plan = null; S.planAnahtarlari = (S.planAnahtarlari || []).filter(k => k !== anahtar(S.y, S.m)); S.ist = ''; S.sayfa = 'pano'; S.takipVeri = null; S.asos = null;
+          // Ay sıfırdan başlar: plan + bu plan ayına yüklenen dosyaların kayıtları + onlardan gelen gerçekleşen nöbet verileri (başka bir ayın yüklemesinde de kullanılan nöbet ayı korunur)
+          const ayK = ayAnahtari(), yl = (await depo.get('yuklemeler')) || [], buAy = yl.filter(x => x.ay === ayK), kalan = yl.filter(x => x.ay !== ayK), nAy = nAylari(buAy);
+          if (!confirm(`${ayEtiket()} planı TAMAMEN silinsin mi?\n\nPlan, bu aya yüklenen dosyalar (${buAy.length} kayıt) ve onlardan gelen nöbet verileri silinecek: kişiler, nöbet sayıları, görevlendirmeler, istasyon onayları, Modül 2 nöbet listeleri ve yükleme kayıtları${nAy.length ? `; gerçekleşen nöbet kayıtları (${[...new Set(nAy)].map(ayAd).join(', ')}) — başka bir ayın yüklemesinde de kullanılanlar korunur` : ''}. Arşiv kaydı ve diğer aylar etkilenmez. Bu işlem geri alınamaz (önce Ayarlar'dan JSON yedeği alabilirsiniz).`)) break;
+          clearTimeout(kaydetZamani); await depo.del(anahtar(S.y, S.m));
+          if (buAy.length) { await depo.put('yuklemeler', kalan); S.yuklemeler = kalan; await gercekTemizle(nAy, kalan); } S.plan = null; S.planAnahtarlari = (S.planAnahtarlari || []).filter(k => k !== anahtar(S.y, S.m)); S.ist = ''; S.sayfa = 'pano'; S.takipVeri = null; S.asos = null;
           toast(`${ayEtiket()} planı sıfırlandı.`); break;
         }
         case 'tum-sifirla': {      // tüm aylık planlar + arşiv + gerçekleşen nöbet + yükleme günlüğü (ayarlar korunur); yalnız yönetici

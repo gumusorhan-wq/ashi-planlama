@@ -346,11 +346,22 @@
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
       case 'yukleme-sil': {
+        // Yükleme kaydı silinince o kayda ait veriler de silinir: Nöbet raporunda plana işlenen nöbet rolü / sürücülük / idari nöbet bilgisi
+        // (yalnız o plan ayının aynı ayları kapsayan başka bir Nöbet yüklemesi yoksa) ve başka hiçbir yüklemede kullanılmayan gerçekleşen nöbet kayıtları.
+        // Personel listelerinin (EKİP, Personel Listesi, İzin) kişilere işlediği bilgiler ayrıştırılamadığı için geri alınmaz; durum tablosu yükleme kayıtlarından türetildiği için tutarlı kalır.
         const l = S.yuklemeler || [], x = l[+v]; if (!x || S.rol === 'salt_okur') break;
-        if (!confirm(`"${x.ad}" yükleme kaydı silinsin mi?\n\nNot: Dosyanın plana işlediği veriler (kişiler, izinler, nöbetler) geri alınmaz; yalnızca bu günlük kaydı silinir.`)) break;
-        l.splice(+v, 1); await depo.put('yuklemeler', l); S.yuklemeler = l;
-        if (x.tur === 'N' && x.aylar && confirm(`Bu dosyadan oluşturulan gerçekleşen nöbet kayıtları da (${x.aylar.split(',').map(ayAd).join(', ')}) silinsin mi?\n\nTamam: arşiv istatistiklerinden de kalkar. İptal: kayıtlar kalır.`)) { for (const ay of x.aylar.split(',')) { await depo.del('gercek:' + ay); if (S.gercekVeri) delete S.gercekVeri[ay]; } }
-        toast('Yükleme kaydı silindi.'); break;
+        const nAy = nAylari([x]), acik = !!S.plan && x.ay === ayAnahtari();
+        if (nAy.length && acik && salt()) { toast('Bu ayın planı salt okunur (kilitli ya da başkası düzenliyor); bu yükleme şimdi silinemez.'); break; }
+        if (!confirm(nAy.length ? `"${x.ad}" yükleme kaydı ve bu dosyadan gelen nöbet verileri silinsin mi?\n\n${ayAd(x.ay)} planındaki nöbet rolü / sürücülük bilgileri (${nAy.map(ayAd).join(', ')}) ve başka bir yüklemede kullanılmayan gerçekleşen nöbet kayıtları silinir.` : `"${x.ad}" yükleme kaydı silinsin mi?\n\nNot: Personel listelerinin plana işlediği kişi ve izin bilgileri geri alınmaz; yalnızca yükleme kaydı silinir (ayın dosya durumu "bekleniyor" olur).`)) break;
+        l.splice(+v, 1);
+        if (nAy.length) {
+          const ayniPlan = nAylari(l.filter(y => y.ay === x.ay)), geri = nAy.filter(a => !ayniPlan.includes(a));
+          if (geri.length && acik) { nobetAylariniGeriAl(S.plan, geri); otoHesapla(); logla('Nöbet raporu yüklemesi silindi', `${x.ad}: ${geri.join(', ')}`); damgala(); kaydet(); }
+          else if (geri.length) { const [py, pm] = x.ay.split('-').map(Number), p = py * 12 + pm >= MEVCUT ? await depo.get(anahtar(py, pm)) : null; if (p && p.durum !== 'kilitli') { nobetAylariniGeriAl(p, geri); await depo.put(anahtar(py, pm), p); } }      // geçmiş (salt okunur) ayların planına dokunulmaz
+          await gercekTemizle(nAy, l);
+        }
+        await depo.put('yuklemeler', l); S.yuklemeler = l;
+        toast(nAy.length ? 'Yükleme kaydı ve bu dosyadan gelen nöbet verileri silindi.' : 'Yükleme kaydı silindi.'); break;
       }
       case 'arsiv-yil': S.arsivYilAc = S.arsivYilAc || {}; S.arsivYilAc[v] = !(S.arsivYilAc[v] != null ? S.arsivYilAc[v] : +v === GUNCEL_Y); break;
       case 'ayar-sekme': S.ayarSekme = v; break;
