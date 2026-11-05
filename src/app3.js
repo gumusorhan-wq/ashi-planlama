@@ -303,7 +303,8 @@
     const gc = a.gecici; if (!gc || !gc.ad) return {gorev: null, gecmis: []};
     const hedef = birimCoz(plan, gc.ad), baslik = C.TR(gc.neden);
     const gecmis = gc.bas ? C.aylariListele(gc.bas, gc.bit, bugunIso()) : [];
-    if (gc.bit && gc.bit <= ayIlk() && !(gc.bas && gc.bas >= ayIlk())) return {gorev: null, gecmis, sonaErdi: true};   // görev ayın ilk günü bitiyorsa (ör. 01.10–01.11) kişi o ay kadrosuna döner
+    if (gc.bit && gc.bit <= ayIlk() && !(gc.bas && gc.bas >= ayIlk())) return {gorev: null, gecmis, sonaErdi: true};
+    if (kisaGorev({bas: gc.bas, bit: gc.bit})) return {gorev: null, gecmis: [], sonaErdi: true, kisa: true};      // 1–2 nöbetlik görevlendirme geçici görev sayılmaz (kişi kendi istasyonunda kalır)   // görev ayın ilk günü bitiyorsa (ör. 01.10–01.11) kişi o ay kadrosuna döner
     return {gorev: {yer: gc.ad, hedef, kaynak: 'asos', yolluk: '', bas: gc.bas || '', bit: gc.bit || '', tarih: gc.bas ? `${trTarih(gc.bas)}${gc.bit ? ' – ' + trTarih(gc.bit) : ''}` : '', gerekce: GEREKCE_ESLE[baslik] || ''}, gecmis};
   }
   const bugunIso = () => new Date().toISOString().slice(0, 10);
@@ -782,15 +783,17 @@
   const ayAnahtari = () => `${S.y}-${C.pad(S.m)}`;
   // Görev bitiş tarihi: bit alanı, yoksa elle yazılan tarih metnindeki son tarih ("01.06.2026 – 30.11.2026"); tek tarih yalnız başlangıçtır
   const gorevTarihleri = g => { const m = [...String((g && g.tarih) || '').matchAll(/(\d{2})\.(\d{2})\.(\d{4})/g)].map(x => `${x[3]}-${x[2]}-${x[1]}`); return {bas: (g && g.bas) || m[0] || '', bit: (g && g.bit) || (m.length > 1 ? m[m.length - 1] : '')}; };
+  // 1–2 nöbetlik görevlendirme (başlangıç–bitiş en çok 2 gün; ASOS'ta bitiş dönüş günüdür) geçici görev sayılmaz
+  const kisaGorev = g => { const t = gorevTarihleri(g); if (!t.bas || !t.bit) return false; const gun = (Date.parse(t.bit) - Date.parse(t.bas)) / 864e5; return gun >= 0 && gun <= 2; };
   // Plan ayının ilk günü ya da öncesinde biten geçici görevler kapatılır, kişi kadro istasyonuna döner ("devam" isteği olanlar hariç)
   function bitenGorevleriKapat() {
     if (!S.plan || salt()) return 0;
-    const ilk = ayIlk(), biten = S.plan.kayitlar.filter(k => { if (!k.gorev || k.istek === 'devam' || k.gorev.uzun) return false; const t = gorevTarihleri(k.gorev); return t.bit && t.bit <= ilk && !(t.bas && t.bas >= ilk); });
+    const ilk = ayIlk(), biten = S.plan.kayitlar.filter(k => { if (!k.gorev || k.istek === 'devam' || k.gorev.uzun) return false; const t = gorevTarihleri(k.gorev); return (t.bit && t.bit <= ilk && !(t.bas && t.bas >= ilk)) || kisaGorev(k.gorev); });
     const D0 = durumlar(), artik = S.plan.kayitlar.filter(k => !k.gorev && !(D0[k.durum] || {}).disarida && k.durum !== 'GEÇİCİ GÖREVLİ' && /GECICI GOREV/.test(C.TR(k.durumMetin || '')));
     if (artik.length) { artik.forEach(k => { k.durumMetin = ''; if (k.durumMetinA && /GECICI GOREV/.test(C.TR(k.durumMetinA))) k.durumMetinA = ''; }); logla('Görevi bitmiş personelde kalan "geçici görevli" notu silindi', `${artik.length} kişi`); if (!biten.length) { damgala(); kaydet(); } }
     if (!biten.length) return 0;
-    biten.forEach(k => { const yer = k.gorev.hedef || k.gorev.yer || ''; k.gorev = null; k.gorevSonaErdi = true; if (/GEÇİCİ GÖREVDE/.test(k.durum || '')) k.durum = ''; if (/GECICI GOREV/.test(C.TR(k.durumMetin || ''))) k.durumMetin = ''; k.durumManuel = false; logla('Geçici görev süresi bitti, kadrosuna döndü', `${k.ad}: ${yer} → ${k.birim}`); });
-    otoHesapla(); damgala(); kaydet(); toast(`${biten.length} personelin geçici görevi bu aydan önce bittiği için kadro istasyonuna döndürüldü.`); return biten.length;
+    biten.forEach(k => { const yer = k.gorev.hedef || k.gorev.yer || '', kisa = kisaGorev(k.gorev); k.gorev = null; k.gorevSonaErdi = true; if (/GEÇİCİ GÖREVDE/.test(k.durum || '')) k.durum = ''; if (/GECICI GOREV/.test(C.TR(k.durumMetin || ''))) k.durumMetin = ''; k.durumManuel = false; logla(kisa ? '1–2 nöbetlik görevlendirme geçici görev sayılmadı' : 'Geçici görev süresi bitti, kadrosuna döndü', `${k.ad}: ${yer} → ${k.birim}`); });
+    otoHesapla(); damgala(); kaydet(); toast(`${biten.length} personelin geçici görevi (süresi biten ya da 1–2 nöbetlik) kapatıldı; kadro istasyonunda gösteriliyor.`); return biten.length;
   }
   const gorevAktif = g => !!g && !!(g.hedef || g.yer) && (!g.bit || g.bit > ayIlk() || (g.bas && g.bas >= ayIlk())) && (!g.bas || g.bas <= gunSon());
   const sonCikis = k => [...(k.gecmis || []), ...(k.gecmisAsos || [])].sort().pop() || '';
