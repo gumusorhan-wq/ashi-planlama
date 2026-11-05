@@ -3157,7 +3157,7 @@ function mount(root, opts = {}) {
 }
 return {mount, VERSION};
 })();
-if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => { const el = document.getElementById('ap-app'); if (el) window.__ap = AshiPlanlama.mount(el); });
+if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => { const el = document.getElementById('ap-app'); if (el) window.__ap = AshiPlanlama.mount(el, window.AP_ENTEG || {});   /* gömülü mod: ana uygulama (112stoktakip) depolama ve kullanıcıyı window.AP_ENTEG ile verir */ });
 
 </script>
 </body></html>
