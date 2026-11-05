@@ -603,11 +603,160 @@
     });
     const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [22.8, 14.8, 10.8, 12.8, 22.8, 9.8, 16.8, 16.8, 28, 18.8, 9.8, 12.8, 36].map(wch => ({wch})); return ws;
   }
+  // ---------- Toplu Excel (planlama biriminin aylık dosya düzeni: Personel Bilgileri, İstatistik, Kurum Dışına Giden/Gelen, KKM, Başhekimlik, ilçe sırasıyla istasyonlar) ----------
+  const XL_RENK = {gelen: '8DB4E2', giden: 'C0504D', izin: 'FFFF00', rapor: 'A6A6A6', analik: 'B1A0C7', uzun: '9BBB59', sep: '002060', baslik: 'FFFF00', ozet: 'B7DEE8'};
+  const XL_LEJANT = [['1 AYLIK GELEN PERSONEL', 'gelen'], ['GİDEN PERSONEL', 'giden'], ['YILLIK İZİNLİ PERSONEL', 'izin'], ['RAPORLU PERSONEL', 'rapor'], ['ANALIK HAKKINDAKİ PERSONEL', 'analik'], ['UZUN SÜRELİ GÖREVLENDİRME 3 AY VE ÜZERİ', 'uzun']];
+  const ILCE_SIRA = ['YUNUSEMRE', 'SEHZADELER', 'SARUHANLI', 'AKHISAR', 'SOMA', 'GOLMARMARA', 'KIRKAGAC', 'GORDES', 'DEMIRCI', 'KOPRUBASI', 'AHMETLI', 'TURGUTLU', 'SALIHLI', 'ALASEHIR', 'SARIGOL', 'KULA', 'SELENDI'];
+  const xlTarihler = metin => [...String(metin || '').matchAll(/(\d{2}\.\d{2}\.\d{4})/g)].map(x => x[1]);
+  const xlGorevMetin = k => { const g = k.gorev; if (!g || !(g.hedef || g.yer)) return ''; return [g.hedef || g.yer, g.tarih, g.gerekce && !/PERSONEL İHTİYACI/.test(g.gerekce) ? g.gerekce : ''].filter(Boolean).join(' / '); };
+  const xlUzunGorev = g => !!g && (g.uzun || (() => { const t = gorevTarihleri(g); if (!t.bas || !t.bit) return false; return (Date.parse(t.bit) - Date.parse(t.bas)) / 864e5 >= 89; })());
+  const xlUnvan = k => { const u = C.TR(k.unvan || ''); if (k.sinif !== 'isci' && /SOFOR/.test(u)) return 'Şoför'; if (/HIZMETLI/.test(u)) return 'Hizmetli'; return unvanKisa(k); };
+  const xlIsci = k => /ISCI/.test(C.TR((k.kadroTur || '') + ' ' + (k.unvan || ''))) || k.sinif === 'isci';
+  const xlSurucu = k => (xlIsci(k) || /SOFOR|SURUCU/.test(C.TR(k.unvan || ''))) && !/HIZMETLI/.test(C.TR(k.unvan || ''));
+  function xlMesai(k, sm) { const D = durumlar(), s = sm && sm.get(k.id); if (s) return s.nobetYok ? 0 : s.mesai; try { return C.kisiMesai(k, S.y, S.m, ozel(), D); } catch (e) { return 0; } }
+  function xlTahmini(k, sm) {
+    const D = durumlar(), mesai = xlMesai(k, sm);
+    if (!(mesai > 0)) { const s = sm && sm.get(k.id), dt = D[k.durum] || {}, du = k.durum ? ` (${k.durum})` : ''; if (izinAyGun(k) >= C.gunSayisi(S.y, S.m)) return 'İzinli/raporlu (tüm ay)'; if ((s && s.nobetYok) || dt.nobetYok) return 'Nöbet yok' + du; if (dt.mesaiYok) return 'Mesai yok' + du; return 'Mesai yok'; }
+    if (xlIsci(k)) return `${Math.floor(mesai / 12 + 1e-9)} Nöbet`;
+    const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`;
+  }
+  function xlSatirRenk(k, gelen) {
+    const D = durumlar(), d = k.durum || '';
+    if (gelen) return XL_RENK.gelen;
+    if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[d] || {}).disarida) return xlUzunGorev(k.gorev) ? XL_RENK.uzun : XL_RENK.giden;
+    if (/RAPORLU/.test(d)) return XL_RENK.rapor;
+    if (/ANALIK|DOĞUM|GEBE|GEBELİK/.test(d) || k.sut > 0) return XL_RENK.analik;
+    if (d === 'GEÇİCİ GÖREVLİ') return XL_RENK.gelen;
+    if (D[d] && D[d].renk) return hex(D[d].renk);
+    if (izinAyGun(k) > 0) return XL_RENK.izin;
+    return '';
+  }
+  // Hücre biçimi: Times New Roman, ince kenarlık; başlık kalın ve ortalı
+  const XL_SINIR = {top: {style: 'thin'}, bottom: {style: 'thin'}, left: {style: 'thin'}, right: {style: 'thin'}};
+  function xlSayfa(aoa, ops) {
+    const ws = XLSX.utils.aoa_to_sheet(aoa), o = ops || {}, rng = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let r = 0; r <= rng.e.r; r++) for (let c = 0; c <= rng.e.c; c++) {
+      const a = XLSX.utils.encode_cell({r, c}); const st = (o.stil && o.stil(r, c)) || null; if (!st) { if (ws[a]) ws[a].s = {font: {name: 'Times New Roman', sz: 12}}; continue; }
+      if (!ws[a]) ws[a] = {t: 's', v: ''}; ws[a].s = {font: {name: 'Times New Roman', sz: 12, ...(st.font || {})}, ...(st.kenar ? {border: XL_SINIR} : {}), ...(st.dolgu ? {fill: {patternType: 'solid', fgColor: {rgb: st.dolgu}}} : {}), ...(st.hiza ? {alignment: st.hiza} : {alignment: {vertical: 'center', wrapText: !!st.sar}})};
+    }
+    if (o.cols) ws['!cols'] = o.cols.map(wch => ({wch}));
+    if (o.merges) ws['!merges'] = o.merges;
+    return ws;
+  }
+  // İstasyon / KKM sayfası: AD-SOYAD, UNVAN, G.GÖREV DURUMU, İZİNLER (gün + tür), TAHMİNİ NÖBET, GEÇİCİ GÖREV YERİ TARİH ARALIĞI, YOLLUK DURUMU, AÇIKLAMA
+  function xlIstasyonSayfa(b, baslik) {
+    const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
+    const kis = S.plan.kayitlar.filter(k => !gizliKisi(k) && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida))).sort(nobetSirala(sm));
+    const bas = ['AD-SOYAD', 'UNVAN', 'G.GÖREV DURUMU', 'İZİNLER', '', 'TAHMİNİ NÖBET', 'GEÇİCİ GÖREV YERİ TARİH ARALIĞI', 'YOLLUK DURUMU', 'AÇIKLAMA'], W = bas.length;
+    const aoa = [[baslik || (b.ad + (b.tur === 'istasyon' ? ' NOLU ASHİ' : '')) + (b.ekipOf ? ' — EKİP OF' : '')], bas], stil = {}, grup = k => k.sinif === 'doktor' ? 0 : xlSurucu(k) ? 2 : 1;
+    let onceki = null, izinTop = 0, izinKisi = 0, aktif = 0; const ort = {0: [], 1: [], 2: []};
+    kis.forEach(k => {
+      const gelen = k.birim !== b.ad, g = grup(k);
+      if (onceki != null && g !== onceki) { stil[aoa.length] = {dolgu: XL_RENK.sep}; aoa.push(new Array(W).fill('')); }
+      onceki = g;
+      const iz = gelen ? 0 : izinAyGun(k), mesai = gelen ? 0 : xlMesai(k, sm), giden = !gelen && k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[k.durum] || {}).disarida;
+      if (iz) { izinTop += iz; izinKisi++; } if (mesai > 0 && !giden) { aktif++; ort[g].push(mesai / 24); }
+      stil[aoa.length] = {dolgu: xlSatirRenk(k, gelen)};
+      aoa.push([k.ad, xlUnvan(k), gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), iz ? Math.round(iz * 100) / 100 : '', iz ? izinTur(k) : '', gelen ? '' : (giden ? '' : xlTahmini(k, sm)),
+        gelen ? `${k.birim}${(S.plan.birimler.find(x => x.ad === k.birim) || {}).tur === 'istasyon' ? ' NOLU ASHİ' : ''}${k.gorev && k.gorev.tarih ? ' / ' + k.gorev.tarih : ''}` : (xlGorevMetin(k) || cikGorev(k)), (k.gorev && k.gorev.yolluk) || '', k.aciklama || '']);
+    });
+    const son = aoa.length; aoa.push([]);
+    const ozet = [['AKTİF ÇALIŞAN:', aktif], ['TOPLAM KULLANILAN İZİN SAYISI:', Math.round(izinTop * 100) / 100], ['İZİN KULLANAN PERSONEL SAYISI:', izinKisi], ['DOKTOR Ortalama Nöbet (24 saat):', 0], ['YSP Ortalama Nöbet (24 saat):', 1], ['Sürücü Ortalama Nöbet (24 saat):', 2]];
+    const r0 = aoa.length;
+    for (let i = 0; i < Math.max(ozet.length, XL_LEJANT.length); i++) {
+      const sat = new Array(W).fill(''), o = ozet[i];
+      if (o) { sat[0] = o[0]; sat[1] = i >= 3 ? (ort[o[1]].length ? Math.round(ort[o[1]].reduce((x, y) => x + y, 0) / ort[o[1]].length * 100) / 100 : '') : o[1]; }
+      if (XL_LEJANT[i]) sat[6] = XL_LEJANT[i][0];
+      aoa.push(sat);
+    }
+    const ws = xlSayfa(aoa, {cols: [32, 16, 30, 6, 16, 22, 44, 16, 36], merges: [{s: {r: 0, c: 0}, e: {r: 0, c: W - 1}}, {s: {r: 1, c: 3}, e: {r: 1, c: 4}}], stil: (r, c) => {
+      if (r === 0) return c === 0 ? {font: {bold: true, sz: 14}, hiza: {horizontal: 'center'}} : null;
+      if (r === 1) return {font: {bold: true}, kenar: true, dolgu: 'DCE6F1', sar: true};
+      if (r < son) return {kenar: true, dolgu: (stil[r] || {}).dolgu || ''};
+      if (r >= r0) { const i = r - r0; if (c <= 1 && ozet[i]) return {kenar: true, dolgu: XL_RENK.ozet, font: c === 1 ? {bold: true} : {}}; if (c === 6 && XL_LEJANT[i]) return {kenar: true, dolgu: XL_RENK[XL_LEJANT[i][1]]}; }
+      return null; }});
+    return ws;
+  }
+  function xlBashekimlik(b) {
+    const D = durumlar(), kis = S.plan.kayitlar.filter(k => !gizliKisi(k) && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida))).sort(nobetSirala(new Map()));
+    const aoa = [['BAŞHEKİMLİK PERSONEL BİLGİLERİ'], ['SN', 'AD-SOYAD', 'UNVAN', 'AÇIKLAMA', 'NÖBET', 'GÖREVİ / DURUMU', 'GEÇİCİ GÖREV TARİHLERİ']], renk = {};
+    kis.forEach((k, i) => { const gelen = k.birim !== b.ad; renk[aoa.length] = xlSatirRenk(k, gelen); aoa.push([i + 1, k.ad, xlUnvan(k), k.aciklama || '', idariNobetVar(k) ? 'NÖBET TUTAR' : '', gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), gelen ? `${k.birim} / ${(k.gorev && k.gorev.tarih) || ''}` : (xlGorevMetin(k) || cikGorev(k))]); });
+    return xlSayfa(aoa, {cols: [5, 32, 16, 30, 14, 30, 44], merges: [{s: {r: 0, c: 0}, e: {r: 0, c: 6}}], stil: (r, c) => r === 0 ? (c === 0 ? {font: {bold: true, sz: 14}, hiza: {horizontal: 'center'}} : null) : r === 1 ? {font: {bold: true}, kenar: true, dolgu: 'DCE6F1', sar: true} : {kenar: true, dolgu: renk[r] || ''}});
+  }
+  // Basit liste sayfası: başlık + sütunlar + satırlar (SN otomatik)
+  function xlListe(baslik, bas, satirlar, renkF) {
+    const aoa = [[baslik], ['SN', ...bas]], renk = {};
+    satirlar.forEach((s, i) => { if (renkF) renk[aoa.length] = renkF(s); aoa.push([i + 1, ...s.hucre]); });
+    return xlSayfa(aoa, {cols: [5, 32, 16, 26, 26, 40, 16, 16, 16, 16, 16].slice(0, bas.length + 1), merges: [{s: {r: 0, c: 0}, e: {r: 0, c: bas.length}}], stil: (r, c) => r === 0 ? (c === 0 ? {font: {bold: true, sz: 14}, hiza: {horizontal: 'center'}} : null) : r === 1 ? {font: {bold: true}, kenar: true, dolgu: 'DCE6F1', sar: true} : {kenar: true, dolgu: renk[r] || ''}});
+  }
+  // Kişi grupları (Personel Bilgileri ve İstatistik ortak)
+  function xlGruplar() {
+    const D = durumlar(), K = S.plan.kayitlar.filter(k => k.durum !== 'PASİF'), birimTur = ad => (S.plan.birimler.find(b => b.ad === ad) || {}).tur;
+    const dis = k => k.gorev && !k.gorev.hedef && k.gorev.yer && (D[k.durum] || {}).disarida;
+    const durumTarih = k => xlTarihler(k.durumMetin);
+    return {D, K, dis, birimTur, durumTarih,
+      analik: K.filter(k => /^ANALIK/.test(k.durum || '') || (k.sut > 0 && !/DOĞUM|GEBE|GEBELİK/.test(k.durum || ''))),
+      gebe: K.filter(k => /GEBE|GEBELİK/.test(k.durum || '')),
+      dogumOnce: K.filter(k => k.durum === 'DOĞUM ÖNCESİ'), dogumSonra: K.filter(k => k.durum === 'DOĞUM SONRASI'),
+      yarim: K.filter(k => k.durum === 'YARI ZAMANLI'), ucretsiz: K.filter(k => k.durum === 'ÜCRETSİZ İZİN'), askerlik: K.filter(k => k.durum === 'ASKERLİK İZNİ'),
+      saglik: K.filter(k => k.durum === 'SAĞLIK MAZERETİ MESAİ' || (k.gorev && /SAĞLIK MAZERETİ/.test(k.gorev.gerekce || ''))),
+      muaf: K.filter(k => k.durum === 'NÖBET MUAFİYETİ'), rapor: K.filter(k => /RAPORLU/.test(k.durum || '')),
+      disGiden: K.filter(k => !gizliKisi(k) && dis(k)), disGelen: K.filter(k => k.durum === 'GEÇİCİ GÖREVLİ' && !k.gorev),
+      aile: K.filter(k => k.durum === 'AİLE HEKİMLİĞİNDE')};
+  }
+  function xlPersonelBilgileri(G) {
+    const aoa = [], stil = {}, gen = {}, bolum = (baslik, bas, kisiler, hucre) => {
+      stil[aoa.length] = 'b'; aoa.push([baslik]); stil[aoa.length] = 'h'; gen[aoa.length] = bas.length + 1; aoa.push(['SN', ...bas]);
+      if (!kisiler.length) { stil[aoa.length] = 'v'; gen[aoa.length] = bas.length + 1; aoa.push(['', 'Bu ay kayıt yok']); }
+      kisiler.forEach((k, i) => { stil[aoa.length] = 'v'; gen[aoa.length] = bas.length + 1; aoa.push([i + 1, k.ad, xlUnvan(k), k.birim, ...hucre(k)]); });
+      aoa.push([]);
+    };
+    const yer = k => (k.gorev && (k.gorev.hedef || k.gorev.yer)) || k.birim, gt = k => (k.gorev && k.gorev.tarih) || '', dt = (k, i) => G.durumTarih(k)[i] || '';
+    const izinT = (k, re) => { const i = (k.izin || []).find(x => re.test(C.TR(x.tur || '')) && x.bas); return i ? [trTarih(i.bas), trTarih(i.bit)] : ['', '']; };
+    bolum('ANALIK HAKKINDA OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'SÜT İZNİNİ KULLANDIĞI YER', 'GÖREVLENDİRME TARİHLERİ', 'ANALIK HAKKI BAŞLANGIÇ', 'ANALIK HAKKI BİTİŞ', 'SÜT İZNİ İLK 6 AY', 'SÜT İZNİ SON 6 AY', 'SÜT İZNİ BİTİŞ'], G.analik, k => [yer(k), gt(k), dt(k, 0), dt(k, 1), '', '', '']);
+    bolum('GEBE OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'GEBELİĞE BAĞLI ÇALIŞTIĞI YER', 'GÖREVLENDİRME TARİHLERİ', 'GEBELİK HAFTASI', 'SON ADET TARİHİ', 'DOĞUM ÖNCESİ İZNİ'], G.gebe, k => [yer(k), gt(k), '', '', '']);
+    bolum('DOĞUM ÖNCESİ İZNİNDE OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'GEBELİK HAFTASI', 'SON ADET TARİHİ', 'İZİN BAŞLANGIÇ TARİHİ', 'İZİN BİTİŞ TARİHİ'], G.dogumOnce, k => ['', '', dt(k, 0), dt(k, 1)]);
+    bolum('DOĞUM SONRASI İZNİNDE OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'İZİN BAŞLANGIÇ (DOĞUM) TARİHİ', 'BİTİŞ TARİHİ', 'GÖREVE BAŞLAMA'], G.dogumSonra, k => [dt(k, 0), dt(k, 1), dt(k, 1)]);
+    bolum('YARIM ZAMANLI ÇALIŞAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ VE BİTİŞ TARİHİ'], G.yarim, k => [G.durumTarih(k).join(' – ')]);
+    bolum('ÜCRETSİZ İZİN', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLAYIŞ TARİHİ', 'BİTİŞ TARİHİ', 'AÇIKLAMALAR'], G.ucretsiz, k => { const t = G.durumTarih(k).length ? [dt(k, 0), dt(k, 1)] : izinT(k, /UCRETSIZ/); return [...t, k.aciklama || '']; });
+    bolum('SAĞLIK MAZERETİ OLAN PERSONEL LİSTESİ', ['AD SOYAD', 'ÜNVANI', 'KADRO YERİ', 'GÖREV YERİ', 'GÖREVLENDİRME TARİHLERİ'], G.saglik, k => [yer(k) === k.birim ? '' : yer(k), gt(k)]);
+    bolum('NÖBET MUAFİYETİ OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ', 'AÇIKLAMA'], G.muaf, k => [dt(k, 0), dt(k, 1), k.durumMetin || '']);
+    bolum('RAPORLU PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'RAPOR TÜRÜ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ'], G.rapor, k => [k.durum, dt(k, 0), dt(k, 1)]);
+    bolum('ASKERLİK İZNİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ'], G.askerlik, k => [dt(k, 0), dt(k, 1)]);
+    return xlSayfa(aoa, {cols: [5, 32, 16, 24, 26, 30, 18, 18, 16, 16, 16], stil: (r, c) => gen[r] != null && c >= gen[r] ? null : stil[r] === 'b' ? (c === 0 ? {font: {bold: true, sz: 13}, dolgu: XL_RENK.baslik, hiza: {horizontal: 'left'}} : null) : stil[r] === 'h' ? {font: {bold: true}, kenar: true, dolgu: XL_RENK.baslik, sar: true} : stil[r] === 'v' ? {kenar: true} : null});
+  }
+  function xlIstatistik(G) {
+    const D = G.D, ist = S.plan.birimler.filter(b => b.tur === 'istasyon'), kkm = S.plan.birimler.find(b => b.tur === 'kkm'), bas = S.plan.birimler.find(b => b.tur === 'bashekimlik');
+    let istNobet = 0; ist.forEach(b => { const h = hesapla(b); h.satir.forEach(s => { if (!s.nobetYok && s.mesai > 0 && s.k.birim === b.ad) istNobet++; }); });
+    const kkmK = kkm ? S.plan.kayitlar.filter(k => k.birim === kkm.ad && !gizliKisi(k) && k.durum !== 'PASİF' && !(D[k.durum] || {}).disarida) : [], nob = k => !(D[k.durum] || {}).nobetYok && xlMesai(k, null) > 0;
+    const yol = re => S.plan.kayitlar.filter(k => gorevAktif(k.gorev) && re.test(C.TR(k.gorev.yolluk || ''))).length;
+    const ayAd = `${AYLAR[S.m].toLocaleUpperCase('tr-TR')} ${S.y}`;
+    const sol = [['PERSONEL SAYILARI', ''], ['Askerlik İzni:', G.askerlik.length], ['Ücretsiz İzin:', G.ucretsiz.length], ['', ''], ['Kurum Dışı Giden Personel:', G.disGiden.length], ['Kurum Dışından Gelen Personel:', G.disGelen.length], ['', ''],
+      ['Gebe Personel:', G.gebe.length], ['Doğum Öncesi İzin:', G.dogumOnce.length], ['Doğum Sonrası İzin:', G.dogumSonra.length], ['Analık Hakkı ve Süt İzni:', G.analik.length], ['Yarı Zamanlı Çalışan Personel:', G.yarim.length], ['Analık Hakkı Kurum Dışında Görevli:', G.analik.filter(G.dis).length], ['', ''],
+      ['Sağlık Mazereti Kurum İçi Mesai:', G.saglik.filter(k => !G.dis(k)).length], ['Sağlık Mazereti Kurum Dışı Mesai:', G.saglik.filter(G.dis).length], ['Nöbet Muafiyeti:', G.muaf.length], ['Raporlu:', G.rapor.length], ['', ''],
+      ['KKM Nöbet Sağlık Personeli:', kkmK.filter(k => k.sinif !== 'doktor' && nob(k)).length], ['KKM Nöbet Doktor:', kkmK.filter(k => k.sinif === 'doktor' && nob(k)).length], ['KKM Mesai:', kkmK.filter(k => !nob(k) && xlMesai(k, null) > 0).length], ['', ''],
+      ['İstasyon Nöbet (Aktif Çalışan):', istNobet], ['Başhekimlik:', bas ? S.plan.kayitlar.filter(k => k.birim === bas.ad && !gizliKisi(k) && k.durum !== 'PASİF').length : 0], ['Aile Hekimliğinde Çalışan Personel:', G.aile.length], ['Toplam Personel Sayısı:', G.K.length]];
+    const sag = [[`${ayAd} AYI MESAİSİ`, ''], ['657 PERSONEL', `${fmt(C.ayMesai(S.y, S.m, false, ozel()))} SAAT`], ["4/D'Lİ PERSONEL", `${fmt(C.ayMesai(S.y, S.m, true, ozel()))} SAAT`], ['', ''], [`${ayAd} YOLLUKSUZ GÖREVLENDİRME SAYISI:`, yol(/YOLLUKSUZ/)], [`${ayAd} YOLLUKLU GÖREVLENDİRME SAYISI:`, yol(/^YOLLUKLU|[^Z]YOLLUKLU/)], ['', '']];
+    let izinTop = 0, izinKisi = 0; S.plan.kayitlar.forEach(k => { const g = izinAyGun(k); if (g > 0 && !gizliKisi(k)) { izinTop += g; izinKisi++; } });
+    sag.push(['TOPLAM KULLANILAN İZİN SAYISI:', Math.round(izinTop * 100) / 100], ['TOPLAM İZİN KULLANAN PERSONEL SAYISI:', izinKisi], ['', '']);
+    const lej0 = sag.length; XL_LEJANT.forEach(l => sag.push([l[0], '']));
+    const aoa = []; for (let i = 0; i < Math.max(sol.length, sag.length); i++) aoa.push([...(sol[i] || ['', '']), '', ...(sag[i] || ['', ''])]);
+    return xlSayfa(aoa, {cols: [38, 10, 4, 46, 16], stil: (r, c) => {
+      if (c <= 1 && sol[r] && sol[r][0]) return r === 0 ? {font: {bold: true}, dolgu: 'FF7C80', kenar: true} : {kenar: true, dolgu: c === 0 ? XL_RENK.ozet : '', font: c === 1 ? {bold: true} : {}};
+      if (c >= 3 && sag[r] && sag[r][0]) { if (r >= lej0) return c === 3 ? {kenar: true, dolgu: XL_RENK[XL_LEJANT[r - lej0][1]]} : null; return {kenar: true, dolgu: r === 0 ? 'FF7C80' : c === 3 ? XL_RENK.ozet : '', font: r === 0 || c === 4 ? {bold: true} : {}}; }
+      return null; }});
+  }
   function excelToplu() {
-    const wb = XLSX.utils.book_new(), kul = new Set(), sayfalar = [];
-    S.plan.birimler.forEach(b => { if (b.tur === 'istasyon' || b.tur === 'kkm' || b.tur === 'bashekimlik') sayfalar.push({ad: b.tur === 'bashekimlik' ? 'İL AMBULANS SERVİSİ BAŞHEKİMLİĞİ' : b.ad, ws: excelIstasyonSayfa(b)}); });
-    sayfalar.push({ad: 'Tanımsız İstasyon', ws: XLSX.utils.aoa_to_sheet([['AD SOYAD', 'UNVAN', 'SRC YETKİSİ', 'KADRO TÜRÜ', 'BRANŞ', 'İZİN (GÜN)', 'TAHMİNİ NÖBET', 'G.GÖREV DURUMU', 'GELDİĞİ/GİTTİĞİ İSTASYON', 'NEDEN', 'KALAN AY', 'YOLLUK DURUMU', 'AÇIKLAMA']])});
-    sayfalar.sort((x, y) => trCollator.compare(x.ad, y.ad)).forEach(x => XLSX.utils.book_append_sheet(wb, x.ws, sheetAd(x.ad, kul)));      // sayfa sırası: alfabetik (örnek dosyadaki gibi)
+    const wb = XLSX.utils.book_new(), kul = new Set(), G = xlGruplar(), ekle = (ad, ws) => XLSX.utils.book_append_sheet(wb, ws, sheetAd(ad, kul));
+    ekle('Personel Bilgileri', xlPersonelBilgileri(G));
+    ekle('İstatistik', xlIstatistik(G));
+    ekle('Kurum Dışına Giden', xlListe('KURUM DIŞINA GİDEN', ['AD-SOYAD', 'UNVAN', 'KADRO YERİ', 'G.GÖREV DURUMU', 'GEÇİCİ GÖREV YERİ TARİH ARALIĞI', 'YOLLUK DURUMU'], G.disGiden.sort((a, b) => trCollator.compare(a.birim, b.birim) || trCollator.compare(a.ad, b.ad)).map(k => ({k, hucre: [k.ad, xlUnvan(k), k.birim, cikDurum(k), xlGorevMetin(k), (k.gorev && k.gorev.yolluk) || '']})), s => xlUzunGorev(s.k.gorev) ? XL_RENK.uzun : ''));
+    ekle('Kurum Dışından Gelen', xlListe('KURUM DIŞINDAN GELEN', ['AD-SOYAD', 'UNVAN', 'ÇALIŞTIĞI YER', 'G.GÖREV DURUMU', 'AÇIKLAMA'], G.disGelen.sort((a, b) => trCollator.compare(a.birim, b.birim) || trCollator.compare(a.ad, b.ad)).map(k => ({k, hucre: [k.ad, xlUnvan(k), k.birim, 'GEÇİCİ GÖREVLİ', k.durumMetin || k.aciklama || '']})), () => XL_RENK.gelen));
+    const kkm = S.plan.birimler.filter(b => b.tur === 'kkm'), bas = S.plan.birimler.filter(b => b.tur === 'bashekimlik');
+    kkm.forEach(b => ekle(kkm.length > 1 ? b.ad : 'KKM', xlIstasyonSayfa(b, 'KOMUTA KONTROL MERKEZİ')));
+    bas.forEach(b => ekle(bas.length > 1 ? b.ad : 'BAŞHEKİMLİK', xlBashekimlik(b)));
+    const sira = b => { const i = ILCE_SIRA.indexOf(C.ilceAdi(b.ad)); return i < 0 ? 99 : i; }, no = b => +((/(\d+)/.exec(b.ad) || [])[1] || 0);
+    S.plan.birimler.filter(b => b.tur === 'istasyon').sort((a, b) => sira(a) - sira(b) || trCollator.compare(C.ilceAdi(a.ad), C.ilceAdi(b.ad)) || no(a) - no(b) || trCollator.compare(a.ad, b.ad)).forEach(b => ekle(b.ad, xlIstasyonSayfa(b)));
     return wb;
   }
   const xlsxIndir = (wb, ad) => indir(new Blob([XLSX.write(wb, {bookType: 'xlsx', type: 'array'})], {type: 'application/octet-stream'}), ad);
@@ -964,7 +1113,7 @@
           ek('Fazla istasyonlar', ['İstasyon', 'Fazla nöbet'], ists.filter(x => x.h.fazlaVar).sort((a, b) => b.h.fazlaEf - a.h.fazlaEf).map(x => [x.b.ad, r1(x.h.fazlaH)]));
           xlsxIndir(wb, `Gorevlendirme-${S.y}-${C.pad(S.m)}.xlsx`); break;
         }
-        case 'excel-ist': { const b = S.plan.birimler.find(x => x.ad === v), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, excelIstasyonSayfa(b), sheetAd(b.tur === 'bashekimlik' ? 'İL AMBULANS SERVİSİ BAŞHEKİMLİĞİ' : b.ad, new Set())); xlsxIndir(wb, `${b.ad}-${S.y}-${C.pad(S.m)}.xlsx`); break; }
+        case 'excel-ist': { const b = S.plan.birimler.find(x => x.ad === v), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, b.tur === 'bashekimlik' ? xlBashekimlik(b) : xlIstasyonSayfa(b, b.tur === 'kkm' ? 'KOMUTA KONTROL MERKEZİ' : ''), sheetAd(b.tur === 'bashekimlik' ? 'BAŞHEKİMLİK' : b.tur === 'kkm' ? 'KKM' : b.ad, new Set())); xlsxIndir(wb, `${b.ad}-${S.y}-${C.pad(S.m)}.xlsx`); break; }
         case 'excel-toplu': xlsxIndir(excelToplu(), `ASHI-Planlama-${S.y}-${C.pad(S.m)}.xlsx`); break;
         case 'yedek-al': indir(new Blob([JSON.stringify({surum: VERSION, plan: S.plan})], {type: 'application/json'}), `ashi-planlama-${S.y}-${C.pad(S.m)}.json`); break;
         case 'yedek-yukle': { const f = await dosyaSec('.json', false); if (!f) break; try { const j = JSON.parse(new TextDecoder().decode(await dosyaOku(f))); if (!j.plan || !Array.isArray(j.plan.kayitlar)) throw new Error('Geçersiz yedek'); if (!confirm('Bu ayın planı yedekle değiştirilecek. Devam edilsin mi?')) break; S.plan = j.plan; logla('Yedekten yüklendi'); damgala(); kaydet(); } catch (er) { toast('Yedek okunamadı: ' + er.message); } break; }
