@@ -28,7 +28,7 @@
         ${typeof opts.veriKaynagi === 'function' ? `<button class="ap-btn" data-act="asos-kaynak" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''} title="ASHİ'deki güncel Nöbet Listesi ve İzin-Muafiyet raporlarını doğrudan alır">ASHİ'den nöbet listesi + izin raporu getir</button>` : ''}
         <button class="ap-btn" data-act="plan-kopya" ${oncekiVar && S.rol !== 'salt_okur' && guncelAy() ? '' : 'disabled'}>Önceki aydan kopyala (${onceki})</button>
         <button class="ap-btn" data-act="plan-bos" ${S.rol === 'salt_okur' || !guncelAy() ? 'disabled' : ''}>Boş plan</button></div>
-      <p class="ap-note">Veriler yalnızca bu tarayıcıda (IndexedDB) tutulur. Yedek almak için Ayarlar'daki JSON yedeğini kullanın.</p></div>`;
+      <p class="ap-note">${opts.gomulu ? 'Veriler kurum sunucusunda (HUSER Yönetim Sistemi) tutulur; planlama ekibi aynı planı görür ve sunucu yedeğine girer.' : "Veriler yalnızca bu tarayıcıda (IndexedDB) tutulur. Yedek almak için Ayarlar'daki JSON yedeğini kullanın."}</p></div>`;
   }
 
   // ---- istasyon kartı: hangi yuva eksik, hangi branştan kaç kişi gerekli, kaç kişi dışarı çıkabilir ----
