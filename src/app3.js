@@ -1097,7 +1097,7 @@
           if (!confirm(`${L.length} tarihi boş görevlendirme bitirilsin mi?${ist ? `\n(${ist} süzgeci)` : ''}\n\nBu kişiler kadro istasyonlarına döner. ASOS dosyası yeniden yüklense de aynı görev geri gelmez; gerekiyorsa yeniden görevlendirebilirsiniz. İşlem günlüğe yazılır.`)) break;
           tarihsizGorevleriBitir(L, 'Tarihi boş görevlendirme bitirildi (önceki ayın görevi)'); otoHesapla(); damgala(); kaydet(); toast(`${L.length} görevlendirme bitirildi.`); break;
         }
-        case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); break; }
+        case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); S.gAra = ''; break; }
         case 'og-ekle': { const d = root.querySelector('#ap-og-t').value, tur = root.querySelector('#ap-og-tur').value; if (!d) { toast('Tarih seçin.'); break; } mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break; }
         case 'og-sil': mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
         case 'liste': { const i = v.indexOf(':'), tip = v.slice(0, i), d = v.slice(i + 1), ozelAd = t.dataset.ad || ''; S.filtre = {q: '', durum: tip === 'durum' ? d : '', birim: '', sinif: tip === 'sinif' ? d : '', ozel: tip === 'ozel' ? d : '', ozelAd}; S.pSayfa = 0; S.sayfa = 'personel'; break; }
@@ -1199,7 +1199,8 @@
       const q = C.TR(S.disAra).trim(); root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!S.disIst || r.dataset.kay === S.disIst) ? '' : 'none'; }); return;
     }
     if (!t || (t.id !== 'ap-g-kisi' && t.id !== 'ap-g-ist')) return;
-    const q = C.TR((root.querySelector('#ap-g-kisi') || {}).value || '').trim(), ist = (root.querySelector('#ap-g-ist') || {}).value || '';
+    S.gAra = (root.querySelector('#ap-g-kisi') || {}).value || ''; S.gIst = (root.querySelector('#ap-g-ist') || {}).value || '';
+    const q = C.TR(S.gAra).trim(), ist = S.gIst;
     root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!ist || r.dataset.kay === ist || r.dataset.hed === ist) ? '' : 'none'; });
   });
   root.addEventListener('change', async e => {
