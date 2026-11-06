@@ -246,3 +246,9 @@ table.tk td.tk-gr.tk-soluk{background:rgba(220,38,38,.06)}
 .ap-slot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;margin-top:6px;font-size:13px}.ap-slot .r{white-space:nowrap}.ap-slot details[open]{flex-basis:100%}
 .ap-ist-ozet>.ap-card{padding:8px 12px}
 .ap-gtpop{position:fixed;top:140px;left:50%;transform:translateX(-50%);z-index:70;width:min(520px,94vw)}.ap-aybtn.bek{outline:2px dashed var(--ap-pri,#1f5fa8);outline-offset:1px}
+.ap-sbas{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.ap-sbas-sag{margin-left:auto;flex:0 0 auto}
+.ap-tppop{position:fixed;top:110px;left:50%;transform:translateX(-50%);z-index:80;width:min(360px,94vw)}
+.ap-gungrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}.ap-gunbtn{padding:6px 0}.ap-gunbtn.hs:not(.sec){color:#b91c1c}.ap-gunbtn:disabled{opacity:.3;cursor:default}
+.ap-ayac{background:none;border:0;font:inherit;font-weight:700;cursor:pointer;color:inherit;padding:2px 4px;border-radius:6px}.ap-ayac:hover{background:rgba(31,95,168,.08)}
+.ap-yilac{background:none;border:0;font:inherit;cursor:pointer;padding:0;color:inherit}.ap-tpbtn{white-space:nowrap}
+.ap-gunbtn:not(.sec):not(.hs){color:#1e293b}

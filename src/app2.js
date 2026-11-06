@@ -8,7 +8,7 @@
     const d = S.plan ? S.plan.durum : '';
     return `<div class="ap-top"><img class="ap-logo" src="${AP_LOGO}" alt="HUSER" title="HUSER"><h1>HUSER ASHİ PLANLAMA <span class="ap-note">v${VERSION}</span></h1>
       <div class="ap-mod">${S.rol === 'istasyon' ? '' : `<button class="${S.modul === 1 ? 'on' : ''}" data-act="modul" data-v="1">Modül 1 · Planlama</button>`}<button class="${S.modul === 2 ? 'on' : ''}" data-act="modul" data-v="2">Modül 2 · Nöbet listesi</button></div>
-      <div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><b>${ayEtiket()}</b><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
+      <div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><button class="ap-ayac" data-pop data-act="tp-ay-ac" title="Ay seç">${ayEtiket()} ▾</button><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
       ${S.plan ? `<span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>` : ''}
       <span class="ap-sp"></span>
       ${opts.gomulu ? '' : `<button class="ap-btn sm" data-act="kilavuz" title="Programın kullanımı">Kullanım kılavuzu</button>
@@ -36,8 +36,8 @@
     const kisaAy = `${AYLAR[S.m].slice(0, 3)} ${String(S.y).slice(2)}`;
     return `<nav class="ap-yan ${S.yanAcik ? 'acik' : ''} ${S.yanDar ? 'dar' : ''}" aria-label="Planlama menüsü">
       <div class="ap-yanbas"><img class="ap-ylogo" src="${AP_LOGO}" alt=""><div class="ap-ybaslik"><b>ASHİ Planlama</b><span>${S.modul === 2 ? 'Modül 2' : 'Modül 1'} · ${esc(aktif)}</span></div><button type="button" class="ap-yanac" data-act="yan-ac" aria-label="Menüyü aç / kapat">${S.yanAcik ? '✕' : '☰'}</button></div>
-      <div class="ap-ykisa" title="${esc(ayEtiket())}"><button class="ap-ykok" data-act="ay-" title="Önceki ay">‹</button><b>${kisaAy}</b><button class="ap-ykok" data-act="ay+" title="Sonraki ay">›</button></div>
-      <div class="ap-yanust"><div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><b>${ayEtiket()}</b><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
+      <div class="ap-ykisa" title="${esc(ayEtiket())}"><button class="ap-ykok" data-act="ay-" title="Önceki ay">‹</button><button class="ap-ayac" data-pop data-act="tp-ay-ac" title="Ay seç">${kisaAy}</button><button class="ap-ykok" data-act="ay+" title="Sonraki ay">›</button></div>
+      <div class="ap-yanust"><div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><button class="ap-ayac" data-pop data-act="tp-ay-ac" title="Ay seç">${ayEtiket()} ▾</button><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
         ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}">${d === 'taslak' ? 'Taslak' : d === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</span>${guncelAy() && planlamaRol() ? durumSecHtml(d) : ''}</div>` : ''}
         ${opts.kullanici ? '' : `<select class="ap-sel" data-act="rol" title="Rol (demo)">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select>`}</div>
       <div class="ap-yanic">${m1 ? `<div class="ap-ysec">MODÜL 1 · PLANLAMA</div>${m1Sec.map(s1).join('')}` : ''}
@@ -160,7 +160,7 @@
       <div><b>${ih}</b><span>Toplam ihtiyaç (nöbet)</span></div><div><b>${fmt(S.ayar.panoMod === 'mesai' ? kap : azk)}</b><span>${S.ayar.panoMod === 'mesai' ? 'Kapasite (mesai karşılığı)' : `Kapasite (en çok ${fmt(S.ayar.azamiMemur)} nöbet)`}</span></div>
       <div><b>${fmt(pl)}</b><span>Planlanan</span></div>${tk('oner', acik, 'var(--ap-bad)', 'Personel önerilen istasyon', ` (toplam ${kisiOner} kişi)`)}${S.ayar.panoMod === 'mesai' ? '' : tk('icerde', fm, 'var(--ap-warn)', 'Fazla nöbetle kendi içinde dönen')}${tk('elle', elle, '#9a3412', S.ayar.panoMod === 'mesai' ? 'Açık kalan (kişiye yetmeyen)' : 'Elle karar gerektiren')}${tk('fazla', fazla, 'var(--ap-warn)', S.ayar.panoMod === 'mesai' ? 'Mesai tamamlayamayan' : 'Fazlalığı olan (fazla mesaili)')}</div>
       ${f ? `<div class="ap-row"><b>${FILTRE_AD[f]}: ${gosterilen.length}</b><button class="ap-btn sm" data-act="pano-filtre" data-v="">✕ Filtreyi kaldır</button><span class="ap-note">Kartlara tıklayarak istasyonu açabilirsiniz.</span></div>` : ''}
-      <div class="ap-toolbar ap-noprint" data-ust><button class="ap-btn pri" data-act="tum-plan" ${salt() ? 'disabled' : ''} title="Geri çağırma, nöbet hesabı ve rotasyon görevlendirmelerini tek seferde yapar">Tüm planlamayı oluştur</button><button class="ap-btn dng" data-act="plan-sifirla" ${salt() || !planlamaRol() ? 'disabled' : ''} title="Bu ayın planını tamamen siler (arşiv etkilenmez)">Bu ayın planını sıfırla</button><button class="ap-btn" data-act="oner-hepsi" title="Tüm istasyonlarda planlanan nöbetleri yeniden hesaplar">Planlananı yeniden hesapla</button>
+      <div class="ap-toolbar ap-noprint" data-ust><button class="ap-btn pri" data-act="tum-plan" ${salt() ? 'disabled' : ''} title="Geri çağırma, nöbet hesabı ve rotasyon görevlendirmelerini tek seferde yapar">Tüm planlamayı oluştur</button><button class="ap-btn" data-act="oner-hepsi" title="Tüm istasyonlarda planlanan nöbetleri yeniden hesaplar">Planlananı yeniden hesapla</button>
       <button class="ap-btn" data-act="excel-toplu" title="Planlama biriminin aylık dosya düzeni: Personel Bilgileri, İstatistik, Kurum Dışına Giden/Gelen, KKM, Başhekimlik ve ilçe sırasıyla istasyonlar; satırlar duruma göre renkli, tahmini nöbet mesai saatinden">Tüm istasyonlar Excel (tek dosya)</button>
       <span class="ap-seg" title="Mesai karşılığı: herkes yalnız mesaisini tamamlayacak kadar nöbet tutar. Fazla mesaili: DOKTOR-AABT-ATT'ye yazdığınız nöbet sayısına kadar fazla nöbet yazılabilir."><button class="${S.ayar.panoMod === 'mesai' ? 'on' : ''}" data-act="pano-mod" data-v="mesai">Mesai karşılığı</button><button class="${S.ayar.panoMod !== 'mesai' ? 'on' : ''}" data-act="pano-mod" data-v="fazla">Fazla mesaili</button></span>
       <label class="ap-note ap-azami ${S.ayar.panoMod === 'mesai' ? 'off' : ''}" title="DOKTOR-AABT-ATT'ye bir ayda yazılabilecek en çok 24 saatlik nöbet sayısı. Yazdığınız sayıya göre pano yeniden hesaplanır (istasyon sayfasından istasyona özel değiştirilebilir).">DOKTOR-AABT-ATT en çok <input class="ap-in n" type="number" min="0" step="0.5" data-pano-azami value="${S.ayar.azamiMemur}" ${S.ayar.panoMod === 'mesai' || salt() ? 'disabled' : ''}> nöbet</label>
@@ -392,7 +392,7 @@
     const o = ozel(), duz = !salt();
     const liste = Object.entries(o).sort();
     const tatil = []; for (let d = 1; d <= C.gunSayisi(S.y, S.m); d++) { const i = C.iso(S.y, S.m, d), w = C.RESMI[i]; if (w !== undefined) tatil.push(`${i.split('-').reverse().join('.')} ${w === 'A' ? '(arife, 5 saat)' : '(resmî tatil)'}`); }
-    return `<div class="ap-two"><div class="ap-card"><h2>Özel gün ekle</h2><div class="ap-row"><input type="date" class="ap-in" id="ap-og-t" min="${C.iso(S.y, S.m, 1)}" max="${C.iso(S.y, S.m, C.gunSayisi(S.y, S.m))}">
+    return `<div class="ap-two"><div class="ap-card"><h2>Özel gün ekle</h2><div class="ap-row">${tarihDugme('og', 'tek', {min: C.iso(S.y, S.m, 1), max: C.iso(S.y, S.m, C.gunSayisi(S.y, S.m)), idler: ['ap-og-t']})}
       <select class="ap-sel" id="ap-og-tur">${Object.entries(C.OZEL_TUR).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><button class="ap-btn pri" data-act="og-ekle" ${duz ? '' : 'disabled'}>Ekle</button></div>
       <p class="ap-note">Bayram, resmî tatil ve idari izin günü tüm personelin mesaisinden tam gün düşer (hafta içiyse). Yarım gün 5 saattir. Kişiye özel idari izin için ilgili kişinin izin türünü <b>İDARİ İZİN</b> seçip gün sayısını girin.</p>
       <h2>Eklenenler</h2>${liste.map(([t, v]) => `<div class="ap-row"><b>${t.split('-').reverse().join('.')}</b> ${C.OZEL_TUR[v.tur]} <button class="ap-btn sm dng" data-act="og-sil" data-v="${t}" ${duz ? '' : 'disabled'}>Sil</button></div>`).join('') || '<span class="ap-note">Yok</span>'}</div>
@@ -451,7 +451,9 @@
     let d = DAMGA_SAYFA.includes(k) ? D[k === 'ist' ? 'ist:' + S.ist : 'sayfa:' + k] : null;
     if (k === 'ayar' && S.ayar.damga && (!d || S.ayar.damga.t > d.t)) d = S.ayar.damga;
     const baslik = k === 'ist' ? esc(S.ist || 'İstasyon') : esc((SAYFALAR.find(x => x[0] === k) || [, ''])[1]);
-    return opts.gomulu ? `<div class="ap-sbas"><h2>${baslik}</h2>${damgaHtml(d)}</div>` : (d ? `<div class="ap-sbas">${damgaHtml(d)}</div>` : '');
+    // Pano: "Bu ayın planını sıfırla" sağ üstte (profil kartının altı), sık kullanılan düğmelerden ayrı
+    const sag = k === 'pano' ? `<button class="ap-btn dng sm ap-sbas-sag ap-noprint" data-act="plan-sifirla" ${salt() || !planlamaRol() ? 'disabled' : ''} title="Bu ayın planını tamamen siler (arşiv etkilenmez)">Bu ayın planını sıfırla</button>` : '';
+    return opts.gomulu ? `<div class="ap-sbas"><div><h2>${baslik}</h2>${damgaHtml(d)}</div>${sag}</div>` : (d || sag ? `<div class="ap-sbas"><div>${damgaHtml(d)}</div>${sag}</div>` : '');
   }
   function sayfaHtml() {
     if (S.modul === 2) return n2Html();
@@ -517,6 +519,33 @@
       ${yillar.map(yil).join('')}
       <div class="ap-popalt"><span><button class="ap-btn sm" data-pop data-act="gt-suresiz">Süresiz</button> <button class="ap-btn sm" data-pop data-act="gt-temizle">Tarihi sil</button></span><button class="ap-btn sm" data-pop data-act="gt-kapat">Kapat ✕</button></div></div>`;
   }
+  // ---------- Ortak tarih düzeni (12.48): tek ay seçimi "‹ Ay Yıl ›" + yıl–ay ızgarası; gün gerekiyorsa aynı görünümde gün takvimi ----------
+  // S.tp = {tur: 'ay'} ay geçişi | {tur: 'gun', anahtar, mod: 'tek'|'aralik', gor: 'YYYY-MM', min, max, bekle}; seçilen günler S.tarihSec[anahtar]
+  const tarihSec = () => S.tarihSec = S.tarihSec || {};
+  const tpGunEt = d => d ? trTarih(d) : '';
+  function tarihDugme(anahtar, mod, ops) {      // gün seçim düğmesi + gizli değer alanları (eski id'lerle)
+    const v = tarihSec()[anahtar] || {}, o = ops || {}, et = mod === 'aralik' ? (v.bas ? `${tpGunEt(v.bas)} – ${v.bit ? tpGunEt(v.bit) : '…'}` : (o.bos || 'Tarih aralığı seç')) : (v.bas ? tpGunEt(v.bas) : (o.bos || 'Gün seç'));
+    return `<button class="ap-btn ap-tpbtn" data-pop data-act="tp-gun-ac" data-v="${anahtar}" data-mod="${mod}" data-min="${o.min || ''}" data-max="${o.max || ''}" ${o.disabled ? 'disabled' : ''}>📅 ${esc(et)} ▾</button>${(o.idler || []).map((id, i) => `<input type="hidden" id="${id}" value="${i === 0 ? (v.bas || '') : (v.bit || '')}">`).join('')}`;
+  }
+  function tarihPopHtml() {
+    const T = S.tp; if (!T) return '';
+    if (T.tur === 'ay') {
+      const yillar = [...new Set([S.y - 1, S.y, S.y + 1, BUGUN.getFullYear()])].sort((a, b) => b - a), ac = T.acik || [S.y];
+      return `<div class="ap-pop ap-tppop" data-pop><div class="ap-row" style="justify-content:space-between"><b class="ap-poph">AY SEÇ</b><span class="ap-note">${ayEtiket()}</span></div>
+        ${yillar.map(y => `<div class="ap-yil"><button class="ap-yilbas ap-yilac" data-pop data-act="tp-yil" data-v="${y}"><b>${ac.includes(y) ? '▾' : '▸'} ${y}</b></button>${ac.includes(y) ? `<div class="ap-aygrid" style="grid-template-columns:repeat(6,1fr)">${AY_KISA.map((ad, i) => `<button class="ap-aybtn ${y === S.y && i + 1 === S.m ? 'sec' : ''}" data-pop data-act="tp-ay" data-v="${y}-${C.pad(i + 1)}">${ad}</button>`).join('')}</div>` : ''}</div>`).join('')}
+        <div class="ap-popalt"><span></span><button class="ap-btn sm" data-pop data-act="tp-kapat">Kapat ✕</button></div></div>`;
+    }
+    const v = tarihSec()[T.anahtar] || {}, [gy, gm] = T.gor.split('-').map(Number), N = C.gunSayisi(gy, gm), ilk = (new Date(Date.UTC(gy, gm - 1, 1)).getUTCDay() + 6) % 7;      // Pazartesi başlangıçlı
+    const bas = T.bekle || v.bas, bit = T.bekle ? '' : v.bit, gunler = [];
+    for (let i = 0; i < ilk; i++) gunler.push('<span></span>');
+    for (let d = 1; d <= N; d++) { const iso = C.iso(gy, gm, d), dis = (T.min && iso < T.min) || (T.max && iso > T.max), sec = bas && (iso === bas || (bit && iso >= bas && iso <= bit)), hs = ((ilk + d - 1) % 7) >= 5;
+      gunler.push(`<button class="ap-aybtn ap-gunbtn ${sec ? 'sec' : ''} ${iso === T.bekle ? 'bek' : ''} ${hs ? 'hs' : ''}" data-pop data-act="tp-gun" data-v="${iso}" ${dis ? 'disabled' : ''}>${d}</button>`); }
+    const ileri = T.max && T.max.slice(0, 7) <= T.gor ? 'disabled' : '', geri = T.min && T.min.slice(0, 7) >= T.gor ? 'disabled' : '';
+    return `<div class="ap-pop ap-tppop" data-pop><div class="ap-row" style="justify-content:space-between"><b class="ap-poph">${T.mod === 'aralik' ? 'TARİH ARALIĞI' : 'GÜN SEÇ'}</b><span class="ap-note">${T.mod === 'aralik' ? (T.bekle ? 'Şimdi bitiş gününe tıklayın' : 'Başlangıç gününe, sonra bitiş gününe tıklayın') : ''}</span></div>
+      <div class="ap-row" style="justify-content:space-between;margin:6px 0"><button class="ap-btn sm" data-pop data-act="tp-gor" data-v="-1" ${geri}>‹</button><b>${AYLAR[gm]} ${gy}</b><button class="ap-btn sm" data-pop data-act="tp-gor" data-v="1" ${ileri}>›</button></div>
+      <div class="ap-gungrid">${['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(x => `<span class="ap-note">${x}</span>`).join('')}${gunler.join('')}</div>
+      <div class="ap-popalt"><span>${v.bas ? `<button class="ap-btn sm" data-pop data-act="tp-temizle">Temizle</button>` : ''}</span><button class="ap-btn sm" data-pop data-act="tp-kapat">Kapat ✕</button></div></div>`;
+  }
   function render() {
     const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0, ic0 = root.querySelector('.ap-icerik'), isy = ic0 ? ic0.scrollTop : 0;
     const koyu = !opts.gomulu && S.ayar && (S.ayar.tema === 'koyu' || (S.ayar.tema === 'sistem' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
@@ -524,7 +553,7 @@
     if (S.rol === 'istasyon') S.modul = 2;
     kilitGuncelle();
     const bant = (kilitBende() ? '' : `<div class="ap-oku"><b>${esc(kilitMesaj())}</b> O kişi çıkınca düzenleme kendiliğinden açılır.</div>`) + (guncelAy() ? '' : `<div class="ap-oku"><b>Arşiv görünümü — ${ayEtiket()} salt okunur.</b> Geçmiş aylar yalnızca görüntülenir, değiştirilemez. <button class="ap-btn sm" data-act="guncel-ay">Güncel aya dön (${AYLAR[GUNCEL_M]} ${GUNCEL_Y})</button></div>`);
-    root.innerHTML = (opts.gomulu ? `<div class="ap-yanlay">${yanHtml()}<div class="ap-icerik">${bant}<div class="ap-main"><div class="ap-ust"></div>${sayfaHtml()}</div></div></div>` : ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + bant + `<div class="ap-main">${sayfaHtml()}</div>`) + (S.modal ? S.modal() : '');
+    root.innerHTML = (opts.gomulu ? `<div class="ap-yanlay">${yanHtml()}<div class="ap-icerik">${bant}<div class="ap-main"><div class="ap-ust"></div>${sayfaHtml()}</div></div></div>${tarihPopHtml()}` : ustHtml() + (S.plan || S.modul === 2 ? navHtml() : '') + bant + `<div class="ap-main">${sayfaHtml()}</div>${tarihPopHtml()}`) + (S.modal ? S.modal() : '');
     // Sayı sütunları: tüm hücreleri sayı olan sütunun başlığı ve hücreleri sağa yaslanır (başlık ile sayı aynı hizada)
     root.querySelectorAll('table').forEach(t => {
       const ths = [...t.querySelectorAll('thead th')]; if (!ths.length) return;

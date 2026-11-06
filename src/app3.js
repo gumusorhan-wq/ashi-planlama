@@ -1074,6 +1074,17 @@
         case 'kilit-ac': ayKilidiAcIste(); return;
         case 'kisi-sil': { const k = kayit(t.dataset.id); if (k && confirm(`${k.ad} kaydı silinsin mi?`)) mut(() => { (S.plan.silinen = S.plan.silinen || []).unshift({...JSON.parse(JSON.stringify(k)), _silZaman: Date.now(), _silBirim: k.birim}); S.plan.silinen.length = Math.min(S.plan.silinen.length, 200); S.plan.kayitlar = S.plan.kayitlar.filter(x => x.id !== k.id); }, 'Kişi silindi', k.ad); break; }
         case 'kisi-geri': { const sl = (S.plan.silinen || []).find(x => x.id === t.dataset.id); if (!sl) break; if (S.plan.kayitlar.some(x => x.id === sl.id || (sl.tc && x.tc === sl.tc))) { toast('Bu kişi zaten listede.'); break; } const {_silZaman, _silBirim, ...k0} = sl; mut(() => { S.plan.kayitlar.push(k0); S.plan.silinen = S.plan.silinen.filter(x => x.id !== sl.id); }, 'Silinen kişi geri getirildi', `${k0.ad} → ${k0.birim}`); toast(`${k0.ad} geri getirildi.`); break; }
+        case 'tp-ay-ac': S.tp = S.tp && S.tp.tur === 'ay' ? null : {tur: 'ay', acik: [S.y]}; break;
+        case 'tp-yil': if (S.tp) { const y = +v, ac = S.tp.acik || []; S.tp.acik = ac.includes(y) ? ac.filter(x => x !== y) : [...ac, y]; } break;
+        case 'tp-ay': { const [yy, mm] = v.split('-').map(Number); S.tp = null; if (yy === S.y && mm === S.m) break; S.y = yy; S.m = mm; S.ist = ''; await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); kaydet(); } break; }
+        case 'tp-kapat': S.tp = null; break;
+        case 'tp-gun-ac': { if (S.tp && S.tp.tur === 'gun' && S.tp.anahtar === v) { S.tp = null; break; } const d = t.dataset, cur = tarihSec()[v] || {}; S.tp = {tur: 'gun', anahtar: v, mod: d.mod || 'tek', min: d.min || '', max: d.max || '', gor: (cur.bas || d.min || C.iso(S.y, S.m, 1)).slice(0, 7), bekle: ''}; break; }
+        case 'tp-gor': { if (!S.tp) break; const [yy, mm] = S.tp.gor.split('-').map(Number), n = new Date(Date.UTC(yy, mm - 1 + (+v), 1)); S.tp.gor = `${n.getUTCFullYear()}-${C.pad(n.getUTCMonth() + 1)}`; break; }
+        case 'tp-temizle': if (S.tp) { delete tarihSec()[S.tp.anahtar]; S.tp.bekle = ''; } break;
+        case 'tp-gun': { const T = S.tp; if (!T) break; const sec = tarihSec();
+          if (T.mod === 'tek') { sec[T.anahtar] = {bas: v}; S.tp = null; break; }
+          if (T.bekle && v >= T.bekle) { sec[T.anahtar] = {bas: T.bekle, bit: v}; S.tp = null; } else { T.bekle = v; sec[T.anahtar] = {bas: v}; }      // aralık: ilk tık başlangıç, ikinci tık bitiş
+          break; }
         case 'gt-ac': S.gtAc = S.gtAc === v ? '' : v; S.gtBekle = null; break;
         case 'gt-kapat': S.gtAc = ''; S.gtBekle = null; break;
         case 'gt-ay': case 'gt-yil': case 'gt-suresiz': case 'gt-temizle': {
@@ -1098,7 +1109,7 @@
           tarihsizGorevleriBitir(L, 'Tarihi boş görevlendirme bitirildi (önceki ayın görevi)'); otoHesapla(); damgala(); kaydet(); toast(`${L.length} görevlendirme bitirildi.`); break;
         }
         case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); S.gAra = ''; break; }
-        case 'og-ekle': { const d = root.querySelector('#ap-og-t').value, tur = root.querySelector('#ap-og-tur').value; if (!d) { toast('Tarih seçin.'); break; } mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break; }
+        case 'og-ekle': { const d = root.querySelector('#ap-og-t').value, tur = root.querySelector('#ap-og-tur').value; if (!d) { toast('Tarih seçin.'); break; } delete tarihSec().og; mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break; }
         case 'og-sil': mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
         case 'liste': { const i = v.indexOf(':'), tip = v.slice(0, i), d = v.slice(i + 1), ozelAd = t.dataset.ad || ''; S.filtre = {q: '', durum: tip === 'durum' ? d : '', birim: '', sinif: tip === 'sinif' ? d : '', ozel: tip === 'ozel' ? d : '', ozelAd}; S.pSayfa = 0; S.sayfa = 'personel'; break; }
         case 'f-ozel-sil': S.filtre = {...S.filtre, ozel: '', ozelAd: ''}; S.pSayfa = 0; break;
@@ -1176,7 +1187,7 @@
     render();
   });
   // Açık seçim penceresi (aylar / istasyonlar): boşluğa tıklayınca ya da Esc ile kapanır
-  document.addEventListener('click', e => { if ((S.arstatAc || S.gtAc) && root.isConnected && !e.target.closest('[data-pop],.ap-pop')) { S.arstatAc = ''; S.gtAc = ''; S.gtBekle = null; render(); } }, true);
+  document.addEventListener('click', e => { if ((S.arstatAc || S.gtAc || S.tp) && root.isConnected && !e.target.closest('[data-pop],.ap-pop')) { S.arstatAc = ''; S.gtAc = ''; S.gtBekle = null; S.tp = null; render(); } }, true);
   root.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || !e.target.matches || !e.target.matches(PLAN_KUTU)) return;
     e.preventDefault(); const l = [...root.querySelectorAll(PLAN_KUTU)], i = l.indexOf(e.target); if (i < 0) return;
