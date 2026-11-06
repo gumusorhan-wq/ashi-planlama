@@ -1,7 +1,7 @@
 
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
-  const N2_SEKME = [['plan', 'Planlama'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
+  const N2_SEKME = [['plan', 'Nöbet hedefleri'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
   const IHLAL_AD = {donus: 'İzin / rapor dönüşü nöbetsiz', eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği', gunGece: 'İşçi gündüz / gece dengesizliği'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
   // İstasyon sorumlusu, planlama onaylanmadan (Kesinleştir / Ayı kilitle) kendi istasyonunun planlamasını ve nöbet listesi araçlarını göremez
@@ -21,10 +21,10 @@
   function n2Kisiler(b) {
     const dp = n2Depo(b.ad);
     if (dp.kisiler && !S.plan.kayitlar.some(k => k.birim === b.ad)) return dp.kisiler;
-    const sat = hesapla(b).satir.filter(s => !s.nobetYok), sm = new Map(sat.map(s => [s.k.id, s])), sira = nobetSirala(sm);
+    const h = hesapla(b), oto = C.oneri(h), sat = h.satir.filter(s => !s.nobetYok), sm = new Map(sat.map(s => [s.k.id, s])), sira = nobetSirala(sm);      // kişi başı nöbet: Modül 1'in elle dağıtımı bağlayıcı değil; istasyonun ihtiyacı mesai ve azamiye göre otomatik dağıtılır
     return sat.sort((x, y) => sira(x.k, y.k)).map(s => {
       const k = s.k, azami = Math.floor(s.azami + 1e-9);
-      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), planlanan: sayi(k.planlanan), ust: k.sinif === 'isci' ? null : azami, gelen: !!k._gelen,
+      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), planlanan: oto.has(k.id) ? oto.get(k.id) : sayi(k.planlanan), ust: k.sinif === 'isci' ? null : azami, gelen: !!k._gelen,
         izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
     });      // branş sırası: doktor → AABT → ATT → diğer memur → sürücü ATT → işçi
   }
@@ -65,29 +65,17 @@
     return {h, o, satir, toplam, mevcutT, fark: Math.abs(toplam - h.ihtiyac) < 0.05 ? 0 : Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
   }
   function n2PlanHtml(b) {
-    const ist = S.rol === 'istasyon';
-    if (ist && !n2Onayli()) return `<div class="ap-card ap-empty"><h2>Planlama henüz onaylanmadı</h2><p>${ayEtiket()} planlaması planlama birimi tarafından <b>kesinleştirilip istasyonlara gönderilince</b> burada görünecek; nöbet sayılarını düzenleyip planlamaya geri gönderirsiniz.</p></div>`;
-    const T = n2TeklifOzet(b), h = T.h, o = T.o, D = durumlar(), duz = ist && n2Duzenlenir(b.ad) && n2Duz();
-    const durumMetin = s => { const k = s.k;
-      if (k._gelen) return `Geçici görevli (${esc(k.birim)} kadrosundan)`;
-      if (aileHek(k)) return 'Aile hekimliğinde';
-      if ((D[k.durum] || {}).disarida && k.gorev && (k.gorev.hedef || k.gorev.yer)) return `Başka yerde görevli: ${esc(k.gorev.hedef || k.gorev.yer)}`;
-      if (izinAyGun(k) > 0 && !s.nobetYok) return `İzinli (${fmt(izinAyGun(k))} gün)`;
-      if (s.nobetYok) return 'Nöbet tutmaz';
-      return 'Nöbet tutar'; };
-    const sat = T.satir.map(x => `<tr><td>${esc(x.k.ad)}</td><td>${esc(bransAd(x.k))}</td><td>${durumMetin(x.s)}</td><td>${x.tutar ? esc(NB_AD[x.s.grup] || '') : ''}</td><td class="num">${x.tutar ? fmt(x.mevcut) : ''}</td>
-      <td class="num">${!x.tutar ? '' : duz ? `<input class="ap-in n ${x.asim ? 'n2e' : ''}" type="number" min="0" step="0.01" data-n2="teklif" data-id="${x.k.id}" value="${x.tek}" title="${x.asim ? 'Üst sınır ' + fmt(x.ust) + ' nöbet' : ''}">` : `<b class="${x.degisti ? 'n2d' : ''}">${fmt(x.tek)}</b>`}</td><td class="num">${x.tutar && x.degisti ? `<span class="${x.tek > x.mevcut ? 'n2art' : 'n2eks'}">${x.tek > x.mevcut ? '+' : ''}${fmt(x.tek - x.mevcut)}</span>` : ''}</td></tr>`).join('');
-    const durumRozet = `<span class="ap-badge ${o.durum === 'onaylandi' ? 'ap-b-kesin' : o.durum === 'reddedildi' ? 'ap-b-taslak' : ''}">${ONAY_AD[o.durum]}</span>`;
-    const uyari = [T.fark ? `Toplam ${fmt(T.toplam)}, gereken ${h.ihtiyac} (${T.fark > 0 ? '+' : ''}${fmt(T.fark)})` : '', T.asimSay ? `${T.asimSay} kişide üst sınır aşıldı` : ''].filter(Boolean);
-    return `${!ist ? `<div class="ap-card" style="border-color:var(--ap-warn);background:var(--ap-warnbg)"><span class="ap-note">Planlama birimi görünümü. İstasyon sorumlusu bu bölümü yalnızca plan <b>Kesinleştirildiğinde</b> görür (şu an: <b>${S.plan.durum === 'taslak' ? 'Taslak' : S.plan.durum === 'kesin' ? 'Kesinleşti' : 'Kilitli'}</b>), nöbet sayılarını düzenleyip size geri gönderir; onayınızı <b>İstasyon talepleri</b> sayfasından verirsiniz. Sağlık nedenleri (rapor, doğum, muafiyet) istasyon sorumlusuna gösterilmez.</span></div>` : ''}
-      ${o.durum === 'reddedildi' && o.ret ? `<div class="ap-card" style="border-color:var(--ap-bad)"><b>Planlama düzeltme istedi:</b> ${esc(o.ret)}</div>` : ''}
-      <div class="ap-card"><h2>${esc(b.ad)} — ${ayEtiket()} planlaması ${durumRozet}</h2>
-      ${ist ? `<div class="ap-row" style="margin:8px 0 10px">${duz ? `<button class="ap-btn pri" data-act="n2-gonder">Planlamaya gönder</button>${T.degisenSay ? `<button class="ap-btn" data-act="n2-teklif-sifirla">Değişiklikleri geri al</button>` : ''}` : o.durum === 'gonderildi' ? '<span class="ap-note">Planınız planlama birimine gönderildi; onay bekleniyor.</span>' : o.durum === 'onaylandi' ? '<button class="ap-btn pri" data-act="n2-sekme" data-v="istek">İstek takvimine geç →</button>' : ''}</div>` : ''}
-      <div class="ap-sum ap-sum1" style="margin-bottom:10px"><div><b>${fmt(T.toplam)} / ${h.ihtiyac}</b><span>${T.degisenSay ? 'Sizin planınız / gereken nöbet' : 'Yazılan / gereken nöbet'}</span></div><div><b>${T.satir.filter(x => x.tutar).length}</b><span>Nöbet tutan kişi</span></div>${[['es', 'Ekip şefi'], ['ysp', 'YSP'], ['sur', 'Sürücü']].map(([k, ad]) => `<div><b>${fmt(h.slot.dem[k] - Math.max(0, h.acikM[k]))}/${fmt(h.slot.dem[k])}</b><span>${ad} (planlamadaki)</span></div>`).join('')}</div>
-      ${uyari.length ? `<div class="ap-ek ap-ek-c" style="margin-bottom:8px"><b>Dikkat:</b> ${uyari.join(' · ')}</div>` : ''}
-      <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Kadro</th><th>Durum</th><th>Nöbet branşı</th><th>Planlamanın yazdığı</th><th>${duz ? 'Sizin planınız' : 'Planlanan (son)'}</th><th>Fark</th></tr></thead><tbody>${sat || '<tr><td colspan="7" class="ap-empty">Kişi yok</td></tr>'}</tbody></table></div>
-      <p class="ap-note" style="margin-top:8px">Kime kaç nöbet yazılacağını ${duz ? '<b>"Sizin planınız"</b> sütunundan değiştirebilirsiniz' : 'bu sütunda görürsünüz'} (24 saatlik nöbet; 12 saatlik nöbetler 0,5). Toplam, istasyonun gereken nöbetine (${h.ihtiyac}) eşit olmalı; DOKTOR-AABT-ATT için üst sınır ${istMod(b) === 'mesai' ? 'hedef nöbetleridir' : fmt(azamiDeger(b)) + ' nöbettir'}.</p>
-</div>`;
+    // Kişi başı nöbet sayısı bağlayıcı değildir ve planlamaya beyan edilmez: istasyonun ihtiyacı (gün × 3 nöbet branşı) mesai hedefi ve azami nöbete göre otomatik dağıtılır; liste bu sayılarla oluşturulur
+    const h = hesapla(b), ks = n2Kisiler(b), dp = n2Depo(b.ad), L = dp.liste, D = durumlar();
+    const yazilan = id => { if (!L) return null; let t = 0; for (let g = 1; g < L.length; g++) { const x = L[g]; if (!x) continue; ['es', 'ysp', 'sur'].forEach(y => { if (x[y] === id) t += x.bol && x.bol[y] ? (24 - x.bol[y].saat) / 24 : 1; }); ['surG', 'surA'].forEach(y => { if (x[y] === id) t += 0.5; }); Object.entries(x.bol || {}).forEach(([y, bb]) => { if (bb && bb.id === id && x[y] != null) t += bb.saat / 24; }); } return Math.round(t * 100) / 100; };
+    const disari = h.satir.filter(s => !gizliKisi(s.k) && (s.nobetYok || (D[s.k.durum] || {}).disarida));
+    const sat = ks.map(k => { const y = yazilan(k.id), f = y == null ? 0 : Math.round((y - k.planlanan) * 100) / 100; return `<tr><td>${esc(k.ad)}</td><td>${esc(k.brans || '')}</td><td>${esc(NB_AD[k.grup] || '')}</td><td class="num">${fmt(k.planlanan)}</td><td class="num">${y == null ? '' : `<b>${fmt(y)}</b>`}</td><td class="num">${f ? `<span class="${f > 0 ? 'n2art' : 'n2eks'}">${f > 0 ? '+' : ''}${fmt(f)}</span>` : ''}</td></tr>`; }).join('');
+    const toplam = ks.reduce((a, k) => a + (k.planlanan || 0), 0);
+    return `<div class="ap-card"><h2>${esc(b.ad)} — ${ayEtiket()} nöbet hedefleri</h2>
+      <p class="ap-note">İstasyonun ihtiyacı <b>${h.ihtiyac}</b> nöbet (${NC.gunSayisi(S.y, S.m)} gün × 3 nöbet branşı). Kişi başı sayı mesai hedefine ve azami nöbete göre <b>otomatik</b> dağıtılır; planlamaya bildirilmez, bağlayıcı değildir. Nöbet listesi bu sayılarla oluşturulur; küsuratlar bölünmüş nöbetle (16/8, 12/12) karşılanır.</p>
+      <div class="ap-sum ap-sum1" style="margin-bottom:10px"><div><b>${fmt(toplam)} / ${h.ihtiyac}</b><span>Dağıtılan / gereken nöbet</span></div><div><b>${ks.length}</b><span>Nöbet tutan kişi</span></div></div>
+      <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Kadro</th><th>Nöbet branşı</th><th>Hedef nöbet</th><th>Listede</th><th>Fark</th></tr></thead><tbody>${sat || '<tr><td colspan="6" class="ap-empty">Nöbet tutan kişi yok</td></tr>'}</tbody></table></div>
+      ${disari.length ? `<p class="ap-note" style="margin-top:8px">Nöbet tutmayan / başka yerde olan: ${disari.map(s => esc(s.k.ad)).join(', ')}</p>` : ''}</div>`;
   }
   // Modül 1: istasyonlardan gelen talepler
   function talepHtml() {
