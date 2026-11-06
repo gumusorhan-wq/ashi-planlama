@@ -121,7 +121,7 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri'}, esk), 'ke');
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri', rolSay: {es: 50, ysp: 50, sur: 0}}, esk), 'ke');
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri', rolSay: {es: 40, ysp: 30, sur: 30}}, esk), 'ka');
-  assert.deepStrictEqual(C.YETENEK.ke, ['es', 'ysp']); }
+  assert.deepStrictEqual(C.YETENEK.ke, ['es', 'ysp', 'sur']); }
 // ASOS izin bitişi dönüş günüdür (dahil değil): 14.10–01.11 Kasım mesaisini etkilemez; elle girilen tarihli izinde bitiş dahildir
 { const D = C.DURUM_VARSAYILAN, k = (iz) => ({sinif: 'memur', durum: '', izin: [iz]});
   const tam = C.kisiMesai({sinif: 'memur', durum: '', izin: []}, 2026, 11, {}, D);
@@ -141,7 +141,7 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
 { const kisi = (id, hedef, azami) => ({k: {id}, hedef, azami});
   const gr2 = {dok: [], isci: [], ke: [kisi('ke', 7, 8)], ka: [kisi('ka1', 3, 10), kisi('ka2', 3, 10)], ysp: [kisi('ysp', 7, 8)], sy: [kisi('sy1', 3, 10), kisi('sy2', 3, 10)]};
   const o = C.oneri({ihtiyac: 40, gruplar: gr2}, null), ka = o.get('ka1') + o.get('ka2'), sy = o.get('sy1') + o.get('sy2');
-  assert.ok(Math.abs(ka - sy) <= 1.01, 'ATT sürücü ve AABT sürücüye sırayla eşit fazlalık: ' + ka + ' / ' + sy); assert.ok(Math.abs(o.get('ka1') - o.get('ka2')) <= 0.02 && Math.abs(o.get('sy1') - o.get('sy2')) <= 0.02, 'grup içinde eşit');
+  assert.ok(Math.abs(ka - sy) <= 1.01, 'ATT sürücü ve AABT sürücüye sırayla eşit fazlalık: ' + ka + ' / ' + sy); assert.ok(Math.abs(o.get('ka1') - o.get('ka2')) <= 1.01 && Math.abs(o.get('sy1') - o.get('sy2')) <= 1.01, 'grup içinde eşit (tam sayıya yuvarlama en çok 1 fark)');
   const gr3 = {dok: [], isci: [], ke: [kisi('ke', 3, 8)], ka: [], ysp: [kisi('ysp', 7, 8)], sy: [kisi('sy', 10, 10)]};
   const o3 = C.oneri({ihtiyac: 30, gruplar: gr3}, null); assert.ok(Math.abs(o3.get('ke') - 8) < 0.011 && Math.abs(o3.get('sy') - 10) < 0.011, 'ekip şefi fazlalığı yalnız AABT\'ye: ' + o3.get('ke') + ' / ' + o3.get('sy')); }
 console.log('çekirdek testleri geçti');

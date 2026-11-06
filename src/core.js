@@ -216,9 +216,9 @@ const APCore = (() => {
   // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
   // Ekip şefi nöbetlerini doktor ve AABT tutar; doktorlu olmayan ekipte ATT ekip şefi nöbet branşına en son takviye verebilir (attEs).
   const GRUPLAR = ['dok', 'isci', 'ke', 'ka', 'ysp', 'sy'];
-  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
+  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp', 'sur'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
   const YETENEK_ES = {...YETENEK, ysp: ['ysp', 'es'], sy: ['sur', 'ysp', 'es']};      // doktorsuz ekip: ATT ekip şefine takviye
-  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (sürücü dahil)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
+  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP + sürücü)', ka: 'AABT (sürücü öncelikli)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
   // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) nöbet branşları doldurur; ATT geri kalan nöbet branşları doldurur.
   // Böylece AABT'nin hedef nöbetleri tam kullanılır, fazlalık ATT'de görünür (bir ATT bir ay dışarı çıkabilir).
   function akis(sup, dem, attEs) {
@@ -253,7 +253,15 @@ const APCore = (() => {
     const ae = !!hesap.attEs, f0 = akis(kilitSup, {es: D3, ysp: D3, sur: D3}, ae), f1 = akis(sup1, f0.rem, ae), f2 = akisEk(ek, f1.rem, ae);
     GRUPLAR.forEach(g => {
       const L = ser(g), t = x => x.es + x.ysp + x.sur, total = t(f1.fill[g]) + t(f2.fill[g]);
-      dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), g === 'isci' ? ADIM : 0.01).forEach((v, i) => sonuc.set(L[i].k.id, v));
+      // Hedefin üstüne fazla nöbet yazılan memur/doktorda nöbet tam sayıya yuvarlanır: önce aşağı, eksik kalan toplam küsuratı en büyük olanlardan başlayarak azamiyi aşmadan yukarı tamamlanır (ör. 8,67 / 8,67 / 8,66 → 9 / 9 / 8)
+      const V = dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), g === 'isci' ? ADIM : 0.01);
+      if (g !== 'isci') {
+        const fz = V.map((v, i) => v > L[i].hedef + 0.01 ? i : -1).filter(i => i >= 0), hedefT = fz.reduce((x, i) => x + V[i], 0);
+        const R = V.slice(); fz.forEach(i => { R[i] = Math.max(L[i].hedef, Math.floor(V[i] + 0.01)); });
+        let eksik = hedefT - fz.reduce((x, i) => x + R[i], 0);
+        fz.slice().sort((x, y) => (V[y] - Math.floor(V[y] + 0.01)) - (V[x] - Math.floor(V[x] + 0.01))).forEach(i => { if (eksik <= 0.01) return; const ust = Math.min(L[i].azami, Math.ceil(V[i] - 0.01)); if (ust > R[i]) { eksik -= ust - R[i]; R[i] = ust; } });
+        R.forEach((v, i) => sonuc.set(L[i].k.id, v));
+      } else V.forEach((v, i) => sonuc.set(L[i].k.id, v));
     });
     return sonuc;
   }

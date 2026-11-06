@@ -3,8 +3,9 @@ const NobetCore = (() => {
   const pad = n => String(n).padStart(2, '0');
   const iso = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
   const gunSayisi = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
-  // yuva yetenekleri (Modül 1 ile aynı): dok → ekip şefi; işçi → sürücü (12 saat); AABT → her yuva; ATT yalnız YSP / sürücü + YSP
-  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'ysp', 'sur'], ysp: ['ysp'], sy: ['sur', 'ysp']};
+  // yuva yetenekleri (Modül 1 ile aynı): dok → ekip şefi; işçi → sürücü (12 saat); AABT → her yuva; ATT yalnız YSP / sürücü + YSP;
+  // doktorlu olmayan ekipte (g.attEs ve listede doktor yok) ATT ekip şefi nöbet branşına da yazılabilir (en son tercih)
+  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp', 'sur'], ka: ['es', 'ysp', 'sur'], ysp: ['ysp'], sy: ['sur', 'ysp']};
   const KURAL = {minAra: 1, maxAra: 5, izinOnce: 3, surGunAsiri: true, isciGece: true};
   const YUVA_AD = {es: 'Ekip şefi', ysp: 'YSP', sur: 'Sürücü'};
   const KOD = {es: 'E', ysp: 'Y', sur: 'S', surG: 'G', surA: 'A'};
@@ -16,7 +17,8 @@ const NobetCore = (() => {
   // Girdiyi gün indekslerine çevirir. kisi: {id, ad, grup, adet (24 saatlik nöbet), yarim (işçi 12 saatlik adet), izin:[{bas,bit}], istek:[iso]}
   function hazirla(g, kural) {
     const N = g.gun || gunSayisi(g.y, g.m), K = {...KURAL, ...(kural || {})}, ay = `${g.y}-${pad(g.m)}`;
-    const gunNo = d => (d && d.slice(0, 7) === ay ? +d.slice(8, 10) : null);
+    const gunNo = d => (d && d.slice(0, 7) === ay ? +d.slice(8, 10) : null), attEs = !!g.attEs && !g.kisiler.some(k => k.grup === 'dok');
+    const yetBul = grup => { const y = YETENEK[grup] || ['ysp']; return attEs && (grup === 'ysp' || grup === 'sy') ? [...y, 'es'] : y; };
     const P = g.kisiler.map(k => {
       const izin = new Set(), once = new Set(), istek = new Set(), baslar = [], donusAday = [];
       (k.izin || []).forEach(i => {
@@ -31,13 +33,13 @@ const NobetCore = (() => {
       (k.istek || []).forEach(x => { const d = gunNo(x); if (d) istek.add(d); });
       // İzin / rapor dönüşü: işe başlama günü nöbete girmek zorunludur (o gün başka bir izinle kapanmıyorsa)
       const donus = new Set(donusAday.filter(d => !izin.has(d)));
-      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: YETENEK[k.grup] || ['ysp'], isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, izin, once, istek, baslar, donus};
+      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: yetBul(k.grup), isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, izin, once, istek, baslar, donus};
     });
     // hafta sonu (cumartesi/pazar) ve resmî tatil günleri: nöbetlerin bu günlere kişiler arasında dengeli dağılması için
     const ozel = new Uint8Array(N + 2); let ozelSay = 0;
     const tatil = new Set((g.tatil || []).map(x => typeof x === 'number' ? x : gunNo(x)).filter(Boolean));
     for (let d = 1; d <= N; d++) { const w = new Date(Date.UTC(g.y, g.m - 1, d)).getUTCDay(); if (w === 0 || w === 6 || tatil.has(d)) { ozel[d] = 1; ozelSay++; } }
-    return {N, K, P, byId: new Map(P.map(p => [p.id, p])), ozel, ozelOran: N ? ozelSay / N : 0, ozelSay};
+    return {N, K, P, attEs, byId: new Map(P.map(p => [p.id, p])), ozel, ozelOran: N ? ozelSay / N : 0, ozelSay};
   }
   // Kişinin hafta sonu / resmî tatil nöbet sayısının beklenenden sapması (±1 nöbet tolerans); ceza tam sayıdır
   const ozelCeza = (say, toplam, oran) => { const dev = Math.abs(say - toplam * oran); return dev > 1 ? Math.round(30 * (dev - 1)) : 0; }

@@ -32,7 +32,7 @@
     const dp = n2Depo(b.ad), ks = n2Kisiler(b).map(k => ({...k, izin: [...(k.izin || []), ...(dp.izin[k.id] || [])], istek: dp.istek[k.id] || []}));
     const ozet = NC.adetHazirla(ks, NC.gunSayisi(S.y, S.m));
     const oz = ozel(), tatil = []; for (let d = 1; d <= NC.gunSayisi(S.y, S.m); d++) { const i = C.iso(S.y, S.m, d), og = oz[i]; if (C.RESMI[i] === 0 || (og && (og.tur === 'bayram' || og.tur === 'resmi'))) tatil.push(d); }      // resmî tatil / bayram günleri (hafta sonu gibi dengeli dağıtılır)
-    return {girdi: {y: S.y, m: S.m, kisiler: ks, tatil}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
+    return {girdi: {y: S.y, m: S.m, kisiler: ks, tatil, attEs: b.tip !== 'A1'}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
   }
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
@@ -156,7 +156,7 @@
   function n2ListeHtml(b) {
     const {G, H, L, d} = n2Deneti(b), dp = n2Depo(b.ad), N = H.N, duz = n2Duz(), ks = G.girdi.kisiler, K = G.kural, kap = NC.kapasiteAnalizi(G.girdi, G.kural);
     const hata = new Map(); d.ihlal.forEach(i => { const a = `${i.gun}|${i.kisi == null ? '' : i.kisi}`; hata.set(a, (hata.get(a) || '') + i.mesaj + '\n'); if (i.yuva) hata.set(`${i.gun}||${i.yuva}`, i.mesaj); });
-    const secenek = (yuva, tip, sec) => `<option value=""></option>` + ks.filter(k => (k.grup === 'isci') === (tip === 'surG' || tip === 'surA') && NC.YETENEK[k.grup].includes(yuva)).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
+    const secenek = (yuva, tip, sec) => `<option value=""></option>` + ks.filter(k => (k.grup === 'isci') === (tip === 'surG' || tip === 'surA') && ((H.byId.get(k.id) || {}).yet || NC.YETENEK[k.grup] || []).includes(yuva)).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
     const hucre = (gun, tip) => { const yuva = tip === 'surG' || tip === 'surA' ? 'sur' : tip, id = L[gun][tip], e = (id != null && hata.get(`${gun}|${id}`)) || (id == null && hata.get(`${gun}||${yuva}`) && (tip === 'sur' || tip === 'es' || tip === 'ysp') ? 'Boş' : '');
       const bl = L[gun].bol && L[gun].bol[tip];
       const bolHtml = bl ? `<div class="ap-note n2bol" title="İzin / rapor dönüşü: aynı gün dönen iki kişi bu nöbeti böler (saatine göre kısmi nöbet sayılır)">+ ${esc(n2Ad(G, bl.id))} <select class="ap-sel" data-n2="bol" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'}>${[[12, '12/12'], [8, '16/8 (sonra 8 sa)'], [16, '8/16 (sonra 16 sa)'], ['', 'bölmeyi kaldır']].map(([v, t]) => `<option value="${v}" ${String(v) === String(bl.saat) ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : '';

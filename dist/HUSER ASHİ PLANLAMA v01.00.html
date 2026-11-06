@@ -203,7 +203,7 @@ table.tk th.tk-ay{text-align:center;min-width:52px}table.tk th.tk-yok{color:var(
 @media print{.ap-yan{display:none!important}}
 .ap-ist td.num+td:not(.num),.ap-ist th.num+th:not(.num),.ap-ist td.num,.ap-ist th.num{padding-left:5px}
 
-.ap-pano-ara{margin:4px 0 8px;gap:10px}.ap-pano-ara .ap-in{width:260px;max-width:100%}
+.ap-pano-ara{display:inline-flex;flex-wrap:wrap;align-items:center;gap:10px}.ap-pano-ara .ap-in{width:260px;max-width:100%}
 /* İzin / görev takibi: eşit, dar ay sütunları */
 table.tk{table-layout:fixed;width:max-content;min-width:100%}
 table.tk col.tk-c-ad{width:170px}table.tk col.tk-c-ek{width:110px}table.tk col.tk-c-ay{width:58px}table.tk col.tk-c-top{width:72px}
@@ -475,9 +475,9 @@ const APCore = (() => {
   // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
   // Ekip şefi nöbetlerini doktor ve AABT tutar; doktorlu olmayan ekipte ATT ekip şefi nöbet branşına en son takviye verebilir (attEs).
   const GRUPLAR = ['dok', 'isci', 'ke', 'ka', 'ysp', 'sy'];
-  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
+  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp', 'sur'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
   const YETENEK_ES = {...YETENEK, ysp: ['ysp', 'es'], sy: ['sur', 'ysp', 'es']};      // doktorsuz ekip: ATT ekip şefine takviye
-  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (sürücü dahil)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
+  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP + sürücü)', ka: 'AABT (sürücü öncelikli)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
   // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) nöbet branşları doldurur; ATT geri kalan nöbet branşları doldurur.
   // Böylece AABT'nin hedef nöbetleri tam kullanılır, fazlalık ATT'de görünür (bir ATT bir ay dışarı çıkabilir).
   function akis(sup, dem, attEs) {
@@ -512,7 +512,15 @@ const APCore = (() => {
     const ae = !!hesap.attEs, f0 = akis(kilitSup, {es: D3, ysp: D3, sur: D3}, ae), f1 = akis(sup1, f0.rem, ae), f2 = akisEk(ek, f1.rem, ae);
     GRUPLAR.forEach(g => {
       const L = ser(g), t = x => x.es + x.ysp + x.sur, total = t(f1.fill[g]) + t(f2.fill[g]);
-      dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), g === 'isci' ? ADIM : 0.01).forEach((v, i) => sonuc.set(L[i].k.id, v));
+      // Hedefin üstüne fazla nöbet yazılan memur/doktorda nöbet tam sayıya yuvarlanır: önce aşağı, eksik kalan toplam küsuratı en büyük olanlardan başlayarak azamiyi aşmadan yukarı tamamlanır (ör. 8,67 / 8,67 / 8,66 → 9 / 9 / 8)
+      const V = dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), g === 'isci' ? ADIM : 0.01);
+      if (g !== 'isci') {
+        const fz = V.map((v, i) => v > L[i].hedef + 0.01 ? i : -1).filter(i => i >= 0), hedefT = fz.reduce((x, i) => x + V[i], 0);
+        const R = V.slice(); fz.forEach(i => { R[i] = Math.max(L[i].hedef, Math.floor(V[i] + 0.01)); });
+        let eksik = hedefT - fz.reduce((x, i) => x + R[i], 0);
+        fz.slice().sort((x, y) => (V[y] - Math.floor(V[y] + 0.01)) - (V[x] - Math.floor(V[x] + 0.01))).forEach(i => { if (eksik <= 0.01) return; const ust = Math.min(L[i].azami, Math.ceil(V[i] - 0.01)); if (ust > R[i]) { eksik -= ust - R[i]; R[i] = ust; } });
+        R.forEach((v, i) => sonuc.set(L[i].k.id, v));
+      } else V.forEach((v, i) => sonuc.set(L[i].k.id, v));
     });
     return sonuc;
   }
@@ -647,8 +655,9 @@ const NobetCore = (() => {
   const pad = n => String(n).padStart(2, '0');
   const iso = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
   const gunSayisi = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
-  // yuva yetenekleri (Modül 1 ile aynı): dok → ekip şefi; işçi → sürücü (12 saat); AABT → her yuva; ATT yalnız YSP / sürücü + YSP
-  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'ysp', 'sur'], ysp: ['ysp'], sy: ['sur', 'ysp']};
+  // yuva yetenekleri (Modül 1 ile aynı): dok → ekip şefi; işçi → sürücü (12 saat); AABT → her yuva; ATT yalnız YSP / sürücü + YSP;
+  // doktorlu olmayan ekipte (g.attEs ve listede doktor yok) ATT ekip şefi nöbet branşına da yazılabilir (en son tercih)
+  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp', 'sur'], ka: ['es', 'ysp', 'sur'], ysp: ['ysp'], sy: ['sur', 'ysp']};
   const KURAL = {minAra: 1, maxAra: 5, izinOnce: 3, surGunAsiri: true, isciGece: true};
   const YUVA_AD = {es: 'Ekip şefi', ysp: 'YSP', sur: 'Sürücü'};
   const KOD = {es: 'E', ysp: 'Y', sur: 'S', surG: 'G', surA: 'A'};
@@ -660,7 +669,8 @@ const NobetCore = (() => {
   // Girdiyi gün indekslerine çevirir. kisi: {id, ad, grup, adet (24 saatlik nöbet), yarim (işçi 12 saatlik adet), izin:[{bas,bit}], istek:[iso]}
   function hazirla(g, kural) {
     const N = g.gun || gunSayisi(g.y, g.m), K = {...KURAL, ...(kural || {})}, ay = `${g.y}-${pad(g.m)}`;
-    const gunNo = d => (d && d.slice(0, 7) === ay ? +d.slice(8, 10) : null);
+    const gunNo = d => (d && d.slice(0, 7) === ay ? +d.slice(8, 10) : null), attEs = !!g.attEs && !g.kisiler.some(k => k.grup === 'dok');
+    const yetBul = grup => { const y = YETENEK[grup] || ['ysp']; return attEs && (grup === 'ysp' || grup === 'sy') ? [...y, 'es'] : y; };
     const P = g.kisiler.map(k => {
       const izin = new Set(), once = new Set(), istek = new Set(), baslar = [], donusAday = [];
       (k.izin || []).forEach(i => {
@@ -675,13 +685,13 @@ const NobetCore = (() => {
       (k.istek || []).forEach(x => { const d = gunNo(x); if (d) istek.add(d); });
       // İzin / rapor dönüşü: işe başlama günü nöbete girmek zorunludur (o gün başka bir izinle kapanmıyorsa)
       const donus = new Set(donusAday.filter(d => !izin.has(d)));
-      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: YETENEK[k.grup] || ['ysp'], isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, izin, once, istek, baslar, donus};
+      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: yetBul(k.grup), isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, izin, once, istek, baslar, donus};
     });
     // hafta sonu (cumartesi/pazar) ve resmî tatil günleri: nöbetlerin bu günlere kişiler arasında dengeli dağılması için
     const ozel = new Uint8Array(N + 2); let ozelSay = 0;
     const tatil = new Set((g.tatil || []).map(x => typeof x === 'number' ? x : gunNo(x)).filter(Boolean));
     for (let d = 1; d <= N; d++) { const w = new Date(Date.UTC(g.y, g.m - 1, d)).getUTCDay(); if (w === 0 || w === 6 || tatil.has(d)) { ozel[d] = 1; ozelSay++; } }
-    return {N, K, P, byId: new Map(P.map(p => [p.id, p])), ozel, ozelOran: N ? ozelSay / N : 0, ozelSay};
+    return {N, K, P, attEs, byId: new Map(P.map(p => [p.id, p])), ozel, ozelOran: N ? ozelSay / N : 0, ozelSay};
   }
   // Kişinin hafta sonu / resmî tatil nöbet sayısının beklenenden sapması (±1 nöbet tolerans); ceza tam sayıdır
   const ozelCeza = (say, toplam, oran) => { const dev = Math.abs(say - toplam * oran); return dev > 1 ? Math.round(30 * (dev - 1)) : 0; }
@@ -1483,8 +1493,7 @@ function mount(root, opts = {}) {
       <button class="ap-btn" data-act="excel-toplu" title="Planlama biriminin aylık dosya düzeni: Personel Bilgileri, İstatistik, Kurum Dışına Giden/Gelen, KKM, Başhekimlik ve ilçe sırasıyla istasyonlar; satırlar duruma göre renkli, tahmini nöbet mesai saatinden">Tüm istasyonlar Excel (tek dosya)</button>
       <span class="ap-seg" title="Mesai karşılığı: herkes yalnız mesaisini tamamlayacak kadar nöbet tutar. Fazla mesaili: DOKTOR-AABT-ATT'ye yazdığınız nöbet sayısına kadar fazla nöbet yazılabilir."><button class="${S.ayar.panoMod === 'mesai' ? 'on' : ''}" data-act="pano-mod" data-v="mesai">Mesai karşılığı</button><button class="${S.ayar.panoMod !== 'mesai' ? 'on' : ''}" data-act="pano-mod" data-v="fazla">Fazla mesaili</button></span>
       <label class="ap-note ap-azami ${S.ayar.panoMod === 'mesai' ? 'off' : ''}" title="DOKTOR-AABT-ATT'ye bir ayda yazılabilecek en çok 24 saatlik nöbet sayısı. Yazdığınız sayıya göre pano yeniden hesaplanır (istasyon sayfasından istasyona özel değiştirilebilir).">DOKTOR-AABT-ATT en çok <input class="ap-in n" type="number" min="0" step="0.5" data-pano-azami value="${S.ayar.azamiMemur}" ${S.ayar.panoMod === 'mesai' || salt() ? 'disabled' : ''}> nöbet</label>
-      <span class="ap-note">${AYLAR[S.m]}: ${C.gunSayisi(S.y, S.m)} gün × ${C.YUVA_VARSAYILAN} nöbet branşı = ${C.gunSayisi(S.y, S.m) * C.YUVA_VARSAYILAN} nöbet/istasyon · memur ${fmt(C.ayMesai(S.y, S.m, false, ozel()))} sa., işçi ${fmt(C.ayMesai(S.y, S.m, true, ozel()))} sa.</span></div>
-      <div class="ap-row ap-noprint ap-pano-ara" data-ust><input id="ap-pano-ara" class="ap-in" type="search" placeholder="Ekip ara…" value="${esc(S.panoAra || '')}" aria-label="Ekip (istasyon) ara" autocomplete="off"><span class="ap-note" id="ap-pano-ara-say">${araQ ? `${araGorunen} / ${gosterilenI.length} istasyon gösteriliyor (üstteki sayılar tüm istasyonlar içindir)` : ''}</span></div>
+      <span class="ap-pano-ara"><input id="ap-pano-ara" class="ap-in" type="search" placeholder="Ekip ara…" value="${esc(S.panoAra || '')}" aria-label="Ekip (istasyon) ara" autocomplete="off"><span class="ap-note">${AYLAR[S.m]}: ${C.gunSayisi(S.y, S.m)} gün × ${C.YUVA_VARSAYILAN} nöbet branşı = ${C.gunSayisi(S.y, S.m) * C.YUVA_VARSAYILAN} nöbet/istasyon · memur ${fmt(C.ayMesai(S.y, S.m, false, ozel()))} sa., işçi ${fmt(C.ayMesai(S.y, S.m, true, ozel()))} sa.</span><span class="ap-note" id="ap-pano-ara-say">${araQ ? `${araGorunen} / ${gosterilenI.length} istasyon gösteriliyor (üstteki sayılar tüm istasyonlar içindir)` : ''}</span></span></div>
       <div class="ap-grid">${kartlar || `<div class="ap-empty">${f ? 'Bu grupta istasyon yok' : 'İstasyon yok'}</div>`}<div class="ap-empty" id="ap-pano-ara-yok" style="display:${araQ && !araGorunen && kartlar ? '' : 'none'}">Aramaya uyan istasyon yok</div></div>`;
   }
 
@@ -1510,7 +1519,7 @@ function mount(root, opts = {}) {
     const fazla = C.GRUPLAR.filter(g => H.fazla[g] > 0.05).map(g => `<span class="ap-tag ap-t-fz">${C.GRUP_AD[g]}: ${fmt(H.fazla[g])} nöbet fazla</span>`).join(' ');
     return `<div class="ap-card" style="margin-top:8px;padding:10px"><b>Nöbet branşı dengesi (planlanan nöbetle)</b>${satir}
       ${fazla ? `<div style="margin-top:4px">${fazla} <span class="ap-note">fazla = o gruptaki kişilere yazılan nöbet kendi nöbet branşlarını aşıyor; başka nöbet branşını dolduramaz</span></div>` : ''}
-      <details class="ap-note" style="margin-top:4px"><summary style="cursor:pointer">Nöbet branşı kuralları</summary>Yetenekler: doktor → ekip şefi · işçi → sürücü · AABT (sağlık teknikeri) → ekip şefi, YSP; sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa · ATT (sağlık memuru / teknisyeni) → YSP ve sürücü; doktorlu ekipte (tip A1 ya da kadroda doktor) ATT ekip şefi nöbet branşına girmez, doktorsuz ekipte en son ekip şefine takviye verir. Önce AABT nöbet branşları doldurur (ekip şefi öncelikli), fazlalık ATT'de görünür.</details></div>`;
+      <details class="ap-note" style="margin-top:4px"><summary style="cursor:pointer">Nöbet branşı kuralları</summary>Yetenekler: doktor → ekip şefi · işçi → sürücü · AABT (sağlık teknikeri) → ekip şefi, YSP ve sürücü (nöbet listesinde sürücü görünen AABT sürücü branşına öncelikli girer) · ATT (sağlık memuru / teknisyeni) → YSP ve sürücü; doktorlu ekipte (tip A1 ya da kadroda doktor) ATT ekip şefi nöbet branşına girmez, doktorsuz ekipte en son ekip şefine takviye verir. Önce AABT nöbet branşları doldurur (ekip şefi öncelikli), fazlalık ATT'de görünür.</details></div>`;
   }
   // Silinen kişiler: kayıt kalıcı silinmez, buradan geri getirilebilir
   function silinenHtml(b, duz) {
@@ -2204,7 +2213,7 @@ function mount(root, opts = {}) {
     const dp = n2Depo(b.ad), ks = n2Kisiler(b).map(k => ({...k, izin: [...(k.izin || []), ...(dp.izin[k.id] || [])], istek: dp.istek[k.id] || []}));
     const ozet = NC.adetHazirla(ks, NC.gunSayisi(S.y, S.m));
     const oz = ozel(), tatil = []; for (let d = 1; d <= NC.gunSayisi(S.y, S.m); d++) { const i = C.iso(S.y, S.m, d), og = oz[i]; if (C.RESMI[i] === 0 || (og && (og.tur === 'bayram' || og.tur === 'resmi'))) tatil.push(d); }      // resmî tatil / bayram günleri (hafta sonu gibi dengeli dağıtılır)
-    return {girdi: {y: S.y, m: S.m, kisiler: ks, tatil}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
+    return {girdi: {y: S.y, m: S.m, kisiler: ks, tatil, attEs: b.tip !== 'A1'}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
   }
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
@@ -2328,7 +2337,7 @@ function mount(root, opts = {}) {
   function n2ListeHtml(b) {
     const {G, H, L, d} = n2Deneti(b), dp = n2Depo(b.ad), N = H.N, duz = n2Duz(), ks = G.girdi.kisiler, K = G.kural, kap = NC.kapasiteAnalizi(G.girdi, G.kural);
     const hata = new Map(); d.ihlal.forEach(i => { const a = `${i.gun}|${i.kisi == null ? '' : i.kisi}`; hata.set(a, (hata.get(a) || '') + i.mesaj + '\n'); if (i.yuva) hata.set(`${i.gun}||${i.yuva}`, i.mesaj); });
-    const secenek = (yuva, tip, sec) => `<option value=""></option>` + ks.filter(k => (k.grup === 'isci') === (tip === 'surG' || tip === 'surA') && NC.YETENEK[k.grup].includes(yuva)).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
+    const secenek = (yuva, tip, sec) => `<option value=""></option>` + ks.filter(k => (k.grup === 'isci') === (tip === 'surG' || tip === 'surA') && ((H.byId.get(k.id) || {}).yet || NC.YETENEK[k.grup] || []).includes(yuva)).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
     const hucre = (gun, tip) => { const yuva = tip === 'surG' || tip === 'surA' ? 'sur' : tip, id = L[gun][tip], e = (id != null && hata.get(`${gun}|${id}`)) || (id == null && hata.get(`${gun}||${yuva}`) && (tip === 'sur' || tip === 'es' || tip === 'ysp') ? 'Boş' : '');
       const bl = L[gun].bol && L[gun].bol[tip];
       const bolHtml = bl ? `<div class="ap-note n2bol" title="İzin / rapor dönüşü: aynı gün dönen iki kişi bu nöbeti böler (saatine göre kısmi nöbet sayılır)">+ ${esc(n2Ad(G, bl.id))} <select class="ap-sel" data-n2="bol" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'}>${[[12, '12/12'], [8, '16/8 (sonra 8 sa)'], [16, '8/16 (sonra 16 sa)'], ['', 'bölmeyi kaldır']].map(([v, t]) => `<option value="${v}" ${String(v) === String(bl.saat) ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : '';
