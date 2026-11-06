@@ -263,6 +263,16 @@ const APCore = (() => {
         R.forEach((v, i) => sonuc.set(L[i].k.id, Math.round(v * 100) / 100));      // 7,666… → 7,67
       } else V.forEach((v, i) => sonuc.set(L[i].k.id, Math.round(v * 100) / 100));
     });
+    // Tam sayıya yuvarlama ihtiyacı aşarsa (ör. 94 / 93) fazlalık, nöbet branşına sığmayan gruptan başlayarak en çok nöbeti olandan 1'er nöbet geri alınır (hedefin altına inilmez)
+    const kilitTop = GRUPLAR.reduce((x, g) => x + kilitSup[g], 0), planTop = () => [...sonuc.values()].reduce((x, v) => x + v, 0) + kilitTop;
+    for (let tur = 0; tur < 200 && planTop() - ihtiyac >= 0.99; tur++) {
+      const sup = {}; GRUPLAR.forEach(g => { sup[g] = kilitSup[g] + ser(g).reduce((x, s2) => x + (sonuc.get(s2.k.id) || 0), 0); });
+      const tasan = akis(sup, {es: D3, ysp: D3, sur: D3}, ae).fazla;
+      const aday = GRUPLAR.filter(g => g !== 'isci').flatMap(g => ser(g).map(s2 => ({s2, g, v: sonuc.get(s2.k.id) || 0}))).filter(x => x.v - 1 >= x.s2.hedef - 0.01)
+        .sort((x, y) => ((tasan[y.g] >= 0.99) - (tasan[x.g] >= 0.99)) || (y.v - y.s2.hedef) - (x.v - x.s2.hedef));
+      if (!aday.length) break;
+      sonuc.set(aday[0].s2.k.id, Math.round((aday[0].v - 1) * 100) / 100);
+    }
     return sonuc;
   }
   // Kadro tipi: AABT (sağlık teknikeri) ve ATT (sağlık memuru / teknisyeni). Unvanda açıkça yazıyorsa o esas alınır.
