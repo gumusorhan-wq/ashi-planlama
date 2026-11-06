@@ -1848,7 +1848,7 @@ function mount(root, opts = {}) {
   function gorevTarihPop() {
     const k = S.plan && S.plan.kayitlar.find(x => x.id === S.gtAc); if (!k || !k.gorev) return '';
     const r = gorevAyAraligi(k.gorev) || {ilk: '', son: ''}, bekle = S.gtBekle && S.gtBekle.id === k.id ? S.gtBekle.ilk : '';
-    const yillar = [...new Set([S.y, ...(S.m === 12 ? [S.y + 1] : []), ...(r.ilk ? [+r.ilk.slice(0, 4)] : []), ...(r.son ? [+r.son.slice(0, 4)] : [])])].sort();
+    const yillar = [...new Set([S.y, ...(S.m === 1 ? [S.y - 1] : []), ...(r.ilk ? [+r.ilk.slice(0, 4)] : []), ...(r.son ? [+r.son.slice(0, 4)] : [])])].sort();      // plan yılı; Ocak planında önceki yıl da (Aralık'ta başlayan görevler)
     const icinde = ym => r.ilk && ym >= r.ilk && (!r.son || ym <= r.son);
     const yil = y => `<div class="ap-yil"><div class="ap-yilbas"><b>${y}</b><button class="ap-btn sm" data-pop data-act="gt-yil" data-v="${y}">✓ Tüm yıl</button></div><div class="ap-aygrid" style="grid-template-columns:repeat(6,1fr)">${AY_KISA.map((ad, i) => { const ym = `${y}-${C.pad(i + 1)}`; return `<button class="ap-aybtn ${icinde(ym) ? 'sec' : ''} ${ym === bekle ? 'bek' : ''}" data-pop data-act="gt-ay" data-v="${ym}">${ad}</button>`; }).join('')}</div></div>`;
     return `<div class="ap-pop ap-gtpop" data-pop><div class="ap-row" style="justify-content:space-between"><b class="ap-poph">GÖREV TARİHİ — ${esc(k.ad)}</b><span class="ap-note">${esc(gorevTarihEtiket(k))}</span></div>
