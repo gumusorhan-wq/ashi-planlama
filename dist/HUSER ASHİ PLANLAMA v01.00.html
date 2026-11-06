@@ -1111,8 +1111,12 @@ const NobetCore = (() => {
     const gerek = gun * 2 + (gun - gunIsci);
     diger.forEach(k => { k.adet = Math.floor(k.planlanan || 0); k.kesir = (k.planlanan || 0) - k.adet; });
     let fark = gerek - diger.reduce((x, k) => x + k.adet, 0);
-    while (fark > 0) { const aday = diger.filter(k => k.adet < (k.ust == null ? 99 : k.ust)).sort((a, b) => b.kesir - a.kesir || (b.planlanan || 0) - (a.planlanan || 0))[0]; if (!aday) break; aday.adet++; aday.kesir -= 1; fark--; }
-    while (fark < 0) { const aday = diger.filter(k => k.adet > 0).sort((a, b) => (a.kesir) - (b.kesir) || b.adet - a.adet)[0]; if (!aday) break; aday.adet--; aday.kesir += 1; fark++; }
+    // Küsurat tamamlanırken tek nöbet branşına bağlı gruplar (doktor → yalnız ekip şefi, ATT yalnız YSP → yalnız YSP) o branşın gün sayısını aşmaz;
+    // aşarsa artan nöbet esnek gruplara (AABT, sürücü ATT) gider. Böylece Modül 1'de dolu görünen branş Modül 2'de boş kalmaz.
+    const tekGrup = {dok: 'dok', ysp: 'ysp'}, grupTop = g => diger.filter(k => k.grup === g).reduce((x, k) => x + k.adet, 0), dolu = k => !!tekGrup[k.grup] && grupTop(k.grup) >= gun;
+    const sirala = L => L.sort((a, b) => b.kesir - a.kesir || (b.planlanan || 0) - (a.planlanan || 0));
+    while (fark > 0) { const L = diger.filter(k => k.adet < (k.ust == null ? 99 : k.ust)); const aday = sirala(L.filter(k => !dolu(k)))[0] || sirala(L)[0]; if (!aday) break; aday.adet++; aday.kesir -= 1; fark--; }
+    while (fark < 0) { const L = diger.filter(k => k.adet > 0), tasan = L.filter(k => tekGrup[k.grup] && grupTop(k.grup) > gun); const aday = (tasan.length ? tasan : L).sort((a, b) => (a.kesir) - (b.kesir) || b.adet - a.adet)[0]; if (!aday) break; aday.adet--; aday.kesir += 1; fark++; }
     return {gerek, gunIsci, kalanFark: fark};
   }
   return {adetHazirla, kapasiteAnalizi, hazirla, denetle, uret, oneriler, bos, YETENEK, KURAL, YUVA_AD, KOD, gunSayisi, iso};
