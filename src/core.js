@@ -66,7 +66,7 @@ const APCore = (() => {
     'HEYET RAPORLU':       {renk: '#A6A6A6', nobetYok: true,  mesaiYok: true},
     'ÜCRETSİZ İZİN':       {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
     'ASKERLİK İZNİ':       {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
-    'YARI ZAMANLI':        {renk: '#FCD5B4', nobetYok: false, mesaiYok: false, mesaiOran: 0.5},      // istasyonda kalan yarı zamanlı mesaisinin yarısı kadar nöbet tutar
+    'YARI ZAMANLI':        {renk: '#FCD5B4', nobetYok: false, mesaiYok: false, mesaiOran: 0.5, fazlaYok: true},      // istasyonda kalan yarı zamanlı mesaisinin yarısı kadar nöbet tutar
     'SAĞLIK MAZERETİ MESAİ': {renk: '#FCD5B4', nobetYok: true, mesaiYok: false},
     'MESAİ USULÜ':         {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
     'NÖBET USULÜ':         {renk: null,      nobetYok: false, mesaiYok: false},
@@ -187,7 +187,8 @@ const APCore = (() => {
     // Azami nöbet: memur/doktor tam ay hedefinin üstüne azamiMemur'a kadar (ör. Kasım: hedef 7, azami 8); izinli kişide hedef + aynı ek; işçi: hedef + isciEk × 0,5
     const a = ayar || {}, azamiMemur = a.azamiMemur || 0, tam = hedefNobet(ayMesai(y, m, false, ozel), 'memur', false, a).birim, ek = Math.max(0, azamiMemur - tam);
     satir.forEach(s => {
-      s.azami = s.nobetYok || !(s.hedef > 0) ? 0 : (s.k.sinif === 'isci' ? s.hedef + (a.isciEk || 0) * ADIM : Math.min(Math.max(azamiMemur, s.hedef), s.hedef + ek));
+      const dz = (durumlar || {})[s.k.durum] || {}, fazlaYok = dz.fazlaYok != null ? !!dz.fazlaYok : s.k.durum === 'YARI ZAMANLI';      // yarı zamanlı yalnız kendi mesaisi kadar, fazla nöbet yazılmaz
+      s.azami = s.nobetYok || !(s.hedef > 0) ? 0 : fazlaYok ? s.hedef : (s.k.sinif === 'isci' ? s.hedef + (a.isciEk || 0) * ADIM : Math.min(Math.max(azamiMemur, s.hedef), s.hedef + ek));
     });
     // Yuva yetenekleri: doktor → ekip şefi; işçi → sürücü; AABT (sağlık teknikeri) → ekip şefi + YSP + sürücü; ATT (sağlık memuru / teknisyeni) → YSP + sürücü
     // (nöbet kayıtlarında ekip şefi olarak görev almışsa ekip şefi + YSP; yalnızca YSP olarak çalışıyorsa YSP).
