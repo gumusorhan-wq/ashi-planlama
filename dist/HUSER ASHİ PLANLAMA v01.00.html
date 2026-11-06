@@ -1639,7 +1639,7 @@ function mount(root, opts = {}) {
       const eng = C.gorevlendirmeEngeli(k, ayIlk()), dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
       return `<tr data-ara="${esc(C.TR([k.ad, k.birim, k.gorev.hedef || '', k.gorev.yer || '', k.unvan].join(' ')))}" data-kay="${esc(k.birim)}" data-hed="${esc(k.gorev.hedef || '')}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${duz ? '' : 'disabled'}>${opts(k)}</select>${k.gorev.hedef ? '' : `<div class="ap-note">${esc(k.gorev.yer || '')}</div>`}</td>
-      <td style="min-width:235px"><input class="ap-in w" style="min-width:225px;font-variant-numeric:tabular-nums" title="${esc(k.gorev.tarih || '')}" data-id="${k.id}" data-f="gTarih" value="${esc(k.gorev.tarih || '')}" ${duz ? '' : 'disabled'}></td>
+      <td style="min-width:235px"><input class="ap-in w" style="min-width:225px;font-variant-numeric:tabular-nums" title="${esc(k.gorev.tarih || '')}" data-id="${k.id}" data-f="gTarih" placeholder="01.09.2026 – 30.11.2026" value="${esc(k.gorev.tarih || '')}" ${duz ? '' : 'disabled'}></td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${duz ? '' : 'disabled'}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === (k.gorev.yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gGerekce" ${duz ? '' : 'disabled'}>${GEREKCE.map(a => `<option ${a === (k.gorev.gerekce || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
       <td>${eng ? `<span class="ap-tag ap-t-ih" title="${esc(eng)}">Engel</span>` : ''}</td></tr>`;
@@ -1677,7 +1677,8 @@ function mount(root, opts = {}) {
       <input class="ap-in" list="ap-kisi-list" id="ap-g-kisi" placeholder="Kişi ara (listeyi süzer) / seç…" title="Yazdıkça aşağıdaki görevlendirme listesi ad, kaynak ve hedefe göre süzülür; listeden bir kişi seçip yanındaki istasyonla Görevlendir diyerek yeni görevlendirme yapabilirsiniz"><datalist id="ap-kisi-list">${S.plan.kayitlar.filter(k => !k.gorev || !k.gorev.hedef).slice(0, 2000).map(k => `<option value="${esc(k.ad)}">`).join('')}</datalist>
       <label class="ap-note" title="Seçilen istasyondan görevli çıkanlar ve o istasyona gelenler listelenir">İstasyon süz <select class="ap-sel" id="ap-g-ist"><option value="">Tümü</option>${birimler.map(b => `<option>${esc(b.ad)}</option>`).join('')}</select></label>
       <span class="ap-note">Yeni görevlendirme hedefi:</span><select class="ap-sel" id="ap-g-hedef">${birimler.map(b => `<option>${esc(b.ad)}</option>`).join('')}</select>
-      <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button></div>
+      <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button>
+      <button class="ap-btn" data-act="g-tarihsiz-bitir" ${duz ? '' : 'disabled'} title="TARİH sütunu boş (önceki aylardan kalan) görevlendirmeleri bitirir; istasyon süzgeci seçiliyse yalnız o istasyonunkileri. Uzun süreli (OF) ve devam isteği olanlar hariç.">Tarihi boş görevleri bitir (${gk.filter(k => tarihsizGorev(k)).length})</button></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div></div>`;
     return nav + ({deg: degerlendirme, rot: sekme === 'rot' ? rotasyonHtml() : '', ozet, list: liste, dis}[sekme] || degerlendirme);
   }
@@ -3375,7 +3376,8 @@ function mount(root, opts = {}) {
   // ---------- aylık rotasyon: her istasyondan ayda (kota) kişi çıkar; sırayla, kişi isteği varsa öncelikli / birkaç ay üst üste ----------
   const ayAnahtari = () => `${S.y}-${C.pad(S.m)}`;
   // Görev bitiş tarihi: bit alanı, yoksa elle yazılan tarih metnindeki son tarih ("01.06.2026 – 30.11.2026"); tek tarih yalnız başlangıçtır
-  const gorevTarihleri = g => { const m = [...String((g && g.tarih) || '').matchAll(/(\d{2})\.(\d{2})\.(\d{4})/g)].map(x => `${x[3]}-${x[2]}-${x[1]}`); return {bas: (g && g.bas) || m[0] || '', bit: (g && g.bit) || (m.length > 1 ? m[m.length - 1] : '')}; };
+  // Tek tarih, önünde tire ya da "bitiş" / arkasında "kadar" varsa bitiştir ("– 30.11.2026", "bitiş 30.11.2026", "30.11.2026'ya kadar")
+  const gorevTarihleri = g => { const t = String((g && g.tarih) || ''), m = [...t.matchAll(/(\d{2})\.(\d{2})\.(\d{4})/g)].map(x => `${x[3]}-${x[2]}-${x[1]}`); const tekBit = m.length === 1 && (/^\s*[-–—]|B[İI]T[İI][ŞS]/i.test(t) || /KADAR/i.test(C.TR(t))); return {bas: (g && g.bas) || (tekBit ? '' : m[0]) || '', bit: (g && g.bit) || (m.length > 1 ? m[m.length - 1] : tekBit ? m[0] : '')}; };
   // 1–2 nöbetlik görevlendirme (başlangıç–bitiş en çok 2 gün; ASOS'ta bitiş dönüş günüdür) geçici görev sayılmaz
   const kisaGorev = g => { const t = gorevTarihleri(g); if (!t.bas || !t.bit) return false; const gun = (Date.parse(t.bit) - Date.parse(t.bas)) / 864e5; return gun >= 0 && gun <= 2; };
   // Nöbet listesine göre bir istasyona yalnız 1–2 nöbet için gidilmişse ASOS'taki açık görev kaydı yok sayılır (k.gorevYoksay = {hedef, ay})
@@ -3395,6 +3397,11 @@ function mount(root, opts = {}) {
     if (!biten.length) return 0;
     biten.forEach(({k, hedef, orada}) => { k.gorevYoksay = {hedef, ay: son}; k.gorev = null; if (/GEÇİCİ GÖREVDE/.test(k.durum || '')) k.durum = ''; k.durumA = k.durumA === 'GEÇİCİ GÖREVDE' ? '' : k.durumA; if (/GECICI GOREV/.test(C.TR(k.durumMetin || ''))) k.durumMetin = ''; if (/GECICI GOREV/.test(C.TR(k.durumMetinA || ''))) k.durumMetinA = ''; k.durumManuel = false; logla('1–2 nöbet için gidilen istasyon geçici görev sayılmadı', `${k.ad}: ${hedef} (${son} nöbet listesinde ${fmt(orada)} nöbet) → ${k.birim}`); });
     otoHesapla(); damgala(); kaydet(); toast(`${biten.length} personel başka istasyonda yalnız 1–2 nöbet tuttuğu için geçici görevli sayılmadı; kendi istasyonunda gösteriliyor.`); return biten.length;
+  }
+  // Tarihsiz görev: başlangıç/bitiş yok, süresiz (OF) değil — aylık rotasyon görevlendirmesi sayılır; yeni aya kendiliğinden geçmez
+  const tarihsizGorev = k => { const g = k.gorev; if (!g || !(g.hedef || g.yer) || g.uzun || k.istek === 'devam') return false; const t = gorevTarihleri(g); return !t.bas && !t.bit; };
+  function tarihsizGorevleriBitir(liste, neden) {
+    liste.forEach(k => { const hedef = k.gorev.hedef || k.gorev.yer || ''; k.gorevYoksay = {hedef, ay: ayAnahtari()}; k.gorev = null; if (/GEÇİCİ GÖREVDE/.test(k.durum || '')) k.durum = ''; if (k.durumA === 'GEÇİCİ GÖREVDE') k.durumA = ''; if (/GECICI GOREV/.test(C.TR(k.durumMetin || ''))) k.durumMetin = ''; if (/GECICI GOREV/.test(C.TR(k.durumMetinA || ''))) k.durumMetinA = ''; k.durumManuel = false; logla(neden, `${k.ad}: ${hedef} → ${k.birim}`); });
   }
   // Plan ayının ilk günü ya da öncesinde biten geçici görevler kapatılır, kişi kadro istasyonuna döner ("devam" isteği olanlar hariç)
   function bitenGorevleriKapat() {
@@ -3521,7 +3528,7 @@ function mount(root, opts = {}) {
       case 'aciklama': S.toplu = true; try { mut(() => { k.aciklama = String(v || '').trim(); }, 'Kişi açıklaması', `${k.ad}: ${k.aciklama}`); } finally { S.toplu = false; } break;
       case 'kilit': mut(() => { k.kilit = !!v; }, v ? 'Kilitlendi' : 'Kilit açıldı', k.ad); break;
       case 'yolluk': mut(() => { k.gorev = k.gorev || {yer: '', hedef: null, kaynak: 'manuel', yolluk: '', tarih: '', gerekce: ''}; k.gorev.yolluk = v; }, 'Yolluk durumu', `${k.ad}: ${v}`); break;
-      case 'gTarih': mut(() => { k.gorev.tarih = v; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${v}`); break;
+      case 'gTarih': mut(() => { k.gorev.tarih = v; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${v}`); if (bitenGorevleriKapat()) render(); break;      // bitiş plan ayından önceyse görev hemen kapanır
       case 'gGerekce': mut(() => { k.gorev.gerekce = v; k.gorev.kaynak = 'manuel'; }, 'Görevlendirme gerekçesi', `${k.ad}: ${v}`); break;
       case 'istek': mut(() => { k.istek = v; }, 'Kişi isteği', `${k.ad}: ${ISTEK[v] || 'Sırayla'}`); break;
       case 'gHedef':
@@ -3649,6 +3656,13 @@ function mount(root, opts = {}) {
         case 'kilit-ac': ayKilidiAcIste(); return;
         case 'kisi-sil': { const k = kayit(t.dataset.id); if (k && confirm(`${k.ad} kaydı silinsin mi?`)) mut(() => { (S.plan.silinen = S.plan.silinen || []).unshift({...JSON.parse(JSON.stringify(k)), _silZaman: Date.now(), _silBirim: k.birim}); S.plan.silinen.length = Math.min(S.plan.silinen.length, 200); S.plan.kayitlar = S.plan.kayitlar.filter(x => x.id !== k.id); }, 'Kişi silindi', k.ad); break; }
         case 'kisi-geri': { const sl = (S.plan.silinen || []).find(x => x.id === t.dataset.id); if (!sl) break; if (S.plan.kayitlar.some(x => x.id === sl.id || (sl.tc && x.tc === sl.tc))) { toast('Bu kişi zaten listede.'); break; } const {_silZaman, _silBirim, ...k0} = sl; mut(() => { S.plan.kayitlar.push(k0); S.plan.silinen = S.plan.silinen.filter(x => x.id !== sl.id); }, 'Silinen kişi geri getirildi', `${k0.ad} → ${k0.birim}`); toast(`${k0.ad} geri getirildi.`); break; }
+        case 'g-tarihsiz-bitir': {
+          if (salt()) break;
+          const ist = (root.querySelector('#ap-g-ist') || {}).value || '', L = S.plan.kayitlar.filter(k => tarihsizGorev(k) && (!ist || k.birim === ist || k.gorev.hedef === ist));
+          if (!L.length) { toast('Tarihi boş görevlendirme yok.'); break; }
+          if (!confirm(`${L.length} tarihi boş görevlendirme bitirilsin mi?${ist ? `\n(${ist} süzgeci)` : ''}\n\nBu kişiler kadro istasyonlarına döner. ASOS dosyası yeniden yüklense de aynı görev geri gelmez; gerekiyorsa yeniden görevlendirebilirsiniz. İşlem günlüğe yazılır.`)) break;
+          tarihsizGorevleriBitir(L, 'Tarihi boş görevlendirme bitirildi (önceki ayın görevi)'); otoHesapla(); damgala(); kaydet(); toast(`${L.length} görevlendirme bitirildi.`); break;
+        }
         case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); break; }
         case 'og-ekle': { const d = root.querySelector('#ap-og-t').value, tur = root.querySelector('#ap-og-tur').value; if (!d) { toast('Tarih seçin.'); break; } mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break; }
         case 'og-sil': mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
@@ -3661,7 +3675,7 @@ function mount(root, opts = {}) {
           const ofBirim = new Set((onceki.birimler || []).filter(b => b.ekipOf).map(b => b.ad));
           S.plan.kayitlar = JSON.parse(JSON.stringify(onceki.kayitlar)).map(k => {
             const y = {...k, izin: [], planlanan: null, kilit: false};
-            if (y.gorev && y.gorev.bit && y.gorev.bit <= ayIlk()) {
+            if (y.gorev && ((y.gorev.bit && y.gorev.bit <= ayIlk()) || tarihsizGorev(y))) {      // tarihsiz görev önceki ayın görevlendirmesidir
               if (y.istek === 'devam' || ofBirim.has(y.birim)) { y.gorev = {...y.gorev, bas: ayIlk(), bit: gunSon(), tarih: `${trTarih(ayIlk())} – ${trTarih(gunSon())}`}; y.gecmis = [...new Set([...(y.gecmis || []), ayAnahtari()])].sort(); }
               else { y.gorev = null; if (y.durum === 'GEÇİCİ GÖREVDE') y.durum = ''; y.durumManuel = false; }
             }
