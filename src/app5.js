@@ -24,7 +24,7 @@
     const h = hesapla(b), oto = C.oneri(h), sat = h.satir.filter(s => !s.nobetYok), sm = new Map(sat.map(s => [s.k.id, s])), sira = nobetSirala(sm);      // kişi başı nöbet: Modül 1'in elle dağıtımı bağlayıcı değil; istasyonun ihtiyacı mesai ve azamiye göre otomatik dağıtılır
     return sat.sort((x, y) => sira(x.k, y.k)).map(s => {
       const k = s.k, azami = Math.floor(s.azami + 1e-9);
-      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), planlanan: oto.has(k.id) ? oto.get(k.id) : sayi(k.planlanan), ust: k.sinif === 'isci' ? null : azami, gelen: !!k._gelen,
+      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), otoHedef: oto.has(k.id) ? oto.get(k.id) : sayi(k.planlanan), planlanan: (dp.hedef || {})[k.id] != null ? dp.hedef[k.id] : oto.has(k.id) ? oto.get(k.id) : sayi(k.planlanan), elle: (dp.hedef || {})[k.id] != null, ust: k.sinif === 'isci' ? null : azami, gelen: !!k._gelen,
         izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
     });      // branş sırası: doktor → AABT → ATT → diğer memur → sürücü ATT → işçi
   }
@@ -66,13 +66,15 @@
   }
   function n2PlanHtml(b) {
     // Kişi başı nöbet sayısı bağlayıcı değildir ve planlamaya beyan edilmez: istasyonun ihtiyacı (gün × 3 nöbet branşı) mesai hedefi ve azami nöbete göre otomatik dağıtılır; liste bu sayılarla oluşturulur
-    const h = hesapla(b), ks = n2Kisiler(b), dp = n2Depo(b.ad), L = dp.liste, D = durumlar();
+    const h = hesapla(b), ks = n2Kisiler(b), dp = n2Depo(b.ad), L = dp.liste, D = durumlar(), duz = n2Duz();
     const yazilan = id => { if (!L) return null; let t = 0; for (let g = 1; g < L.length; g++) { const x = L[g]; if (!x) continue; ['es', 'ysp', 'sur'].forEach(y => { if (x[y] === id) t += x.bol && x.bol[y] ? (24 - x.bol[y].saat) / 24 : 1; }); ['surG', 'surA'].forEach(y => { if (x[y] === id) t += 0.5; }); Object.entries(x.bol || {}).forEach(([y, bb]) => { if (bb && bb.id === id && x[y] != null) t += bb.saat / 24; }); } return Math.round(t * 100) / 100; };
     const disari = h.satir.filter(s => !gizliKisi(s.k) && (s.nobetYok || (D[s.k.durum] || {}).disarida));
-    const sat = ks.map(k => { const y = yazilan(k.id), f = y == null ? 0 : Math.round((y - k.planlanan) * 100) / 100; return `<tr><td>${esc(k.ad)}</td><td>${esc(k.brans || '')}</td><td>${esc(NB_AD[k.grup] || '')}</td><td class="num">${fmt(k.planlanan)}</td><td class="num">${y == null ? '' : `<b>${fmt(y)}</b>`}</td><td class="num">${f ? `<span class="${f > 0 ? 'n2art' : 'n2eks'}">${f > 0 ? '+' : ''}${fmt(f)}</span>` : ''}</td></tr>`; }).join('');
-    const toplam = ks.reduce((a, k) => a + (k.planlanan || 0), 0);
+    const sat = ks.map(k => { const y = yazilan(k.id), f = y == null ? 0 : Math.round((y - k.planlanan) * 100) / 100; return `<tr><td>${esc(k.ad)}</td><td>${esc(k.brans || '')}</td><td>${esc(NB_AD[k.grup] || '')}</td><td class="num">${duz ? `<input class="ap-in n ${k.ust != null && k.planlanan > k.ust + 1e-9 ? 'n2e' : ''}" type="number" min="0" step="0.01" data-n2="hedef" data-id="${k.id}" value="${k.planlanan}" title="Otomatik: ${fmt(k.otoHedef)}${k.ust != null ? ' · üst sınır ' + fmt(k.ust) : ''}">` : `<b>${fmt(k.planlanan)}</b>`}${k.elle ? ` <span class="ap-note" title="Otomatik ${fmt(k.otoHedef)}">elle</span>` : ''}</td><td class="num">${y == null ? '' : `<b>${fmt(y)}</b>`}</td><td class="num">${f ? `<span class="${f > 0 ? 'n2art' : 'n2eks'}">${f > 0 ? '+' : ''}${fmt(f)}</span>` : ''}</td></tr>`; }).join('');
+    const toplam = ks.reduce((a, k) => a + (k.planlanan || 0), 0), elleSay = ks.filter(k => k.elle).length, fark = Math.round((toplam - h.ihtiyac) * 100) / 100, asim = ks.filter(k => k.ust != null && k.planlanan > k.ust + 1e-9).length;
     return `<div class="ap-card"><h2>${esc(b.ad)} — ${ayEtiket()} nöbet hedefleri</h2>
-      <p class="ap-note">İstasyonun ihtiyacı <b>${h.ihtiyac}</b> nöbet (${NC.gunSayisi(S.y, S.m)} gün × 3 nöbet branşı). Kişi başı sayı mesai hedefine ve azami nöbete göre <b>otomatik</b> dağıtılır; planlamaya bildirilmez, bağlayıcı değildir. Nöbet listesi bu sayılarla oluşturulur; küsuratlar bölünmüş nöbetle (16/8, 12/12) karşılanır.</p>
+      <p class="ap-note">İstasyonun ihtiyacı <b>${h.ihtiyac}</b> nöbet (${NC.gunSayisi(S.y, S.m)} gün × 3 nöbet branşı). Kişi başı sayı önce mesai hedefine ve azami nöbete göre <b>otomatik</b> gelir; istasyon <b>Hedef nöbet</b> sütunundan dilediği gibi değiştirebilir (planlamaya bildirilmez). Otomatik nöbet listesi bu sayılara göre oluşturulur; küsuratlar bölünmüş nöbetle (16/8, 12/12) karşılanır.</p>
+      ${fark || asim ? `<div class="ap-ek ap-ek-c" style="margin-bottom:8px"><b>Dikkat:</b> ${[fark ? `toplam ${fmt(toplam)}, gereken ${h.ihtiyac} (${fark > 0 ? '+' : ''}${fmt(fark)}) — eşit değilse listede boş ya da fazla nöbet kalır` : '', asim ? `${asim} kişide azami nöbet aşıldı` : ''].filter(Boolean).join(' · ')}</div>` : ''}
+      ${duz && elleSay ? `<div class="ap-row" style="margin-bottom:8px"><span class="ap-note">${elleSay} kişide sayı elle değiştirildi.</span><button class="ap-btn" data-act="n2-hedef-oto">Otomatik sayılara dön</button></div>` : ''}
       <div class="ap-sum ap-sum1" style="margin-bottom:10px"><div><b>${fmt(toplam)} / ${h.ihtiyac}</b><span>Dağıtılan / gereken nöbet</span></div><div><b>${ks.length}</b><span>Nöbet tutan kişi</span></div></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Kadro</th><th>Nöbet branşı</th><th>Hedef nöbet</th><th>Listede</th><th>Fark</th></tr></thead><tbody>${sat || '<tr><td colspan="6" class="ap-empty">Nöbet tutan kişi yok</td></tr>'}</tbody></table></div>
       ${disari.length ? `<p class="ap-note" style="margin-top:8px">Nöbet tutmayan / başka yerde olan: ${disari.map(s => esc(s.k.ad)).join(', ')}</p>` : ''}</div>`;
@@ -281,6 +283,7 @@
         mut2(() => { const o = n2OnayYaz(b.ad); T.satir.forEach(x => { if (x.tutar) o.teklif[x.k.id] = x.tek; }); o.durum = 'gonderildi'; o.gonderZaman = Date.now(); o.ret = ''; }, 'İstasyon planı planlamaya gönderildi', `${b.ad}: ${T.degisenSay} değişiklik`);
         toast('Planınız planlama birimine gönderildi.'); break;
       }
+      case 'n2-hedef-oto': if (n2Duz() && confirm('Elle değiştirilen nöbet hedefleri otomatik sayılara dönsün mü?')) mut2(() => { n2Depo(b.ad).hedef = {}; }, 'Modül 2: nöbet hedefleri otomatiğe döndü', b.ad); break;
       case 'n2-teklif-sifirla': if (n2Duzenlenir(b.ad) && confirm('Yaptığınız değişiklikler geri alınsın mı?')) mut2(() => { n2OnayYaz(b.ad).teklif = {}; }, 'İstasyon teklifi sıfırlandı', b.ad); break;
       case 'talep-onayla': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if (confirm(`${bb.ad} istasyonunun planı kesin plana işlensin mi?`)) { talepOnayla(bb); toast(`${bb.ad} planı onaylandı.`); } break; }
       case 'talep-reddet': { const bb = S.plan.birimler.find(x => x.ad === v), not = (root.querySelector('[id="ap-talep-not-' + v + '"]') || {}).value || ''; if (!bb || salt()) break; if (!not.trim()) { toast('Düzeltme isterken istasyona kısa bir not yazın.'); break; } mut(() => { const o = n2OnayYaz(bb.ad); o.durum = 'reddedildi'; o.ret = not.trim(); }, 'İstasyon planı için düzeltme istendi', `${bb.ad}: ${not.trim()}`); toast('Düzeltme istendi.'); break; }
@@ -378,6 +381,7 @@
     if (a === 'arsiv-ay') return false;
     if (!n) return false;
     const b = S.plan && n2Birim();
+    if (n === 'hedef') { const b2 = S.plan && n2Birim(); if (!b2 || !n2Duz()) return false; const id = t.dataset.id, v = t.value === '' ? null : Math.max(0, Math.round(sayi(t.value) * 100) / 100); mut2(() => { const dp = n2Depo(b2.ad); dp.hedef = {...(dp.hedef || {})}; if (v == null) delete dp.hedef[id]; else dp.hedef[id] = v; }, 'Modül 2: nöbet hedefi', `${id}: ${v == null ? 'otomatik' : v}`); return true; }
     if (n === 'teklif') { const b2 = S.plan && n2Birim(); if (!b2 || !n2Duzenlenir(b2.ad)) return false; const id = t.dataset.id, v = t.value === '' ? null : Math.max(0, Math.round(sayi(t.value) * 100) / 100); mut2(() => { const o = n2OnayYaz(b2.ad); if (v == null) delete o.teklif[id]; else o.teklif[id] = v; }); return true; }
     if (n === 'ist') { S.n2.ist = t.value; S.n2.oneri = null; return true; }
     if (n === 'kural') { const dp = n2Depo(b.ad), k = t.dataset.k; mut2(() => { dp.kural = {...dp.kural, [k]: t.type === 'checkbox' ? t.checked : Math.max(0, Math.round(sayi(t.value))) }; }, 'Modül 2: kural', `${k}`); return true; }

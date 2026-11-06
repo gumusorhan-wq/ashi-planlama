@@ -357,7 +357,7 @@ const NobetCore = (() => {
   }
   const sertSay = ihlal => ihlal.filter(i => SERT.has(i.tur)).length;
   // Küsurat dengeleme: tam sayıya yukarı tamamlanan kişinin (ör. plan 7,67 → 8) bir nöbeti, aşağı kalan kişiyle (7,67 → 7) bölünür:
-  // 16/8, 12/12, 8/16 gibi (saat 4'ün katı). Bölünen kişi o nöbet branşını tutabilmeli, o gün boş olmalı; sert kural ihlali artarsa bölme yapılmaz.
+  // 8/16, 12/12 gibi (saat 4'ün katı; kısa parça her zaman önce). Bölünen kişi o nöbet branşını tutabilmeli, o gün boş olmalı; sert kural ihlali artarsa bölme yapılmaz.
   function kesirDengele(liste, H) {
     const {N, P} = H, yuvalar = ['es', 'ysp', 'sur'], saat = () => { const m = new Map(P.map(p => [p.id, 0])); for (let d = 1; d <= N; d++) { const L = liste[d]; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { const id = L[t]; if (id == null || !m.has(id)) return; m.set(id, m.get(id) + (t === 'surG' || t === 'surA' ? 12 : L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); if (L.bol) Object.entries(L.bol).forEach(([t, b]) => { if (b && m.has(b.id) && L[t] != null) m.set(b.id, m.get(b.id) + b.saat); }); } return m; };
     let sert = sertSay(denetle(liste, H).ihlal), bolunen = 0, deneme = 0;      // deneme sınırı: büyük kadroda tarayıcıyı bekletmesin
@@ -372,10 +372,12 @@ const NobetCore = (() => {
           if (['es', 'ysp', 'sur', 'surG', 'surA'].some(t => L[t] === B.id) || Object.values(L.bol || {}).some(b => b && b.id === B.id)) continue;
           for (const y of yuvalar) { if (L[y] !== A.id || (L.bol && L.bol[y]) || !B.yet.includes(y)) continue;
             if (++deneme > 4000) return bolunen;
-            L.bol = {...(L.bol || {}), [y]: {id: B.id, saat: sa1}};
+            // kısa parça hep önce: nöbet sahibi (ilk parça, 09:00'dan) kısa süreli olan, ikinci kişi uzun parçayı alır (8 sa → 16 sa)
+            const kisaB = sa1 < 12; if (kisaB) L[y] = B.id;
+            L.bol = {...(L.bol || {}), [y]: kisaB ? {id: A.id, saat: 24 - sa1} : {id: B.id, saat: sa1}};
             const s2 = sertSay(denetle(liste, H).ihlal);
             if (s2 <= sert) { sert = s2; bolunen++; yapildi = true; break; }
-            delete L.bol[y]; if (!Object.keys(L.bol).length) delete L.bol; }
+            if (kisaB) L[y] = A.id; delete L.bol[y]; if (!Object.keys(L.bol).length) delete L.bol; }
         }
         if (yapildi) break; }
         if (yapildi) break; }
