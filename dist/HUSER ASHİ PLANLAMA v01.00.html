@@ -1639,7 +1639,7 @@ function mount(root, opts = {}) {
       const eng = C.gorevlendirmeEngeli(k, ayIlk()), dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
       return `<tr data-ara="${esc(C.TR([k.ad, k.birim, k.gorev.hedef || '', k.gorev.yer || '', k.unvan].join(' ')))}" data-kay="${esc(k.birim)}" data-hed="${esc(k.gorev.hedef || '')}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${duz ? '' : 'disabled'}>${opts(k)}</select>${k.gorev.hedef ? '' : `<div class="ap-note">${esc(k.gorev.yer || '')}</div>`}</td>
-      <td style="min-width:235px"><input class="ap-in w" style="min-width:225px;font-variant-numeric:tabular-nums" title="${esc(k.gorev.tarih || '')}" data-id="${k.id}" data-f="gTarih" placeholder="01.09.2026 – 30.11.2026" value="${esc(k.gorev.tarih || '')}" ${duz ? '' : 'disabled'}></td>
+      <td style="min-width:250px">${gorevTarihSecim(k, duz)}</td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${duz ? '' : 'disabled'}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === (k.gorev.yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gGerekce" ${duz ? '' : 'disabled'}>${GEREKCE.map(a => `<option ${a === (k.gorev.gerekce || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
       <td>${eng ? `<span class="ap-tag ap-t-ih" title="${esc(eng)}">Engel</span>` : ''}</td></tr>`;
@@ -1822,6 +1822,17 @@ function mount(root, opts = {}) {
     const sinifla = () => root.querySelectorAll('.ap-icerik .ap-tw').forEach(tw => { const t = tw.querySelector('table'); if (t) tw.classList.toggle('ap-tw-acik', t.scrollWidth <= tw.clientWidth + 1); });
     olc(); sinifla();
     if (typeof ResizeObserver === 'function') { if (ustGozcu) ustGozcu.disconnect(); ustGozcu = new ResizeObserver(() => { olc(); sinifla(); }); ustGozcu.observe(ust); const oz = root.querySelector('.ap-ist-ozet'); if (oz) ustGozcu.observe(oz); const ic = root.querySelector('.ap-icerik'); if (ic) ustGozcu.observe(ic); }
+  }
+  // Görev tarihi seçimi: başlangıç ve bitiş ayın 1'i (09:00 – 09:00 düzeni); plan yılının ayları, Aralık'ta sonraki yılın ayları da
+  function gorevTarihSecim(k, duz) {
+    const t = gorevTarihleri(k.gorev), ay1 = (y, m) => C.iso(y, m, 1), sec = [];
+    for (let m = 1; m <= 12; m++) sec.push(ay1(S.y, m));
+    sec.push(ay1(S.y + 1, 1)); if (S.m === 12) for (let m = 2; m <= 12; m++) sec.push(ay1(S.y + 1, m));
+    // ay sonu yazılmış bitiş (30.11) sonraki ayın 1'i (01.12) sayılır
+    const birine = d => { if (!d) return ''; const [y, m, g] = d.split('-').map(Number); return g === 1 ? d : g >= C.gunSayisi(y, m) ? (m === 12 ? ay1(y + 1, 1) : ay1(y, m + 1)) : ay1(y, m); };
+    const bas = birine(t.bas), bit = birine(t.bit), ops = (v, ilk) => `<option value="">${ilk}</option>` + [...new Set([...sec, v].filter(Boolean))].sort().map(d => `<option value="${d}" ${d === v ? 'selected' : ''}>${trTarih(d)}</option>`).join('');
+    const ham = k.gorev.tarih && (k.gorev.tarih !== `${trTarih(bas)} – ${trTarih(bit)}`) ? `<div class="ap-note" title="Kayıttaki tarih metni">${esc(k.gorev.tarih)}</div>` : '';
+    return `<div style="display:flex;gap:4px;align-items:center"><select class="ap-sel" data-id="${k.id}" data-f="gBas" title="Başlangıç (ayın 1'i 09:00)" ${duz ? '' : 'disabled'}>${ops(bas, 'Başlangıç')}</select> – <select class="ap-sel" data-id="${k.id}" data-f="gBit" title="Bitiş / dönüş (ayın 1'i 09:00)" ${duz ? '' : 'disabled'}>${ops(bit, k.gorev.uzun ? 'Süresiz' : 'Bitiş')}</select></div>${ham}`;
   }
   function render() {
     const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0, ic0 = root.querySelector('.ap-icerik'), isy = ic0 ? ic0.scrollTop : 0;
@@ -3535,6 +3546,13 @@ function mount(root, opts = {}) {
       case 'aciklama': S.toplu = true; try { mut(() => { k.aciklama = String(v || '').trim(); }, 'Kişi açıklaması', `${k.ad}: ${k.aciklama}`); } finally { S.toplu = false; } break;
       case 'kilit': mut(() => { k.kilit = !!v; }, v ? 'Kilitlendi' : 'Kilit açıldı', k.ad); break;
       case 'yolluk': mut(() => { k.gorev = k.gorev || {yer: '', hedef: null, kaynak: 'manuel', yolluk: '', tarih: '', gerekce: ''}; k.gorev.yolluk = v; }, 'Yolluk durumu', `${k.ad}: ${v}`); break;
+      case 'gBas': case 'gBit': {
+        const t = gorevTarihleri(k.gorev), bas = f === 'gBas' ? v : t.bas, bit = f === 'gBit' ? v : t.bit;
+        if (bas && bit && bit <= bas) { toast('Bitiş, başlangıçtan sonra olmalı.'); render(); break; }
+        const metin = bas || bit ? `${bas ? trTarih(bas) : ''} – ${bit ? trTarih(bit) : ''}`.trim() : '';
+        mut(() => { k.gorev.bas = bas; k.gorev.bit = bit; k.gorev.tarih = metin; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${metin || 'silindi'}`);
+        if (bitenGorevleriKapat()) render(); break;      // bitiş plan ayının 1'i ya da öncesiyse görev hemen kapanır
+      }
       case 'gTarih': mut(() => { k.gorev.tarih = v; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${v}`); if (bitenGorevleriKapat()) render(); break;      // bitiş plan ayından önceyse görev hemen kapanır
       case 'gGerekce': mut(() => { k.gorev.gerekce = v; k.gorev.kaynak = 'manuel'; }, 'Görevlendirme gerekçesi', `${k.ad}: ${v}`); break;
       case 'istek': mut(() => { k.istek = v; }, 'Kişi isteği', `${k.ad}: ${ISTEK[v] || 'Sırayla'}`); break;

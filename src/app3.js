@@ -938,6 +938,13 @@
       case 'aciklama': S.toplu = true; try { mut(() => { k.aciklama = String(v || '').trim(); }, 'Kişi açıklaması', `${k.ad}: ${k.aciklama}`); } finally { S.toplu = false; } break;
       case 'kilit': mut(() => { k.kilit = !!v; }, v ? 'Kilitlendi' : 'Kilit açıldı', k.ad); break;
       case 'yolluk': mut(() => { k.gorev = k.gorev || {yer: '', hedef: null, kaynak: 'manuel', yolluk: '', tarih: '', gerekce: ''}; k.gorev.yolluk = v; }, 'Yolluk durumu', `${k.ad}: ${v}`); break;
+      case 'gBas': case 'gBit': {
+        const t = gorevTarihleri(k.gorev), bas = f === 'gBas' ? v : t.bas, bit = f === 'gBit' ? v : t.bit;
+        if (bas && bit && bit <= bas) { toast('Bitiş, başlangıçtan sonra olmalı.'); render(); break; }
+        const metin = bas || bit ? `${bas ? trTarih(bas) : ''} – ${bit ? trTarih(bit) : ''}`.trim() : '';
+        mut(() => { k.gorev.bas = bas; k.gorev.bit = bit; k.gorev.tarih = metin; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${metin || 'silindi'}`);
+        if (bitenGorevleriKapat()) render(); break;      // bitiş plan ayının 1'i ya da öncesiyse görev hemen kapanır
+      }
       case 'gTarih': mut(() => { k.gorev.tarih = v; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${v}`); if (bitenGorevleriKapat()) render(); break;      // bitiş plan ayından önceyse görev hemen kapanır
       case 'gGerekce': mut(() => { k.gorev.gerekce = v; k.gorev.kaynak = 'manuel'; }, 'Görevlendirme gerekçesi', `${k.ad}: ${v}`); break;
       case 'istek': mut(() => { k.istek = v; }, 'Kişi isteği', `${k.ad}: ${ISTEK[v] || 'Sırayla'}`); break;
