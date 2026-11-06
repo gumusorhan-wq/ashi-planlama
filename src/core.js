@@ -66,7 +66,7 @@ const APCore = (() => {
     'HEYET RAPORLU':       {renk: '#A6A6A6', nobetYok: true,  mesaiYok: true},
     'ÜCRETSİZ İZİN':       {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
     'ASKERLİK İZNİ':       {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
-    'YARI ZAMANLI':        {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false, mesaiOran: 0.5},
+    'YARI ZAMANLI':        {renk: '#FCD5B4', nobetYok: false, mesaiYok: false, mesaiOran: 0.5},      // istasyonda kalan yarı zamanlı mesaisinin yarısı kadar nöbet tutar
     'SAĞLIK MAZERETİ MESAİ': {renk: '#FCD5B4', nobetYok: true, mesaiYok: false},
     'MESAİ USULÜ':         {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
     'NÖBET USULÜ':         {renk: null,      nobetYok: false, mesaiYok: false},
