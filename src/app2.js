@@ -298,7 +298,7 @@
       const eng = C.gorevlendirmeEngeli(k, ayIlk()), dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
       return `<tr data-ara="${esc(C.TR([k.ad, k.birim, k.gorev.hedef || '', k.gorev.yer || '', k.unvan].join(' ')))}" data-kay="${esc(k.birim)}" data-hed="${esc(k.gorev.hedef || '')}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${duz ? '' : 'disabled'}>${opts(k)}</select>${k.gorev.hedef ? '' : `<div class="ap-note">${esc(k.gorev.yer || '')}</div>`}</td>
-      <td style="min-width:250px">${gorevTarihSecim(k, duz)}</td>
+      <td style="min-width:170px">${gorevTarihSecim(k, duz)}</td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${duz ? '' : 'disabled'}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === (k.gorev.yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gGerekce" ${duz ? '' : 'disabled'}>${GEREKCE.map(a => `<option ${a === (k.gorev.gerekce || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
       <td>${eng ? `<span class="ap-tag ap-t-ih" title="${esc(eng)}">Engel</span>` : ''}</td></tr>`;
@@ -342,7 +342,7 @@
       <span class="ap-note">Yeni görevlendirme hedefi:</span><select class="ap-sel" id="ap-g-hedef">${birimler.map(b => `<option>${esc(b.ad)}</option>`).join('')}</select>
       <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button>
       <button class="ap-btn" data-act="g-tarihsiz-bitir" ${duz ? '' : 'disabled'} title="TARİH sütunu boş (önceki aylardan kalan) görevlendirmeleri bitirir; istasyon süzgeci seçiliyse yalnız o istasyonunkileri. Uzun süreli (OF) ve devam isteği olanlar hariç.">Tarihi boş görevleri bitir (${gk.filter(k => tarihsizGorev(k)).length})</button></div>
-      <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div></div>`;
+      <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div>${S.gtAc ? gorevTarihPop() : ''}</div>`;
     return nav + ({deg: degerlendirme, rot: sekme === 'rot' ? rotasyonHtml() : '', ozet, list: liste, dis}[sekme] || degerlendirme);
   }
   // İstatistik sayfasındaki satırların listesi (istatistikle aynı kapsam: pasif ve aile hekimliğindekiler hariç)
@@ -482,16 +482,37 @@
     olc(); sinifla();
     if (typeof ResizeObserver === 'function') { if (ustGozcu) ustGozcu.disconnect(); ustGozcu = new ResizeObserver(() => { olc(); sinifla(); }); ustGozcu.observe(ust); const oz = root.querySelector('.ap-ist-ozet'); if (oz) ustGozcu.observe(oz); const ic = root.querySelector('.ap-icerik'); if (ic) ustGozcu.observe(ic); }
   }
-  // Görev tarihi seçimi: başlangıç ve bitiş ayın 1'i (09:00 – 09:00 düzeni); plan yılının ayları, Aralık'ta sonraki yılın ayları da
+  // Görev tarihi: ay seçici (İstatistik dönem seçicisi gibi). Görev, seçilen ilk ayın 1'i 09:00'dan son ayın ertesi ayının 1'i 09:00'a kadardır
+  const ayIleri = ym => { const [y, m] = ym.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${C.pad(m + 1)}`; };
+  const ayGeri = ym => { const [y, m] = ym.split('-').map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${C.pad(m - 1)}`; };
+  // kayıttaki tarihi ay aralığına çevirir: {ilk: 'YYYY-MM', son: 'YYYY-MM' | '' (süresiz)}; ay sonu bitiş (30.11) Kasım'ı kapsar, 01.12 bitiş de Kasım'da biter
+  function gorevAyAraligi(g) {
+    const t = gorevTarihleri(g); if (!t.bas && !t.bit) return null;
+    const ilk = t.bas ? t.bas.slice(0, 7) : '';
+    let son = ''; if (t.bit) { const [y, m, d] = t.bit.split('-').map(Number); son = d === 1 ? ayGeri(t.bit.slice(0, 7)) : t.bit.slice(0, 7); }
+    return {ilk, son};
+  }
+  const ayEt = ym => `${AY_KISA[+ym.slice(5) - 1]} ${ym.slice(0, 4)}`;
+  function gorevTarihEtiket(k) {
+    const r = gorevAyAraligi(k.gorev); if (!r) return 'Tarih seç';
+    if (!r.son) return `${r.ilk ? ayEt(r.ilk) : '?'} – süresiz`; if (!r.ilk) return `… – ${ayEt(r.son)}`;
+    if (r.ilk === r.son) return ayEt(r.ilk); return r.ilk.slice(0, 4) === r.son.slice(0, 4) ? `${AY_KISA[+r.ilk.slice(5) - 1]} – ${ayEt(r.son)}` : `${ayEt(r.ilk)} – ${ayEt(r.son)}`;
+  }
   function gorevTarihSecim(k, duz) {
-    const t = gorevTarihleri(k.gorev), ay1 = (y, m) => C.iso(y, m, 1), sec = [];
-    for (let m = 1; m <= 12; m++) sec.push(ay1(S.y, m));
-    sec.push(ay1(S.y + 1, 1)); if (S.m === 12) for (let m = 2; m <= 12; m++) sec.push(ay1(S.y + 1, m));
-    // ay sonu yazılmış bitiş (30.11) sonraki ayın 1'i (01.12) sayılır
-    const birine = d => { if (!d) return ''; const [y, m, g] = d.split('-').map(Number); return g === 1 ? d : g >= C.gunSayisi(y, m) ? (m === 12 ? ay1(y + 1, 1) : ay1(y, m + 1)) : ay1(y, m); };
-    const bas = birine(t.bas), bit = birine(t.bit), ops = (v, ilk) => `<option value="">${ilk}</option>` + [...new Set([...sec, v].filter(Boolean))].sort().map(d => `<option value="${d}" ${d === v ? 'selected' : ''}>${trTarih(d)}</option>`).join('');
-    const ham = k.gorev.tarih && (k.gorev.tarih !== `${trTarih(bas)} – ${trTarih(bit)}`) ? `<div class="ap-note" title="Kayıttaki tarih metni">${esc(k.gorev.tarih)}</div>` : '';
-    return `<div style="display:flex;gap:4px;align-items:center"><select class="ap-sel" data-id="${k.id}" data-f="gBas" title="Başlangıç (ayın 1'i 09:00)" ${duz ? '' : 'disabled'}>${ops(bas, 'Başlangıç')}</select> – <select class="ap-sel" data-id="${k.id}" data-f="gBit" title="Bitiş / dönüş (ayın 1'i 09:00)" ${duz ? '' : 'disabled'}>${ops(bit, k.gorev.uzun ? 'Süresiz' : 'Bitiş')}</select></div>${ham}`;
+    const r = gorevAyAraligi(k.gorev), tarihMetni = r && r.ilk ? `${trTarih(r.ilk + '-01')} – ${r.son ? trTarih(ayIleri(r.son) + '-01') : 'süresiz'}` : '';
+    const ham = k.gorev.tarih && k.gorev.tarih !== tarihMetni ? `<div class="ap-note" title="Kayıttaki tarih metni">${esc(k.gorev.tarih)}</div>` : '';
+    return `<button class="ap-btn sm" data-pop data-act="gt-ac" data-v="${k.id}" ${duz ? '' : 'disabled'} title="${esc(tarihMetni || 'Görev tarihi girilmemiş')}">${esc(gorevTarihEtiket(k))} ▾</button>${tarihMetni ? `<div class="ap-note">${tarihMetni}</div>` : ''}${ham}`;
+  }
+  function gorevTarihPop() {
+    const k = S.plan && S.plan.kayitlar.find(x => x.id === S.gtAc); if (!k || !k.gorev) return '';
+    const r = gorevAyAraligi(k.gorev) || {ilk: '', son: ''}, bekle = S.gtBekle && S.gtBekle.id === k.id ? S.gtBekle.ilk : '';
+    const yillar = [...new Set([S.y, ...(S.m === 12 ? [S.y + 1] : []), ...(r.ilk ? [+r.ilk.slice(0, 4)] : []), ...(r.son ? [+r.son.slice(0, 4)] : [])])].sort();
+    const icinde = ym => r.ilk && ym >= r.ilk && (!r.son || ym <= r.son);
+    const yil = y => `<div class="ap-yil"><div class="ap-yilbas"><b>${y}</b><button class="ap-btn sm" data-pop data-act="gt-yil" data-v="${y}">✓ Tüm yıl</button></div><div class="ap-aygrid" style="grid-template-columns:repeat(6,1fr)">${AY_KISA.map((ad, i) => { const ym = `${y}-${C.pad(i + 1)}`; return `<button class="ap-aybtn ${icinde(ym) ? 'sec' : ''} ${ym === bekle ? 'bek' : ''}" data-pop data-act="gt-ay" data-v="${ym}">${ad}</button>`; }).join('')}</div></div>`;
+    return `<div class="ap-pop ap-gtpop" data-pop><div class="ap-row" style="justify-content:space-between"><b class="ap-poph">GÖREV TARİHİ — ${esc(k.ad)}</b><span class="ap-note">${esc(gorevTarihEtiket(k))}</span></div>
+      <div class="ap-note" style="margin-top:4px">${bekle ? `Başlangıç <b>${ayEt(bekle)}</b>. Şimdi son ayı seçin (tek ay için aynı aya tıklayın).` : 'Önce başlangıç ayına, sonra son aya tıklayın. Görev ilk ayın 1\'i 09:00\'da başlar, son ayın ertesi ayının 1\'i 09:00\'da biter.'}</div>
+      ${yillar.map(yil).join('')}
+      <div class="ap-popalt"><span><button class="ap-btn sm" data-pop data-act="gt-suresiz">Süresiz</button> <button class="ap-btn sm" data-pop data-act="gt-temizle">Tarihi sil</button></span><button class="ap-btn sm" data-pop data-act="gt-kapat">Kapat ✕</button></div></div>`;
   }
   function render() {
     const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0, ic0 = root.querySelector('.ap-icerik'), isy = ic0 ? ic0.scrollTop : 0;

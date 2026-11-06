@@ -1074,6 +1074,22 @@
         case 'kilit-ac': ayKilidiAcIste(); return;
         case 'kisi-sil': { const k = kayit(t.dataset.id); if (k && confirm(`${k.ad} kaydı silinsin mi?`)) mut(() => { (S.plan.silinen = S.plan.silinen || []).unshift({...JSON.parse(JSON.stringify(k)), _silZaman: Date.now(), _silBirim: k.birim}); S.plan.silinen.length = Math.min(S.plan.silinen.length, 200); S.plan.kayitlar = S.plan.kayitlar.filter(x => x.id !== k.id); }, 'Kişi silindi', k.ad); break; }
         case 'kisi-geri': { const sl = (S.plan.silinen || []).find(x => x.id === t.dataset.id); if (!sl) break; if (S.plan.kayitlar.some(x => x.id === sl.id || (sl.tc && x.tc === sl.tc))) { toast('Bu kişi zaten listede.'); break; } const {_silZaman, _silBirim, ...k0} = sl; mut(() => { S.plan.kayitlar.push(k0); S.plan.silinen = S.plan.silinen.filter(x => x.id !== sl.id); }, 'Silinen kişi geri getirildi', `${k0.ad} → ${k0.birim}`); toast(`${k0.ad} geri getirildi.`); break; }
+        case 'gt-ac': S.gtAc = S.gtAc === v ? '' : v; S.gtBekle = null; break;
+        case 'gt-kapat': S.gtAc = ''; S.gtBekle = null; break;
+        case 'gt-ay': case 'gt-yil': case 'gt-suresiz': case 'gt-temizle': {
+          const k = kayit(S.gtAc); if (!k || !k.gorev || salt()) break;
+          const ileri = ym => { const [y, m] = ym.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${C.pad(m + 1)}`; }, t = gorevTarihleri(k.gorev);
+          let bas = t.bas, bit = t.bit;
+          if (a === 'gt-temizle') { bas = ''; bit = ''; S.gtBekle = null; }
+          else if (a === 'gt-suresiz') { bit = ''; S.gtBekle = null; }
+          else if (a === 'gt-yil') { bas = `${v}-01-01`; bit = `${+v + 1}-01-01`; S.gtBekle = null; }
+          else { const b0 = S.gtBekle && S.gtBekle.id === k.id ? S.gtBekle.ilk : '';
+            if (b0 && v >= b0) { bas = b0 + '-01'; bit = ileri(v) + '-01'; S.gtBekle = null; }      // ikinci tık: son ay
+            else { S.gtBekle = {id: k.id, ilk: v}; break; } }      // ilk tık: başlangıç işaretlenir, kayıt son ay seçilince
+          const metin = bas || bit ? `${bas ? trTarih(bas) : ''} – ${bit ? trTarih(bit) : 'süresiz'}`.trim() : '';
+          mut(() => { k.gorev.bas = bas; k.gorev.bit = bit; k.gorev.tarih = metin; k.gorev.kaynak = 'manuel'; }, 'Görev tarihi', `${k.ad}: ${metin || 'silindi'}`);
+          if (bitenGorevleriKapat()) { S.gtAc = ''; S.gtBekle = null; } break;      // bitiş plan ayının 1'i ya da öncesiyse görev kapanır
+        }
         case 'g-tarihsiz-bitir': {
           if (salt()) break;
           const ist = (root.querySelector('#ap-g-ist') || {}).value || '', L = S.plan.kayitlar.filter(k => tarihsizGorev(k) && (!ist || k.birim === ist || k.gorev.hedef === ist));
@@ -1160,7 +1176,7 @@
     render();
   });
   // Açık seçim penceresi (aylar / istasyonlar): boşluğa tıklayınca ya da Esc ile kapanır
-  document.addEventListener('click', e => { if (S.arstatAc && root.isConnected && !e.target.closest('[data-pop],.ap-pop')) { S.arstatAc = ''; render(); } }, true);
+  document.addEventListener('click', e => { if ((S.arstatAc || S.gtAc) && root.isConnected && !e.target.closest('[data-pop],.ap-pop')) { S.arstatAc = ''; S.gtAc = ''; S.gtBekle = null; render(); } }, true);
   root.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || !e.target.matches || !e.target.matches(PLAN_KUTU)) return;
     e.preventDefault(); const l = [...root.querySelectorAll(PLAN_KUTU)], i = l.indexOf(e.target); if (i < 0) return;
