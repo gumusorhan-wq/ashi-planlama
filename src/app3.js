@@ -75,6 +75,9 @@
   }
   // ASOS raporları: (A) "Başhekimlik Komuta İstasyon Personel Listesi Raporu (EKİP)" ve (B) "Personel Listesi Raporu". İkisi de TC ile birleştirilir.
   const gunSon = () => C.iso(S.y, S.m, C.gunSayisi(S.y, S.m));
+  // Aylık görevlendirme tarihi kurum düzeninde: ayın 1'i 09:00 – sonraki ayın 1'i 09:00 (ör. 01.12.2026 – 01.01.2027); bitiş dönüş günüdür
+  const sonrakiAyIlk = () => S.m === 12 ? C.iso(S.y + 1, 1, 1) : C.iso(S.y, S.m + 1, 1);
+  const ayGorevTarih = () => ({bas: ayIlk(), bit: sonrakiAyIlk(), tarih: `${trTarih(ayIlk())} – ${trTarih(sonrakiAyIlk())}`});
   function asosParse(wb) {
     let rows = [], hi = -1;
     for (const ad of wb.SheetNames) {      // İzin Talepleri Raporu: TC yok; "Adı Soyadı", "Talep Edilen İzin Bitiş Tarihi", "Talep Durumu"
@@ -961,7 +964,8 @@
     if (!hedef) { mut(() => { k.gorev = null; if (k.durum === 'GEÇİCİ GÖREVDE') k.durum = ''; }, 'Görevlendirme kaldırıldı', k.ad); return false; }
     const eng = gorevEngeli(k, hedef);
     if (eng) { toast(`${k.ad}: ${eng}`); render(); return false; }
-    return mut(() => { k.gorev = {...(k.gorev || {}), yer: (k.gorev && k.gorev.yer) || hedef, hedef, kaynak: 'manuel', yolluk: (k.gorev && k.gorev.yolluk) || '', tarih: (k.gorev && k.gorev.tarih) || '', gerekce: (k.gorev && k.gorev.gerekce) || '', ...(ek || {})}; k.durum = 'GEÇİCİ GÖREVDE'; k.durumManuel = true; k.gecmis = [...new Set([...(k.gecmis || []), ayAnahtari()])].sort(); }, 'Görevlendirme', `${k.ad}: ${k.birim} → ${hedef}`);
+    const eskiT = k.gorev && (k.gorev.tarih || k.gorev.bas || k.gorev.bit), ayT = eskiT || (ek && (ek.tarih || ek.uzun)) ? {} : ayGorevTarih();      // yeni görev: bu ayın görevlendirme tarihi
+    return mut(() => { k.gorev = {...(k.gorev || {}), yer: (k.gorev && k.gorev.yer) || hedef, hedef, kaynak: 'manuel', yolluk: (k.gorev && k.gorev.yolluk) || '', tarih: (k.gorev && k.gorev.tarih) || '', gerekce: (k.gorev && k.gorev.gerekce) || '', ...ayT, ...(ek || {})}; k.durum = 'GEÇİCİ GÖREVDE'; k.durumManuel = true; k.gecmis = [...new Set([...(k.gecmis || []), ayAnahtari()])].sort(); }, 'Görevlendirme', `${k.ad}: ${k.birim} → ${hedef}`);
   }
   // Bir ekibin başka birimlere görevli personelini geri çağırır (ör. kapalı ekip yeniden açılırken). Kurum dışı yerlerdeki görevler (hastane, aile hekimliği vb.) değiştirilmez.
   function geriCagirmaAdaylari(b) { return S.plan.kayitlar.filter(k => k.birim === b.ad && !aileHek(k) && gorevAktif(k.gorev) && k.gorev.hedef); }
@@ -1028,7 +1032,7 @@
           try {
             gc = acikGeriCek(true).length; otoHesapla();
             rotasyonOneriler().forEach(o => { const k = kayit(o.id); if (!k || !o.hedef) return; const ofK = (S.plan.birimler.find(x => x.ad === k.birim) || {}).ekipOf;
-              if (gorevlendir(k, o.hedef, ofK ? {bas: ayIlk(), bit: '', uzun: true, gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel', tarih: `${trTarih(ayIlk())} – (ekip OF, uzun süreli)`} : {bas: ayIlk(), bit: gunSon(), gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel', tarih: `${trTarih(ayIlk())} – ${trTarih(gunSon())}`})) { if (k.istek === 'git') k.istek = ''; gv++; } });
+              if (gorevlendir(k, o.hedef, ofK ? {bas: ayIlk(), bit: '', uzun: true, gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel', tarih: `${trTarih(ayIlk())} – (ekip OF, uzun süreli)`} : {...ayGorevTarih(), gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel'})) { if (k.istek === 'git') k.istek = ''; gv++; } });
           } finally { S.toplu = false; }
           S.plan.birimler.forEach(b => oner(b.ad)); otoHesapla(); logla('Tüm planlama tek tuşla oluşturuldu', `${gc} geri çağrıldı, ${gv} görevlendirme`); damgala(); kaydet();
           toast(`Planlama oluşturuldu: ${gc} personel geri çağrıldı, ${gv} görevlendirme yapıldı, nöbetler hesaplandı.`); break;
@@ -1083,7 +1087,7 @@
           S.plan.kayitlar = JSON.parse(JSON.stringify(onceki.kayitlar)).map(k => {
             const y = {...k, izin: [], planlanan: null, kilit: false};
             if (y.gorev && ((y.gorev.bit && y.gorev.bit <= ayIlk()) || tarihsizGorev(y))) {      // tarihsiz görev önceki ayın görevlendirmesidir
-              if (y.istek === 'devam' || ofBirim.has(y.birim)) { y.gorev = {...y.gorev, bas: ayIlk(), bit: gunSon(), tarih: `${trTarih(ayIlk())} – ${trTarih(gunSon())}`}; y.gecmis = [...new Set([...(y.gecmis || []), ayAnahtari()])].sort(); }
+              if (y.istek === 'devam' || ofBirim.has(y.birim)) { y.gorev = {...y.gorev, ...ayGorevTarih()}; y.gecmis = [...new Set([...(y.gecmis || []), ayAnahtari()])].sort(); }
               else { y.gorev = null; if (y.durum === 'GEÇİCİ GÖREVDE') y.durum = ''; y.durumManuel = false; }
             }
             return y;
@@ -1123,7 +1127,7 @@
           toast(`${k.ad} ${k.birim} istasyonuna geri döndü.`); break;
         }
         case 'rot-don': { const k = kayit(t.dataset.id); if (k) mut(() => { k.gorev = null; if (k.durum === 'GEÇİCİ GÖREVDE') k.durum = ''; k.durumManuel = false; }, 'Rotasyon: görev bitirildi', k.ad); break; }
-        case 'rot-uygula': { let n = 0; S.toplu = true; try { root.querySelectorAll('[data-rot]:checked').forEach(c => { const k = kayit(c.dataset.rot), h = root.querySelector('#ap-rh-' + c.dataset.rot).value; const ofK = k && (S.plan.birimler.find(x => x.ad === k.birim) || {}).ekipOf; if (k && h && gorevlendir(k, h, ofK ? {bas: ayIlk(), bit: '', uzun: true, gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel', tarih: `${trTarih(ayIlk())} – (ekip OF, uzun süreli)`} : {bas: ayIlk(), bit: gunSon(), gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel', tarih: `${trTarih(ayIlk())} – ${trTarih(gunSon())}`})) { if (k.istek === 'git') k.istek = ''; n++; } }); } finally { S.toplu = false; } otoHesapla(); kaydet(); toast(`${n} kişi görevlendirildi; planlanan nöbetler yeniden hesaplandı.`); break; }
+        case 'rot-uygula': { let n = 0; S.toplu = true; try { root.querySelectorAll('[data-rot]:checked').forEach(c => { const k = kayit(c.dataset.rot), h = root.querySelector('#ap-rh-' + c.dataset.rot).value; const ofK = k && (S.plan.birimler.find(x => x.ad === k.birim) || {}).ekipOf; if (k && h && gorevlendir(k, h, ofK ? {bas: ayIlk(), bit: '', uzun: true, gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel', tarih: `${trTarih(ayIlk())} – (ekip OF, uzun süreli)`} : {...ayGorevTarih(), gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel'})) { if (k.istek === 'git') k.istek = ''; n++; } }); } finally { S.toplu = false; } otoHesapla(); kaydet(); toast(`${n} kişi görevlendirildi; planlanan nöbetler yeniden hesaplandı.`); break; }
         case 'kilavuz': S.modal = kilavuzHtml; break;
         case 'modal-kapat': S.modal = null; S.asos = null; break;
         case 'png': { const b = S.plan.birimler.find(x => x.ad === v); pngCiz(b).toBlob(bl => indir(bl, `${b.ad}-${S.y}-${C.pad(S.m)}.png`)); break; }
