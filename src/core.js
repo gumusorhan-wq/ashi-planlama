@@ -260,8 +260,8 @@ const APCore = (() => {
         const R = V.slice(); fz.forEach(i => { R[i] = Math.max(L[i].hedef, Math.floor(V[i] + 0.01)); });
         let eksik = hedefT - fz.reduce((x, i) => x + R[i], 0);
         fz.slice().sort((x, y) => (V[y] - Math.floor(V[y] + 0.01)) - (V[x] - Math.floor(V[x] + 0.01))).forEach(i => { if (eksik <= 0.01) return; const ust = Math.min(L[i].azami, Math.ceil(V[i] - 0.01)); if (ust > R[i]) { eksik -= ust - R[i]; R[i] = ust; } });
-        R.forEach((v, i) => sonuc.set(L[i].k.id, v));
-      } else V.forEach((v, i) => sonuc.set(L[i].k.id, v));
+        R.forEach((v, i) => sonuc.set(L[i].k.id, Math.round(v * 100) / 100));      // 7,666… → 7,67
+      } else V.forEach((v, i) => sonuc.set(L[i].k.id, Math.round(v * 100) / 100));
     });
     return sonuc;
   }

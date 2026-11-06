@@ -10,7 +10,7 @@ const GEREKCE = ['', 'PERSONEL İHTİYACI', 'MESAİ TAMAMLAYAMAMA', 'SAĞLIK MAZ
 const IZIN_TURLERI = ['YILLIK İZİN', 'MAZERET İZNİ', 'İDARİ İZİN', 'RAPOR', 'ÜCRETSİZ İZİN', 'DİĞER'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const sayi = v => { const n = parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
-const fmt = v => (Math.round(v * 100) / 100).toLocaleString('tr-TR', {maximumFractionDigits: 2});
+const fmt = v => ((Math.round(v * 100) / 100) || 0).toLocaleString('tr-TR', {maximumFractionDigits: 2});      // -0 yazılmaz
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const trCollator = new Intl.Collator('tr', {numeric: true});
 const adAnahtar = ad => C.TR(ad).split(' ').filter(Boolean).sort().join(' ');
