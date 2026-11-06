@@ -155,7 +155,7 @@ function mount(root, opts = {}) {
   const istMod = b => b && b.azamiMemur != null ? 'fazla' : S.ayar.panoMod;
   const azamiDeger = b => b && b.azamiMemur != null ? b.azamiMemur : S.ayar.azamiMemur;
   function hesaplaCtx(plan, y, m, birim, kisiler) {
-    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, hedefYuvarla: !!S.ayar.hedefYuvarla, azamiMemur: istMod(birim) === 'mesai' ? 0 : azamiDeger(birim), isciEk: 0, mod: istMod(birim), surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik}, birim.ekipOf ? 0 : birim.yuva);
+    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, hedefYuvarla: !!S.ayar.hedefYuvarla, azamiMemur: istMod(birim) === 'mesai' ? 0 : azamiDeger(birim), isciEk: 0, mod: istMod(birim), surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik, attEsIzin: birim.tur === 'istasyon' && birim.tip !== 'A1'}, birim.ekipOf ? 0 : birim.yuva);
   }
   const hesapla = birim => hesaplaCtx(S.plan, S.y, S.m, birim);
   const planlananToplam = (hesap) => hesap.satir.filter(s => !s.nobetYok).reduce((a, s) => a + sayi(s.k.planlanan), 0);

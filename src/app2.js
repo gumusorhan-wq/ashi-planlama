@@ -180,7 +180,7 @@
   function planAkis(h) {
     const sup = {}; C.GRUPLAR.forEach(g => { sup[g] = 0; });
     h.satir.forEach(s => { if (!s.nobetYok) sup[s.grup] = (sup[s.grup] || 0) + sayi(s.k.planlanan); });
-    return C.akis(sup, h.slot.dem);
+    return C.akis(sup, h.slot.dem, h.attEs);
   }
   function slotOzet(h) {
     // dolan / açık / dolu etiketleri listedeki kişi bazlı planlanan nöbetlerle hesaplanır (nöbet girildikçe değişir); azami notu yalnız açık kalan yuvada gösterilir
@@ -191,7 +191,7 @@
     const fazla = C.GRUPLAR.filter(g => H.fazla[g] > 0.05).map(g => `<span class="ap-tag ap-t-fz">${C.GRUP_AD[g]}: ${fmt(H.fazla[g])} nöbet fazla</span>`).join(' ');
     return `<div class="ap-card" style="margin-top:8px;padding:10px"><b>Nöbet branşı dengesi (planlanan nöbetle)</b>${satir}
       ${fazla ? `<div style="margin-top:4px">${fazla} <span class="ap-note">fazla = o gruptaki kişilere yazılan nöbet kendi nöbet branşlarını aşıyor; başka nöbet branşını dolduramaz</span></div>` : ''}
-      <details class="ap-note" style="margin-top:4px"><summary style="cursor:pointer">Nöbet branşı kuralları</summary>Yetenekler: doktor → ekip şefi · işçi → sürücü · AABT (sağlık teknikeri) → ekip şefi, YSP; sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa · ATT (sağlık memuru / teknisyeni) → YSP ve sürücü; ATT ekip şefi nöbet branşına girmez. Önce AABT nöbet branşları doldurur (ekip şefi öncelikli), fazlalık ATT'de görünür.</details></div>`;
+      <details class="ap-note" style="margin-top:4px"><summary style="cursor:pointer">Nöbet branşı kuralları</summary>Yetenekler: doktor → ekip şefi · işçi → sürücü · AABT (sağlık teknikeri) → ekip şefi, YSP; sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa · ATT (sağlık memuru / teknisyeni) → YSP ve sürücü; doktorlu ekipte (tip A1 ya da kadroda doktor) ATT ekip şefi nöbet branşına girmez, doktorsuz ekipte en son ekip şefine takviye verir. Önce AABT nöbet branşları doldurur (ekip şefi öncelikli), fazlalık ATT'de görünür.</details></div>`;
   }
   // Silinen kişiler: kayıt kalıcı silinmez, buradan geri getirilebilir
   function silinenHtml(b, duz) {

@@ -195,7 +195,9 @@ const APCore = (() => {
     const D3 = ihtiyac / 3, dem = {es: D3, ysp: D3, sur: D3}, r2 = v => Math.round(v * 100) / 100, EPS = 1e-9;
     const topla = (f) => { const o = {}; GRUPLAR.forEach(g => { o[g] = gruplar[g].reduce((x, s) => x + s[f], 0); }); return o; };
     const supH = topla('hedef'), supA = topla('azami');
-    const H = akis(supH, dem), A = akis(supA, dem);
+    // Doktorlu olmayan ekipte (istasyon tipi A1 değil ve kadroda nöbet tutan doktor yok) ATT ekip şefi nöbet branşına takviye verebilir (en son öncelik)
+    const attEs = !!a.attEsIzin && !gruplar.dok.length;
+    const H = akis(supH, dem, attEs), A = akis(supA, dem, attEs);
     const toplam = o => Object.values(o).reduce((x, v) => x + v, 0), acikT = r => r2(r.es + r.ysp + r.sur);
     const kapasite = r2(toplam(supH)), azamiKap = r2(toplam(supA));
     const unmetH = acikT(H.rem), unmetA = acikT(A.rem), fazlaH = r2(toplam(H.fazla));
@@ -209,20 +211,21 @@ const APCore = (() => {
     const fazlaEf = fazlaMod ? r2(toplam(A.fazla)) : fazlaH;
     const ihtiyacTur = hedefAcik <= EPS ? 'yok' : (fazlaMod && unmetA <= EPS) ? 'icerde' : ihtiyacKisi >= 1 ? 'oner' : unmetA <= EPS ? 'icerde' : 'elle';
     return {gun, ihtiyac, satir, gruplar, kapasite, azamiKap, fark: r2(fazlaH - unmetH), fazlaH, farkAzami: unmetA > EPS ? -unmetA : r2(azamiKap - ihtiyac), durum, tamHedef: tam, hedefAcik, acikEf: r2(acikEf), fazlaEf, fazlaGrupEf: fazlaMod ? A.fazla : H.fazla, fazlaVar: fazlaMod ? fazlaEf > EPS : durum === 'fazla', acikM: fazlaMod ? A.rem : H.rem, ihtiyacKisi, kalanAcik: r2(acikEf - ihtiyacKisi * tam), ihtiyacTur,
-      slot: {dem, hedef: H, azami: A, supH, supA}, acik: H.rem};
+      slot: {dem, hedef: H, azami: A, supH, supA}, acik: H.rem, attEs};
   }
   // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
-  // ATT hiçbir koşulda ekip şefi nöbet branşına girmez; ekip şefi nöbetlerini doktor ve AABT tutar.
+  // Ekip şefi nöbetlerini doktor ve AABT tutar; doktorlu olmayan ekipte ATT ekip şefi nöbet branşına en son takviye verebilir (attEs).
   const GRUPLAR = ['dok', 'isci', 'ke', 'ka', 'ysp', 'sy'];
   const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
+  const YETENEK_ES = {...YETENEK, ysp: ['ysp', 'es'], sy: ['sur', 'ysp', 'es']};      // doktorsuz ekip: ATT ekip şefine takviye
   const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (sürücü dahil)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
   // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) nöbet branşları doldurur; ATT geri kalan nöbet branşları doldurur.
   // Böylece AABT'nin hedef nöbetleri tam kullanılır, fazlalık ATT'de görünür (bir ATT bir ay dışarı çıkabilir).
-  function akis(sup, dem) {
-    const rem = {...dem}, fill = {}, fazla = {};
+  function akis(sup, dem, attEs) {
+    const rem = {...dem}, fill = {}, fazla = {}, YT = attEs ? YETENEK_ES : YETENEK;
     GRUPLAR.forEach(g => {
       let k = sup[g] || 0; fill[g] = {es: 0, ysp: 0, sur: 0};
-      for (const s of YETENEK[g]) { if (k <= 1e-9) break; const u = Math.min(k, Math.max(0, rem[s])); fill[g][s] += u; rem[s] -= u; k -= u; }
+      for (const s of YT[g]) { if (k <= 1e-9) break; const u = Math.min(k, Math.max(0, rem[s])); fill[g][s] += u; rem[s] -= u; k -= u; }
       fazla[g] = Math.max(0, k);
     });
     ['es', 'ysp', 'sur'].forEach(s => { rem[s] = Math.round(rem[s] * 100) / 100; });
@@ -230,9 +233,9 @@ const APCore = (() => {
   }
   // Önerilen planlanan nöbet: önce hedef nöbetlerle yuvalar doldurulur (fazla gruplar orantılı azalır), açık kalırsa azami sınıra kadar ek nöbet yazılır
   // Fazlalık (hedefin üstüne yazılan) nöbetlerin dağıtımı: sırayla 1 nöbet ATT sürücülere (sy), 1 nöbet AABT sürücülere (ka); ikisinin de payı bitince kalan açık yuvalar diğer branşlar arasında eşit paylaştırılır (tur tur 0,25'lik dilimlerle). Ekip şefi yuvasına ATT giremez (yeteneği yok), yalnız AABT / doktor
-  function akisEk(ek, rem) {
-    const dem = {...rem}, fill = {}, kalan = {...ek}, fazla = {}; GRUPLAR.forEach(g => { fill[g] = {es: 0, ysp: 0, sur: 0}; });
-    const ver = (g, miktar) => { let k = miktar; for (const s of YETENEK[g]) { if (k <= 1e-9) break; const u = Math.min(k, Math.max(0, dem[s])); fill[g][s] += u; dem[s] -= u; k -= u; } return miktar - k; };
+  function akisEk(ek, rem, attEs) {
+    const dem = {...rem}, fill = {}, kalan = {...ek}, fazla = {}, YT = attEs ? YETENEK_ES : YETENEK; GRUPLAR.forEach(g => { fill[g] = {es: 0, ysp: 0, sur: 0}; });
+    const ver = (g, miktar) => { let k = miktar; for (const s of YT[g]) { if (k <= 1e-9) break; const u = Math.min(k, Math.max(0, dem[s])); fill[g][s] += u; dem[s] -= u; k -= u; } return miktar - k; };
     // 1 nöbet ATT sürücülere, 1 nöbet AABT sürücülere (sırayla); grup içinde kişilere eşit dağıtım oneri'de yapılır
     for (let tur = 0; tur < 20000; tur++) { let verildi = false; for (const g of ['sy', 'ka']) { if ((kalan[g] || 0) <= 1e-9) continue; const al = ver(g, Math.min(kalan[g], 1)); if (al > 1e-9) { kalan[g] -= al; verildi = true; } } if (!verildi) break; }
     const digerleri = GRUPLAR.filter(g => g !== 'sy' && g !== 'ka');
@@ -247,7 +250,7 @@ const APCore = (() => {
     const kil = g => gr[g].filter(s => kilitli && kilitli.has(s.k.id)).reduce((x, s) => x + kilitli.get(s.k.id), 0);
     const top = (L, f) => L.reduce((x, s) => x + s[f], 0), kilitSup = {}, sup1 = {}, ek = {};
     GRUPLAR.forEach(g => { const L = ser(g); kilitSup[g] = kil(g); sup1[g] = top(L, 'hedef'); ek[g] = top(L, 'azami') - top(L, 'hedef'); });
-    const f0 = akis(kilitSup, {es: D3, ysp: D3, sur: D3}), f1 = akis(sup1, f0.rem), f2 = akisEk(ek, f1.rem);
+    const ae = !!hesap.attEs, f0 = akis(kilitSup, {es: D3, ysp: D3, sur: D3}, ae), f1 = akis(sup1, f0.rem, ae), f2 = akisEk(ek, f1.rem, ae);
     GRUPLAR.forEach(g => {
       const L = ser(g), t = x => x.es + x.ysp + x.sur, total = t(f1.fill[g]) + t(f2.fill[g]);
       dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), g === 'isci' ? ADIM : 0.01).forEach((v, i) => sonuc.set(L[i].k.id, v));
