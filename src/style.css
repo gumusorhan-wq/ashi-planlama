@@ -223,6 +223,10 @@ table.tk td.tk-gr.tk-soluk{background:rgba(220,38,38,.06)}
   .ap-gomulu .ap-ust .ap-sbas{margin:0}
   .ap-gomulu .ap-ust .ap-subnav{margin:0}
   .ap-gomulu .ap-tw,.ap-gomulu .ap-tw-ist{max-height:calc(100vh - var(--ap-ust-h, 0px) - 40px);overflow:auto}
+  .ap-gomulu .ap-ist-ozet{position:sticky;top:var(--ap-ust-h, 0px);z-index:20;background:#f8fafc;padding:6px 0;margin:0}
+  .ap-gomulu .ap-ist-ozet>.ap-card{margin:0}
+  .ap-gomulu .ap-ist-ozet~.ap-tw-ist{max-height:calc(100vh - var(--ap-ust-h, 0px) - var(--ap-ozet-h, 0px) - 40px)}
+  .ap-gomulu .ap-ist-ozet~.ap-tw.ap-tw-acik thead th{top:calc(var(--ap-ust-h, 0px) + var(--ap-ozet-h, 0px))}
   .ap-gomulu .ap-tw thead th,.ap-gomulu .ap-tw-ist thead th{position:sticky;top:0;z-index:3}
   .ap-gomulu .ap-tw.ap-tw-acik{max-height:none;overflow:visible}
   .ap-gomulu .ap-tw.ap-tw-acik thead th{top:var(--ap-ust-h, 0px)}
@@ -235,3 +239,7 @@ table.tk td.tk-gr.tk-soluk{background:rgba(220,38,38,.06)}
 .ap-ist .ap-idn-ek{background:transparent;color:var(--ap-mut);font-weight:600;opacity:0;transition:opacity .12s}
 .ap-ist tr:hover .ap-idn-ek,.ap-ist .ap-idn-ek:focus-visible{opacity:.75}
 .ap-idn-sec{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}.ap-idn-sec .ap-btn{font-size:11px;padding:2px 6px}
+
+/* İstasyon özeti (Plan / nöbet branşı dengesi) tablonun hemen üstünde; kaydırınca üstte sabit kalır */
+.ap-ist-ozet{position:sticky;top:0;z-index:4;background:var(--ap-bg,#f4f6f9);padding:6px 0}
+@media (max-width:760px){.ap-ist-ozet{position:static}}
