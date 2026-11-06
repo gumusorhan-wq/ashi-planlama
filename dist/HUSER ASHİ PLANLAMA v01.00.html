@@ -1225,6 +1225,7 @@ function mount(root, opts = {}) {
     if (S.plan && !S.ist) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     if (S.plan && S.ist && !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     try { bitenGorevleriKapat(); } catch (e) { console.warn('biten görev kontrolü', e); }
+    try { await kisaGelenKontrol(); } catch (e) { console.warn('kısa görev kontrolü', e); }
   }
   const bosPlan = () => ({ay: `${S.y}-${C.pad(S.m)}`, durum: 'taslak', birimler: [], kayitlar: [], ozel: {}, log: [], disKurum: [], olusturma: Date.now()});
 
@@ -2987,9 +2988,10 @@ function mount(root, opts = {}) {
       if (tur === 'A') {
         k.calisma = a.calisma; if (a.yillikKalan != null) k.yillikKalan = a.yillikKalan; if (a.memBas && !k.atamaBas) k.memBas = a.memBas;
         k.durumA = asosDurumA(a);
-        if (k.gorevSonaErdi && k.durumA === 'GEÇİCİ GÖREVDE') k.durumA = '';      // Personel Listesi Raporu'na göre görevi plan ayından önce bitiyor (ör. 01.10–01.11): kadrosuna döner
-        if (/KADROSUNUN OLDUGU YERDE/.test(C.TR(a.calisma)) || (k.gorevSonaErdi && /GECICI GOREV/.test(C.TR(a.calisma)))) k.durumMetinA = ''; else k.durumMetinA = a.calisma;
-        if (a.gecici.ad && !k.gorevSonaErdi && (!k.gorev || k.gorev.kaynak !== 'manuel') && !(k.gorev && k.gorev.bas)) k.gorev = {yer: a.gecici.ad, hedef: birimCoz(plan, a.gecici.ad), kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
+        const bitti = k.gorevSonaErdi || (a.gecici.ad && gorevYoksay(k, birimCoz(plan, a.gecici.ad)));      // görevi biten ya da 1–2 nöbet için gidildiği nöbet listesinden anlaşılan görev
+        if (bitti && k.durumA === 'GEÇİCİ GÖREVDE') k.durumA = '';      // Personel Listesi Raporu'na göre görevi plan ayından önce bitiyor (ör. 01.10–01.11): kadrosuna döner
+        if (/KADROSUNUN OLDUGU YERDE/.test(C.TR(a.calisma)) || (bitti && /GECICI GOREV/.test(C.TR(a.calisma)))) k.durumMetinA = ''; else k.durumMetinA = a.calisma;
+        if (a.gecici.ad && !bitti && (!k.gorev || k.gorev.kaynak !== 'manuel') && !(k.gorev && k.gorev.bas)) k.gorev = {yer: a.gecici.ad, hedef: birimCoz(plan, a.gecici.ad), kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
         else if (!a.gecici.ad && k.gorev && k.gorev.kaynak === 'asos' && !k.gorev.bas) k.gorev = null;
         if (k.durumA === 'GEÇİCİ GÖREVDE' && !k.gorev) k.gorev = {yer: '', hedef: null, kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
       } else {
@@ -2999,7 +3001,7 @@ function mount(root, opts = {}) {
         if (ilkSatir) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; k.sut = h.sut; k.izin = (k.izin || []).filter(i => !i.asos); }
         else { if (h.durumB && !k.durumB) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; } k.sut = Math.max(k.sut || 0, h.sut); }
         k.izin = (k.izin || []).concat(h.izin.map(i => ({...i, asos: true}))); if (h.izin.length) rapor.izinli++; if (h.durumB === 'NÖBET MUAFİYETİ' || h.sut) rapor.muafiyet++;
-        const gg = geciciGorev(plan, a);
+        let gg = geciciGorev(plan, a); if (gg.gorev && gorevYoksay(k, gg.gorev.hedef)) gg = {gorev: null, gecmis: gg.gecmis, sonaErdi: true};
         k.gorevSonaErdi = !!gg.sonaErdi; if (gg.sonaErdi && k.durumA === 'GEÇİCİ GÖREVDE') { k.durumA = ''; k.durumMetinA = ''; }
         if (!k.gorev || k.gorev.kaynak !== 'manuel') { const eski = k.gorev; k.gorev = gg.gorev && eski && eski.gerekce && !gg.gorev.gerekce ? {...gg.gorev, gerekce: eski.gerekce, yolluk: eski.yolluk || ''} : gg.gorev; }
         k.gecmisAsos = [...new Set([...(k.gecmisAsos || []), ...gg.gecmis])].sort();
@@ -3343,6 +3345,24 @@ function mount(root, opts = {}) {
   const gorevTarihleri = g => { const m = [...String((g && g.tarih) || '').matchAll(/(\d{2})\.(\d{2})\.(\d{4})/g)].map(x => `${x[3]}-${x[2]}-${x[1]}`); return {bas: (g && g.bas) || m[0] || '', bit: (g && g.bit) || (m.length > 1 ? m[m.length - 1] : '')}; };
   // 1–2 nöbetlik görevlendirme (başlangıç–bitiş en çok 2 gün; ASOS'ta bitiş dönüş günüdür) geçici görev sayılmaz
   const kisaGorev = g => { const t = gorevTarihleri(g); if (!t.bas || !t.bit) return false; const gun = (Date.parse(t.bit) - Date.parse(t.bas)) / 864e5; return gun >= 0 && gun <= 2; };
+  // Nöbet listesine göre bir istasyona yalnız 1–2 nöbet için gidilmişse ASOS'taki açık görev kaydı yok sayılır (k.gorevYoksay = {hedef, ay})
+  const gorevYoksay = (k, hedef) => !!(k && hedef && k.gorevYoksay && k.gorevYoksay.hedef === hedef);
+  async function kisaGelenKontrol() {
+    if (!S.plan || salt()) return 0;
+    const plAy = `${S.y}-${C.pad(S.m)}`, aylar = ((await depo.keys()) || []).map(String).filter(x => /^gercek:\d{4}-\d{2}$/.test(x)).map(x => x.slice(7)).filter(a => a < plAy).sort(), son = aylar[aylar.length - 1];
+    if (!son) return 0; const g = await depo.get('gercek:' + son); if (!g || !g.kisi) return 0;
+    const D = durumlar(), istMi = ad => (S.plan.birimler.find(b => b.ad === ad) || {}).tur === 'istasyon', biten = [];
+    S.plan.kayitlar.forEach(k => {
+      const go = k.gorev; if (!go || !go.hedef || go.kaynak === 'manuel' || go.uzun || k.istek === 'devam' || !(D[k.durum] || {}).disarida || !istMi(go.hedef)) return;
+      const t = gorevTarihleri(go); if (t.bas && t.bas.slice(0, 7) > son) return;      // görev nöbet listesinin ayından sonra başlıyorsa karar verilmez
+      const ad = C.TR(k.ad), kis = g.kisi.find(x => C.TR(x.ad) === ad && x.kadro === k.birim); if (!kis) return;
+      const orada = (g.dis || []).filter(x => C.TR(x.ad) === ad && x.istasyon === go.hedef).reduce((a, x) => a + (x.nobet || 0), 0);
+      if (orada <= 2 + 1e-9 && kis.nobet - orada >= 3) biten.push({k, hedef: go.hedef, orada});
+    });
+    if (!biten.length) return 0;
+    biten.forEach(({k, hedef, orada}) => { k.gorevYoksay = {hedef, ay: son}; k.gorev = null; if (/GEÇİCİ GÖREVDE/.test(k.durum || '')) k.durum = ''; k.durumA = k.durumA === 'GEÇİCİ GÖREVDE' ? '' : k.durumA; if (/GECICI GOREV/.test(C.TR(k.durumMetin || ''))) k.durumMetin = ''; if (/GECICI GOREV/.test(C.TR(k.durumMetinA || ''))) k.durumMetinA = ''; k.durumManuel = false; logla('1–2 nöbet için gidilen istasyon geçici görev sayılmadı', `${k.ad}: ${hedef} (${son} nöbet listesinde ${fmt(orada)} nöbet) → ${k.birim}`); });
+    otoHesapla(); damgala(); kaydet(); toast(`${biten.length} personel başka istasyonda yalnız 1–2 nöbet tuttuğu için geçici görevli sayılmadı; kendi istasyonunda gösteriliyor.`); return biten.length;
+  }
   // Plan ayının ilk günü ya da öncesinde biten geçici görevler kapatılır, kişi kadro istasyonuna döner ("devam" isteği olanlar hariç)
   function bitenGorevleriKapat() {
     if (!S.plan || salt()) return 0;
@@ -3614,7 +3634,7 @@ function mount(root, opts = {}) {
             }
             return y;
           });
-          otoHesapla(); bitenGorevleriKapat(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); } logla('Önceki aydan kopyalandı', pk); kaydet(); S.sayfa = 'pano'; break;
+          otoHesapla(); bitenGorevleriKapat(); try { await kisaGelenKontrol(); } catch (e) {} if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); } logla('Önceki aydan kopyalandı', pk); kaydet(); S.sayfa = 'pano'; break;
         }
         case 'plan-asos': { if (salt()) { toast(!guncelAy() ? 'Geçmiş aya dosya yüklenemez (salt okunur).' : 'Düzenleme yetkiniz yok / ay kilitli.'); break; } const f = await dosyaSec('.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', true); if (f.length) await asosDosyalariIsle(f); return; }
         case 'asos-uygula': {
@@ -3622,7 +3642,7 @@ function mount(root, opts = {}) {
           if (S.plan && salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
           const pasif = root.querySelector('#ap-asos-pasif') && root.querySelector('#ap-asos-pasif').checked, eksik = (A.raporlar.find(r => r.tur === 'A') || {eksik: []}).eksik;
           const yeni = A.plan; if (pasif) yeni.kayitlar.forEach(k => { if (eksik.some(e => e.id === k.id)) k.durum = 'PASİF'; });
-          S.plan = yeni; ofUygula(S.plan); otoHesapla(); bitenGorevleriKapat(); if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
+          S.plan = yeni; ofUygula(S.plan); otoHesapla(); bitenGorevleriKapat(); try { await kisaGelenKontrol(); } catch (e) {} if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); }
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | ')); damgala();
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);

@@ -136,6 +136,7 @@ function mount(root, opts = {}) {
     if (S.plan && !S.ist) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     if (S.plan && S.ist && !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     try { bitenGorevleriKapat(); } catch (e) { console.warn('biten görev kontrolü', e); }
+    try { await kisaGelenKontrol(); } catch (e) { console.warn('kısa görev kontrolü', e); }
   }
   const bosPlan = () => ({ay: `${S.y}-${C.pad(S.m)}`, durum: 'taslak', birimler: [], kayitlar: [], ozel: {}, log: [], disKurum: [], olusturma: Date.now()});
 
