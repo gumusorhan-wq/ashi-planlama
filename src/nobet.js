@@ -33,7 +33,7 @@ const NobetCore = (() => {
       (k.istek || []).forEach(x => { const d = gunNo(x); if (d) istek.add(d); });
       // İzin / rapor dönüşü: işe başlama günü nöbete girmek zorunludur (o gün başka bir izinle kapanmıyorsa)
       const donus = new Set(donusAday.filter(d => !izin.has(d)));
-      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: yetBul(k.grup), isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, plan: k.grup !== 'isci' && k.planlanan != null ? Math.round(k.planlanan * 100) / 100 : null, izin, once, istek, baslar, donus};
+      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: yetBul(k.grup), isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, plan: k.grup !== 'isci' && k.planlanan != null ? Math.round(k.planlanan * 100) / 100 : null, onc: (() => { const o = (g.onceki || {})[k.id] || {}; return {t24: (o.t24 || []).filter(d => d <= 0), s24: (o.s24 || []).filter(d => d <= 0), A: (o.A || []).filter(d => d <= 0), G: (o.G || []).filter(d => d <= 0)}; })(), izin, once, istek, baslar, donus};
     });
     // hafta sonu (cumartesi/pazar) ve resmî tatil günleri: nöbetlerin bu günlere kişiler arasında dengeli dağılması için
     const ozel = new Uint8Array(N + 2); let ozelSay = 0;
@@ -72,18 +72,19 @@ const NobetCore = (() => {
       Object.keys(gunde).forEach(d => { if (gunde[d].length > 1) ekle('cakisma', 800, +d, p.id, `${p.ad}: ${d}. gün birden fazla nöbet branşında`); });
       (p.donus || new Set()).forEach(d => { if (!gunde[d]) ekle('donus', 600, d, p.id, `${p.ad}: ${d}. gün izin / rapor dönüşü — işe başladığı gün nöbete girmeli`); });
       // 24 saatlik nöbetler: dinlenme (min boşluk gün) ve sürücü gün aşırı 3
-      const g24 = L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).map(x => x.gun);
-      for (let i = 1; i < g24.length; i++) if (g24[i] - g24[i - 1] - 1 < K.minAra) ekle('dinlenme', 700, g24[i], p.id, `${p.ad}: ${g24[i - 1]}. ve ${g24[i]}. gün art arda 24 saatlik nöbet (arada en az ${K.minAra} gün boşluk gerekir)`);
+      const onc = p.onc || {t24: [], s24: [], A: [], G: []}, oAd = d => d <= 0 ? `önceki ayın ${d === 0 ? 'son' : `sondan ${1 - d}.`} günü` : `${d}. gün`;      // önceki ayın son günleri (0, -1 …)
+      const g24 = [...onc.t24, ...L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).map(x => x.gun)].sort((a, b) => a - b);
+      for (let i = 1; i < g24.length; i++) if (g24[i] >= 1 && g24[i] - g24[i - 1] - 1 < K.minAra) ekle('dinlenme', 700, g24[i], p.id, `${p.ad}: ${oAd(g24[i - 1])} ve ${g24[i]}. gün art arda 24 saatlik nöbet (arada en az ${K.minAra} gün boşluk gerekir)`);
       if (K.surGunAsiri) {
-        const s24 = new Set(L.filter(x => x.tip === 'sur').map(x => x.gun));
-        s24.forEach(d => { if (s24.has(d + 2) && s24.has(d + 4)) ekle('surGunAsiri', 300, d + 4, p.id, `${p.ad}: ${d}., ${d + 2}., ${d + 4}. gün sürücü olarak gün aşırı üst üste 3 nöbet (24 saat)`); });
+        const s24 = new Set([...onc.s24, ...L.filter(x => x.tip === 'sur').map(x => x.gun)]);
+        s24.forEach(d => { if (d + 4 >= 1 && s24.has(d + 2) && s24.has(d + 4)) ekle('surGunAsiri', 300, d + 4, p.id, `${p.ad}: ${d}., ${d + 2}., ${d + 4}. gün sürücü olarak gün aşırı üst üste 3 nöbet (24 saat)`); });
       }
       // işçi: art arda 3 gece; gecenin ertesi günü gündüz vardiyası
       if (p.isci) {
-        const A = new Set(L.filter(x => x.tip === 'surA').map(x => x.gun)), G = new Set(L.filter(x => x.tip === 'surG').map(x => x.gun));
-        if (K.isciGece) A.forEach(d => { if (A.has(d + 1) && A.has(d + 2)) ekle('isciGece', 300, d + 2, p.id, `${p.ad}: ${d}., ${d + 1}., ${d + 2}. gün art arda 3 gece`); });
+        const A = new Set([...onc.A, ...L.filter(x => x.tip === 'surA').map(x => x.gun)]), G = new Set(L.filter(x => x.tip === 'surG').map(x => x.gun));
+        if (K.isciGece) A.forEach(d => { if (d + 2 >= 1 && A.has(d + 1) && A.has(d + 2)) ekle('isciGece', 300, d + 2, p.id, `${p.ad}: ${d}., ${d + 1}., ${d + 2}. gün art arda 3 gece`); });
         G.forEach(d => { if (A.has(d - 1)) ekle('dinlenme', 700, d, p.id, `${p.ad}: ${d - 1}. gün gece nöbetinden sonra ${d}. gün gündüz nöbeti (dinlenme yok)`); });
-        if (Math.abs(G.size - A.size) > 1) ekle('gunGece', 120 * (Math.abs(G.size - A.size) - 1), 0, p.id, `${p.ad}: gündüz ${G.size}, gece ${A.size} nöbet (gece / gündüz eşit dağılmalı)`);
+        const aBu = [...A].filter(d => d >= 1).length; if (Math.abs(G.size - aBu) > 1) ekle('gunGece', 120 * (Math.abs(G.size - A.size) - 1), 0, p.id, `${p.ad}: gündüz ${G.size}, gece ${A.size} nöbet (gece / gündüz eşit dağılmalı)`);
       }
       // iki nöbet arası en fazla maxAra gün (izin araya giriyorsa sayılmaz)
       const tum = L.map(x => x.gun).filter((d, i, a) => a.indexOf(d) === i);
@@ -136,7 +137,7 @@ const NobetCore = (() => {
   function kur(H, seed) {
     const {N, P} = H, R = rng(seed), liste = bos(N);
     const durum = {son: {}, kalan24: {}, kalanYarim: {}, bugun: new Set(), gorevler: {}};
-    P.forEach(p => { durum.kalan24[p.id] = p.hedef24; durum.kalanYarim[p.id] = p.hedefYarim; durum.gorevler[p.id] = {t24: new Set(), s24: new Set(), A: new Set(), G: new Set()}; });
+    P.forEach(p => { durum.kalan24[p.id] = p.hedef24; durum.kalanYarim[p.id] = p.hedefYarim; const o = p.onc || {}; durum.gorevler[p.id] = {t24: new Set(o.t24 || []), s24: new Set(o.s24 || []), A: new Set(o.A || []), G: new Set(o.G || [])}; });      // önceki ayın son günleri dahil
     const ata = (p, d, tip, alan) => {
       alan[tip] = p.id; durum.bugun.add(p.id); durum.son[p.id] = d; const g = durum.gorevler[p.id];
       if (tip === 'surG' || tip === 'surA') { durum.kalanYarim[p.id]--; (tip === 'surA' ? g.A : g.G).add(d); }
@@ -268,15 +269,15 @@ const NobetCore = (() => {
     const pcost = i => {
       const p = P[i], pl = place[i]; let c = 0;
       (p.donus || new Set()).forEach(d => { if (!hasDay[i][d]) c += 600; });                 // izin / rapor dönüş günü nöbette olmalı
-      if (!pl.length) return c; const g24 = [], all = [], A = new Set(), G = new Set(), s24 = new Set();
+      if (!pl.length) return c; const o = p.onc || {}, g24 = [...(o.t24 || [])], all = [], A = new Set(o.A || []), G = new Set(), s24 = new Set(o.s24 || []);      // önceki ayın son günleri
       for (const s of pl) { const d = slotD[s], t = slotT[s]; all.push(d);
         if (p.izin.has(d)) c += 900; else if (p.istek.has(d)) c += 80;
         if (p.once.has(d) && !p.izin.has(d)) c += 300;
         if (t === 'surA') A.add(d); else if (t === 'surG') G.add(d); else { g24.push(d); if (t === 'sur') s24.add(d); } }
       const gv = new Set(); for (const d of all) { if (gv.has(d)) c += 800; gv.add(d); }          // aynı gün birden fazla nöbet
-      g24.sort((a, b) => a - b); for (let k = 1; k < g24.length; k++) if (g24[k] - g24[k - 1] - 1 < K.minAra) c += 700;
-      if (K.surGunAsiri) s24.forEach(d => { if (s24.has(d + 2) && s24.has(d + 4)) c += 300; });
-      if (p.isci) { if (K.isciGece) A.forEach(d => { if (A.has(d + 1) && A.has(d + 2)) c += 300; }); G.forEach(d => { if (A.has(d - 1)) c += 700; }); if (Math.abs(G.size - A.size) > 1) c += 120 * (Math.abs(G.size - A.size) - 1); }
+      g24.sort((a, b) => a - b); for (let k = 1; k < g24.length; k++) if (g24[k] >= 1 && g24[k] - g24[k - 1] - 1 < K.minAra) c += 700;
+      if (K.surGunAsiri) s24.forEach(d => { if (d + 4 >= 1 && s24.has(d + 2) && s24.has(d + 4)) c += 300; });
+      if (p.isci) { if (K.isciGece) A.forEach(d => { if (d + 2 >= 1 && A.has(d + 1) && A.has(d + 2)) c += 300; }); G.forEach(d => { if (A.has(d - 1)) c += 700; }); { const aBu = [...A].filter(d => d >= 1).length; if (Math.abs(G.size - aBu) > 1) c += 120 * (Math.abs(G.size - aBu) - 1); }; }
       const tum = [...new Set(all)].sort((a, b) => a - b);
       for (let k = 1; k < tum.length; k++) { const bos = tum[k] - tum[k - 1] - 1; if (bos > K.maxAra) { let iz = false; for (let d = tum[k - 1] + 1; d < tum[k]; d++) if (p.izin.has(d)) { iz = true; break; } if (!iz) c += 60 * (bos - K.maxAra); } }
       if (H.ozelSay > 0 && pl.length >= 2) { let oz = 0; for (const s of pl) if (H.ozel[slotD[s]]) oz++; c += ozelCeza(oz, pl.length, H.ozelOran); }
@@ -391,7 +392,7 @@ const NobetCore = (() => {
   function doldur(liste, H) {
     const {N, P, K} = H, d0 = denetle(liste, H); let eklenen = 0;
     const say = new Map(P.map(p => [p.id, 0])); for (let d = 1; d <= N; d++) ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { const id = liste[d][t]; if (id != null && say.has(id)) say.set(id, say.get(id) + (t === 'surG' || t === 'surA' ? 0.5 : 1)); });
-    const gorevli = (id, d) => !!liste[d] && ['es', 'ysp', 'sur', 'surG', 'surA'].some(t => liste[d][t] === id);
+    const gorevli = (id, d) => { if (d <= 0) { const p = H.byId.get(id); return !!(p && p.onc && (p.onc.t24.includes(d) || p.onc.A.includes(d))); } return !!liste[d] && ['es', 'ysp', 'sur', 'surG', 'surA'].some(t => liste[d][t] === id); };      // d ≤ 0: önceki ayın son günleri
     const yakin = (id, d) => { for (let k = 1; k <= K.minAra; k++) if (gorevli(id, d - k) || gorevli(id, d + k)) return true; return false; };
     for (let d = 1; d <= N; d++) {
       const L = liste[d], bosYuva = [];

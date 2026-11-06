@@ -32,7 +32,18 @@
     const dp = n2Depo(b.ad), ks = n2Kisiler(b).map(k => ({...k, izin: [...(k.izin || []), ...(dp.izin[k.id] || [])], istek: dp.istek[k.id] || []}));
     const ozet = NC.adetHazirla(ks, NC.gunSayisi(S.y, S.m));
     const oz = ozel(), tatil = []; for (let d = 1; d <= NC.gunSayisi(S.y, S.m); d++) { const i = C.iso(S.y, S.m, d), og = oz[i]; if (C.RESMI[i] === 0 || (og && (og.tur === 'bayram' || og.tur === 'resmi'))) tatil.push(d); }      // resmî tatil / bayram günleri (hafta sonu gibi dengeli dağıtılır)
-    return {girdi: {y: S.y, m: S.m, kisiler: ks, tatil, attEs: b.tip !== 'A1'}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
+    return {girdi: {y: S.y, m: S.m, kisiler: ks, tatil, attEs: b.tip !== 'A1', onceki: n2OncekiGunler(ks)}, ozet, kural: {...NC.KURAL, ...(dp.kural || {})}};
+  }
+  // Önceki ayın son 5 günündeki nöbetler (tüm istasyonların listelerinden): gün 0 = önceki ayın son günü, -1 bir önceki …
+  // Kişi önceki ayda başka istasyonda nöbet tuttuysa da sayılır. Eşleşme kişi kimliği, yoksa TC / ad ile.
+  function n2OncekiGunler(ks) {
+    const O = S.onceNobet; if (!O || !O.nobet) return {};
+    const nOnce = NC.gunSayisi(O.y, O.m), bul = new Map(); ks.forEach(k => { const kk = S.plan.kayitlar.find(x => x.id === k.id) || {}; bul.set(k.id, k.id); if (kk.tc) bul.set('tc:' + kk.tc, k.id); bul.set('ad:' + C.TR(k.ad || ''), k.id); });
+    const kim = id => { if (bul.has(id)) return bul.get(id); const a = O.ad.get(id); if (!a) return null; return (a.tc && bul.get('tc:' + a.tc)) || bul.get('ad:' + a.ad) || null; };
+    const out = {}, ekle = (id, gun, tip) => { const k = kim(id); if (!k) return; const o = out[k] = out[k] || {t24: [], s24: [], A: [], G: []}; if (tip === 'surA') o.A.push(gun); else if (tip === 'surG') o.G.push(gun); else { o.t24.push(gun); if (tip === 'sur') o.s24.push(gun); } };
+    Object.values(O.nobet).forEach(dp => { const L = dp && dp.liste; if (!L) return; for (let g = Math.max(1, nOnce - 4); g <= nOnce && g < L.length; g++) { const x = L[g]; if (!x) continue; const gun = g - nOnce;
+      ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (x[t] != null) ekle(x[t], gun, t); }); Object.entries(x.bol || {}).forEach(([t, bb]) => { if (bb && x[t] != null) ekle(bb.id, gun, t); }); } });
+    return out;
   }
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
@@ -162,8 +173,9 @@
         return `<tr><td class="n2n">${esc(k.ad)}</td>${c}<td class="num"><b>${fmt(birim)}</b></td><td class="num ${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(hedef)}</td></tr>`; }).join('')}</tbody></table></div><p class="ap-note">E: ekip şefi · Y: YSP · S: sürücü (24 sa.) · G: sürücü gündüz · A: sürücü gece (12 sa. işçi)</p>`; };
     const lSek = [['liste', 'Nöbet listesi'], ['kisi', 'Kişi başına nöbet']], la = lSek.some(x => x[0] === S.n2.altSekme) ? S.n2.altSekme : 'liste';
     const lNav = `<div class="ap-subnav ap-noprint">${lSek.map(([v, t]) => `<button class="${la === v ? 'on' : ''}" data-act="n2-alt" data-v="${v}">${t}</button>`).join('')}</div>`;
-    const lKisi = `<div class="ap-card"><h2>Kişi başına nöbet</h2>${tabloHtml(['Personel', 'Branş', 'Hedef (Modül 1)', 'Listede'], sayim.map(({k, birim, hedef}) => [esc(k.ad), k.brans || '', hedef, `<span class="${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(birim)}</span>`]))}</div>`;
-    const lListe = `<div class="ap-card"><h2>Otomatik nöbet listesi</h2>
+    const lKisi = `<div class="ap-card"><h2>Kişi başına nöbet</h2>${tabloHtml(['Personel', 'Branş', 'Hedef', 'Listede'], sayim.map(({k, birim, hedef}) => [esc(k.ad), k.brans || '', hedef, `<span class="${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(birim)}</span>`]))}</div>`;
+    const oncSay = Object.keys(G.girdi.onceki || {}).length, oncNot = `<p class="ap-note" style="margin:0 0 6px">${S.onceNobet && Object.values(S.onceNobet.nobet || {}).some(x => x && x.liste) ? `Önceki ayın son 5 günündeki nöbetler dinlenme ve gün aşırı kurallarında dikkate alınır (bu istasyonda ${oncSay} kişi).` : 'Önceki ayın nöbet listesi bu programda yok; ayın ilk günlerinde önceki ay nöbetlerini kontrol edin.'}</p>`;
+    const lListe = `<div class="ap-card"><h2>Otomatik nöbet listesi</h2>${oncNot}
       <div class="ap-row"><label class="ap-note">İki nöbet arası en az <input class="ap-in n" type="number" min="0" max="5" data-n2="kural" data-k="minAra" value="${K.minAra}"> gün boş</label>
       <label class="ap-note">en fazla <input class="ap-in n" type="number" min="1" max="15" data-n2="kural" data-k="maxAra" value="${K.maxAra}"> gün</label>
       <label class="ap-note">yıllık izin öncesi <input class="ap-in n" type="number" min="0" max="10" data-n2="kural" data-k="izinOnce" value="${K.izinOnce}"> gün boşluk</label>
