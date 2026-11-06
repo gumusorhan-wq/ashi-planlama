@@ -619,7 +619,7 @@
   function xlTahmini(k, sm, gelen) {
     const D = durumlar(), mesai = xlMesai(k, sm, gelen);
     if (!(mesai > 0)) { const s = sm && sm.get(k.id), dt = D[k.durum] || {}, du = k.durum ? ` (${k.durum})` : ''; if (izinAyGun(k) >= C.gunSayisi(S.y, S.m)) return 'İzinli/raporlu (tüm ay)'; if ((s && s.nobetYok) || dt.nobetYok) return 'Nöbet yok' + du; if (dt.mesaiYok) return 'Mesai yok' + du; return 'Mesai yok'; }
-    if (xlIsci(k)) return `${Math.floor(mesai / 12 + 1e-9)} Nöbet`;
+    if (xlIsci(k)) { const pl = sm && sm.get(k.id) && k.planlanan != null ? Math.round(k.planlanan / C.ADIM) : C.hedefNobet(mesai, 'isci', false, {isciDusulen: S.ayar.isciDusulen}).adet; return `${pl} Nöbet`; }      // ekrandaki gibi: planlanan (yoksa hedef) 12 saatlik nöbet adedi
     const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`;
   }
   const xlSatirRenk = (k, gelen) => { const r = satirRenk(k, gelen); return r ? hex(r) : ''; };

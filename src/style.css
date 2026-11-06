@@ -243,3 +243,5 @@ table.tk td.tk-gr.tk-soluk{background:rgba(220,38,38,.06)}
 /* İstasyon özeti (Plan / nöbet branşı dengesi) tablonun hemen üstünde; kaydırınca üstte sabit kalır */
 .ap-ist-ozet{position:sticky;top:0;z-index:4;background:var(--ap-bg,#f4f6f9);padding:6px 0}
 @media (max-width:760px){.ap-ist-ozet{position:static}}
+.ap-slot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;margin-top:6px;font-size:13px}.ap-slot .r{white-space:nowrap}.ap-slot details[open]{flex-basis:100%}
+.ap-ist-ozet>.ap-card{padding:8px 12px}
