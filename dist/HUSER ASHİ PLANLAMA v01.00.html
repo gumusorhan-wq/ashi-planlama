@@ -103,7 +103,8 @@ td.n2n{white-space:nowrap;padding-right:10px}.n2e{background:var(--ap-badbg)!imp
 .ap-lg{display:inline-block;width:11px;height:11px;border-radius:3px;border:2px solid var(--ap-pri);vertical-align:-1px}.ap-lg.sec{background:var(--ap-pri)}
 .ap-pop-ist{width:min(520px,92vw)}.ap-chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;max-height:190px;overflow:auto}.ap-chip{font:inherit;padding:6px 12px;border-radius:99px;border:1px solid var(--ap-line);background:var(--ap-bg);color:var(--ap-ink);cursor:pointer}
 .ap-chip.sec{background:var(--ap-pri);border-color:var(--ap-pri);color:#fff}.ap-chip.kis{border-color:var(--ap-pri);color:var(--ap-pri)}
-.ap-tekbtn{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ap-tekad{padding:4px 6px}
+.ap-tekbtn{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ap-tekbtn.sm{max-width:260px;font-weight:400}.ap-tekbtn.sm b{font-weight:600}.ap-tekad{padding:4px 6px}.ap-tekad.sm{padding:0}
+.ap-tlist button.ozel{font-style:italic;color:var(--ap-mute,#64748b)}.ap-tlist button.ozel.sec{color:var(--ap-pri)}
 .ap-tlist{max-height:280px;overflow:auto;border:1px solid var(--ap-line);border-radius:8px}.ap-tlist button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;padding:6px 10px;border:0;border-bottom:1px solid var(--ap-line);background:transparent;color:var(--ap-ink);cursor:pointer}.ap-tlist button:last-child{border-bottom:0}.ap-tlist button:hover{background:var(--ap-bg)}
 .ap-tlist button i{width:13px;height:13px;border-radius:50%;border:1px solid var(--ap-mute,#94a3b8);flex-shrink:0}.ap-tlist button.sec{font-weight:700;color:var(--ap-pri);background:color-mix(in srgb,var(--ap-pri) 8%,transparent)}.ap-tlist button.sec i{background:var(--ap-pri);border-color:var(--ap-pri);box-shadow:inset 0 0 0 2px var(--ap-card)}
 .ap-ilist{max-height:220px;overflow:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:2px 12px;border-top:1px solid var(--ap-line);padding-top:6px}.ap-ilist label{display:flex;gap:6px;align-items:center;padding:3px 2px;cursor:pointer}
@@ -1611,7 +1612,7 @@ function mount(root, opts = {}) {
     const g = k.gorev, aktif = dt.disarida || (g && (g.hedef || g.yer));
     if (!aktif) return gorevMetin(k) ? `<span class="ap-hd">${esc(gorevMetin(k))}</span>` : '';
     const diger = !!g && !g.hedef && (g.diger || !!g.yer);
-    return `<div class="ap-gh"><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${dis} title="Nereye görevlendirildi? İstasyon, Başhekimlik ve KKM listeden; diğer yerler için Diğer'i seçip yazın"><option value="">— yer seç —</option>${birimler.filter(x => x.ad !== b.ad).map(x => `<option ${g && x.ad === g.hedef ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}<option value="__diger__" ${diger ? 'selected' : ''}>Diğer (yaz)…</option></select>${diger ? `<input class="ap-in w" data-id="${k.id}" data-f="gYer" value="${esc(g.diger && g.yer === 'Diğer' ? '' : g.yer || '')}" placeholder="İlçe Sağlık Müd., Devlet Hastanesi…" ${dis}>` : ''}${g && (g.hedef || g.yer) && g.tarih ? `<div class="ap-note">${esc(g.tarih)}</div>` : ''}</div>`;
+    return `<div class="ap-gh">${istTekHtml('f:' + k.id + ':gHedef', g && g.hedef ? g.hedef : diger ? '__diger__' : '', birimler.filter(x => x.ad !== b.ad).map(x => x.ad), {kucuk: true, kapali: !!dis, bos: '— yer seç —', ek: [['__diger__', 'Diğer (yaz)…']]})}${diger ? `<input class="ap-in w" data-id="${k.id}" data-f="gYer" value="${esc(g.diger && g.yer === 'Diğer' ? '' : g.yer || '')}" placeholder="İlçe Sağlık Müd., Devlet Hastanesi…" ${dis}>` : ''}${g && (g.hedef || g.yer) && g.tarih ? `<div class="ap-note">${esc(g.tarih)}</div>` : ''}</div>`;
   }
   // İstasyon tablosu, ad altındaki "nöbet tutar" etiketi (Başhekimlik / KKM nöbeti). Planlama yetkilisi etikete tıklayıp seçer:
   // Otomatik (rapordan) / Nöbet tutar / Nöbet tutmaz. Elle seçim k.idariNobetElle'de saklanır; "nöbet tutmaz" soluk ve üstü çizili görünür.
@@ -1706,7 +1707,7 @@ function mount(root, opts = {}) {
       const eng = C.gorevlendirmeEngeli(k, ayIlk()), dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
       const araM = C.TR([k.ad, k.birim, k.gorev.hedef || '', k.gorev.yer || '', k.unvan].join(' ')), gq = C.TR(S.gAra || '').trim(), gor = (!gq || araM.includes(gq)) && (!S.gIst || k.birim === S.gIst || k.gorev.hedef === S.gIst);      // süzgeç yeniden çizimde korunur
       return `<tr data-ara="${esc(araM)}" data-kay="${esc(k.birim)}" data-hed="${esc(k.gorev.hedef || '')}" ${gor ? '' : 'style="display:none"'}><td>${esc(k.ad)}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}${dy && !dy.uygun ? `<div class="ap-note" style="color:var(--ap-bad)">4 yıl dolumu: ${dy.dolum.split('-').reverse().join('.')}</div>` : dy && dy.yakinda ? '<div class="ap-note">yakında uygun</div>' : ''}</td><td>${esc(k.birim)}</td>
-      <td><select class="ap-sel" data-id="${k.id}" data-f="gHedef" ${duz ? '' : 'disabled'}>${opts(k)}</select>${k.gorev.hedef ? '' : `<div class="ap-note">${esc(k.gorev.yer || '')}</div>`}</td>
+      <td>${istTekHtml('f:' + k.id + ':gHedef', k.gorev.hedef || (k.gorev.yer ? '__yer__' : ''), birimler.map(b => b.ad), {kucuk: true, kapali: !duz, ek: [['', '— (görevlendirmeyi kaldır)'], ...(!k.gorev.hedef && k.gorev.yer ? [['__yer__', 'Diğer yer: ' + (k.gorev.yer.length > 40 ? k.gorev.yer.slice(0, 40) + '…' : k.gorev.yer)]] : [])]})}${k.gorev.hedef ? '' : `<div class="ap-note">${esc(k.gorev.yer || '')}</div>`}</td>
       <td style="min-width:170px">${gorevTarihSecim(k, duz)}</td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${duz ? '' : 'disabled'}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === (k.gorev.yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
       <td><select class="ap-sel" data-id="${k.id}" data-f="gGerekce" ${duz ? '' : 'disabled'}>${GEREKCE.map(a => `<option ${a === (k.gorev.gerekce || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
@@ -1738,7 +1739,7 @@ function mount(root, opts = {}) {
     const disSat = disK.map(k => { const g = k.gorev || {}, bk = birimler.find(x => x.ad === k.birim) || {ad: k.birim}, dt = D[k.durum] || {}, ara = C.TR([k.ad, k.birim, g.hedef || '', g.yer || '', k.durumMetin || ''].join(' ')), gor = (!dq || ara.includes(dq)) && (!dist || k.birim === dist); return `<tr data-ara="${esc(ara)}" data-kay="${esc(k.birim)}" style="${gor ? '' : 'display:none'}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}</td><td>${esc(k.birim)}</td><td>${esc(k.durum || '')}</td><td>${gorevHucre(k, birimler, bk, {disarida: true}, duz ? '' : 'disabled')}</td></tr>`; }).join('');
     const dis = `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">İstasyon dışı görevliler (${disK.length})</h2>
       <input class="ap-in" id="ap-d-kisi" placeholder="Kişi / yer ara (listeyi süzer)…" value="${esc(S.disAra || '')}" autocomplete="off">
-      <label class="ap-note" title="Yalnız seçilen kadro istasyonunun personeli listelenir">Kadro istasyonu süz <select class="ap-sel" id="ap-d-ist"><option value="">Tümü</option>${[...new Set(disK.map(k => k.birim))].sort(trCollator.compare).map(a => `<option ${a === dist ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></label></div><p class="ap-note">Geçici görevde olup başka bir <b>istasyona</b> atanmamış personel (Başhekimlik, KKM, ilçe sağlık müdürlüğü, hastane vb. ya da yeri henüz seçilmemiş). Bu kişilere kendi istasyonlarında nöbet yazılmaz. Yeri "Görev yeri" sütunundan seçebilir ya da yazabilirsiniz.</p>
+      <label class="ap-note" title="Yalnız seçilen kadro istasyonunun personeli listelenir">Kadro istasyonu süz ${istTekHtml('dist', dist, [...new Set(disK.map(k => k.birim))].sort(trCollator.compare), {bos: 'Tümü', kucuk: true})}</label></div><p class="ap-note">Geçici görevde olup başka bir <b>istasyona</b> atanmamış personel (Başhekimlik, KKM, ilçe sağlık müdürlüğü, hastane vb. ya da yeri henüz seçilmemiş). Bu kişilere kendi istasyonlarında nöbet yazılmaz. Yeri "Görev yeri" sütunundan seçebilir ya da yazabilirsiniz.</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Ünvan</th><th>Kadro istasyonu</th><th>Durum</th><th style="min-width:230px">Görev yeri / tarih</th></tr></thead><tbody>${disSat || '<tr><td colspan="5" class="ap-empty">İstasyon dışında görevli personel yok</td></tr>'}</tbody></table></div></div>`;
     const sekmeler = [['deg', 'Personel ihtiyacı değerlendirmesi'], ['rot', 'Aylık rotasyon'], ['list', `Görevlendirmeler (${gk.length})`], ['dis', `İstasyon dışı görevliler (${disK.length})`], ['ozet', 'Açık / fazla istasyonlar']];
     const nav = `<div class="ap-subnav ap-noprint">${sekmeler.map(([v, t]) => `<button class="${sekme === v ? 'on' : ''}" data-act="gorev-sekme" data-v="${v}">${t}</button>`).join('')}<button class="ap-btn" style="margin-left:auto" data-act="gorev-excel" title="Personel ihtiyacı, rotasyon, görevlendirmeler ve açık/fazla istasyonlar tek Excel dosyasında">Excel'e aktar</button></div>`;
@@ -1749,8 +1750,8 @@ function mount(root, opts = {}) {
     const ozet = `<div class="ap-subnav ap-noprint">${oSek.map(([v, t]) => `<button class="${oa === v ? 'on' : ''}" data-act="ozet-sekme" data-v="${v}">${t}</button>`).join('')}</div>${oKart[oa]}`;
     const liste = `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">Görevlendirmeler (${gk.length})</h2>
       <input class="ap-in" list="ap-kisi-list" id="ap-g-kisi" value="${esc(S.gAra || '')}" placeholder="Kişi ara (listeyi süzer) / seç…" title="Yazdıkça aşağıdaki görevlendirme listesi ad, kaynak ve hedefe göre süzülür; listeden bir kişi seçip yanındaki istasyonla Görevlendir diyerek yeni görevlendirme yapabilirsiniz"><datalist id="ap-kisi-list">${S.plan.kayitlar.filter(k => !k.gorev || !k.gorev.hedef).slice(0, 2000).map(k => `<option value="${esc(k.ad)}">`).join('')}</datalist>
-      <label class="ap-note" title="Seçilen istasyondan görevli çıkanlar ve o istasyona gelenler listelenir">İstasyon süz <select class="ap-sel" id="ap-g-ist"><option value="">Tümü</option>${birimler.map(b => `<option ${S.gIst === b.ad ? 'selected' : ''}>${esc(b.ad)}</option>`).join('')}</select></label>
-      <span class="ap-note">Yeni görevlendirme hedefi:</span><select class="ap-sel" id="ap-g-hedef">${birimler.map(b => `<option>${esc(b.ad)}</option>`).join('')}</select>
+      <label class="ap-note" title="Seçilen istasyondan görevli çıkanlar ve o istasyona gelenler listelenir">İstasyon süz ${istTekHtml('gist', S.gIst || '', birimler.map(b => b.ad), {bos: 'Tümü', kucuk: true})}</label>
+      <span class="ap-note">Yeni görevlendirme hedefi:</span>${(() => { const h = birimler.some(b => b.ad === S.gYeniHedef) ? S.gYeniHedef : (birimler[0] || {}).ad || ''; return `<input type="hidden" id="ap-g-hedef" value="${esc(h)}">${istTekHtml('gyh', h, birimler.map(b => b.ad), {kucuk: true})}`; })()}
       <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button>
       <button class="ap-btn" data-act="g-tarihsiz-bitir" ${duz ? '' : 'disabled'} title="TARİH sütunu boş (önceki aylardan kalan) görevlendirmeleri bitirir; istasyon süzgeci seçiliyse yalnız o istasyonunkileri. Uzun süreli (OF) ve devam isteği olanlar hariç.">Tarihi boş görevleri bitir (${gk.filter(k => tarihsizGorev(k)).length})</button></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div>${S.gtAc ? gorevTarihPop() : ''}</div>`;
@@ -1788,7 +1789,7 @@ function mount(root, opts = {}) {
         <select class="ap-sel" data-act="p-boyut">${[25, 50, 100, 200].map(n => `<option value="${n}" ${n === boyut ? 'selected' : ''}>${n} / sayfa</option>`).join('')}</select></div>`; };
     return `<div class="ap-row ap-noprint" data-ust><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''} title="Personel Listesi Raporu ve EKİP listesini birlikte seçebilirsiniz">Personel listelerini yükle</button>
       <input class="ap-in" data-act="f-q" placeholder="Ad veya TC ara" value="${esc(f.q)}">
-      <select class="ap-sel" data-act="f-birim"><option value="">Tüm birimler</option>${S.plan.birimler.map(b => `<option ${b.ad === f.birim ? 'selected' : ''}>${esc(b.ad)}</option>`).join('')}</select>
+      ${istTekHtml('fbirim', f.birim || '', S.plan.birimler.map(b => b.ad), {bos: 'Tüm birimler', kucuk: true})}
       <select class="ap-sel" data-act="f-sinif"><option value="">Tüm sınıflar</option>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === f.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <select class="ap-sel" data-act="f-surucu" title="ATT sürücülüğü"><option value="">ATT sürücülüğü: tümü</option><option value="dogrulanmadi" ${f.surucu === 'dogrulanmadi' ? 'selected' : ''}>Doğrulanmadı</option><option value="surucu" ${f.surucu === 'surucu' ? 'selected' : ''}>Sürücü</option><option value="degil" ${f.surucu === 'degil' ? 'selected' : ''}>Sürücü değil</option></select>
       <select class="ap-sel" data-act="f-durum"><option value="">Tüm durumlar</option><option value="_izin" ${f.durum === '_izin' ? 'selected' : ''}>İzinli</option>${Object.keys(D).map(a => `<option ${a === f.durum ? 'selected' : ''}>${a}</option>`).join('')}</select>
@@ -1975,6 +1976,7 @@ function mount(root, opts = {}) {
     });
     toastCiz();
     ustYerlestir();
+    tekKonum();
     const tw2 = root.querySelector('.ap-tw'); if (tw2) { tw2.scrollLeft = sl; tw2.scrollTop = st; }
     window.scrollTo(0, sy); const ic1 = root.querySelector('.ap-icerik'); if (ic1) ic1.scrollTop = isy;
     odakUygula();
@@ -2228,17 +2230,31 @@ function mount(root, opts = {}) {
       <div class="ap-popalt"><span class="ap-note">İlçe düğmesi o ilçenin tüm istasyonlarını seçer / kaldırır</span><button class="ap-btn sm" data-pop data-act="arstat-pop" data-v="">Kapat ✕</button></div></div>` : ''}</div>`;
   }
   // Tek istasyon seçen ortak panel — HUSER ortak istasyon seçicisi (IstasyonSeciciTek) görünümü: 🚑 düğme, ara, sayılı ilçe düğmeleri, liste.
-  // anahtar: 'ist' (Modül 1 istasyon sayfası) / 'n2' (Modül 2). Seçim tıklayınca uygulanır, panel kapanır.
-  function istTekHtml(anahtar, secili, adlar) {
-    const acik = S.arstatAc === 'tek-' + anahtar, q = C.TR(S.arstatAra || '').trim(), ilceSec = S.tekIlce || '';
-    if (adlar.length <= 1) return `<b class="ap-tekad">🚑 ${esc(secili || '—')}</b>`;
+  // anahtar: seçimin nereye yazılacağı (arstat-tek-sec'te çözülür): 'ist', 'n2', 'gist', 'dist', 'rist', 'rh:<id>', 'f:<kayıtId>:<alan>'.
+  // ops: {bos: 'Tümü' gibi boş değer satırı, ek: [[değer, yazı]] özel satırlar, kapali: düzenleme yok, kucuk: tablo içi düğme, yazi: düğme yazısı}
+  // Panel ekranda sabit konumlanır (tablo kaydırma kutusu kesmesin); bkz. tekKonum().
+  function istTekHtml(anahtar, secili, adlar, ops = {}) {
+    const acik = S.arstatAc === 'tek-' + anahtar, q = C.TR(S.arstatAra || '').trim(), ilceSec = S.tekIlce || '', ek = ops.ek || [];
+    const ekSec = ek.find(([v]) => v === secili), yazi = ops.yazi != null ? ops.yazi : secili ? (ekSec ? ekSec[1] : secili) : (ops.bos || '—');
+    if (!ops.bos && !ek.length && adlar.length <= 1 || ops.kapali) return `<span class="ap-tekad${ops.kucuk ? ' sm' : ''}">${ops.kucuk ? '' : '🚑 '}${esc(yazi)}</span>`;
     const gruplar = new Map(); adlar.forEach(a => { const k = C.ilceAdi(a), g = gruplar.get(k) || {ad: ilceGoster(a), n: 0}; g.n++; gruplar.set(k, g); });
     const gizle = a => (ilceSec && C.ilceAdi(a) !== ilceSec) || (q && !C.TR(a + ' ' + ilceGoster(a)).includes(q));
-    return `<div class="ap-popwrap"><button class="ap-btn ap-tekbtn" data-pop data-act="arstat-tek-pop" data-v="${anahtar}" title="${esc(secili)}">🚑 <b>${esc(secili || '—')}</b> ▾</button>${acik ? `<div class="ap-pop ap-pop-ist" data-pop>
+    const satir = (v, t, ozel) => `<button class="${v === (secili || '') ? 'sec' : ''}${ozel ? ' ozel' : ''}" data-pop data-act="arstat-tek-sec" data-k="${esc(anahtar)}" data-v="${esc(v)}" ${ozel ? 'data-ozel' : `data-ara="${esc(C.TR(t + ' ' + ilceGoster(t)))}" data-ilce="${esc(C.ilceAdi(t))}"`} ${!ozel && gizle(t) ? 'style="display:none"' : ozel && (q || ilceSec) ? 'style="display:none"' : ''}><i></i>${esc(t)}</button>`;
+    return `<div class="ap-popwrap"><button class="ap-btn ap-tekbtn${ops.kucuk ? ' sm' : ''}${secili ? ' dolu' : ''}" data-pop data-act="arstat-tek-pop" data-v="${esc(anahtar)}" title="${esc(yazi)}">${ops.kucuk ? '' : '🚑 '}<b>${esc(yazi)}</b> ▾</button>${acik ? `<div class="ap-pop ap-pop-ist ap-pop-tek" data-pop>
       <div class="ap-row" style="justify-content:space-between"><b class="ap-poph">İSTASYON SEÇ</b><span class="ap-note">${adlar.length} birim</span></div>
       <input class="ap-in w" id="ap-tek-ara" data-pop placeholder="İlçe veya istasyon ara…" value="${esc(S.arstatAra || '')}" autocomplete="off">
       ${gruplar.size > 1 ? `<div class="ap-chips">${[...gruplar.entries()].map(([k, g]) => `<button class="ap-chip ${ilceSec === k ? 'sec' : C.ilceAdi(secili || '') === k ? 'kis' : ''}" data-pop data-act="arstat-tek-ilce" data-v="${esc(k)}">${esc(g.ad)} (${g.n})</button>`).join('')}</div>` : ''}
-      <div class="ap-tlist">${adlar.map(a => `<button class="${a === secili ? 'sec' : ''}" data-pop data-act="arstat-tek-sec" data-k="${anahtar}" data-v="${esc(a)}" data-ara="${esc(C.TR(a + ' ' + ilceGoster(a)))}" data-ilce="${esc(C.ilceAdi(a))}" ${gizle(a) ? 'style="display:none"' : ''}><i></i>${esc(a)}</button>`).join('')}</div></div>` : ''}</div>`;
+      <div class="ap-tlist">${ops.bos ? satir('', ops.bos, true) : ''}${ek.map(([v, t]) => satir(v, t, true)).join('')}${adlar.map(a => satir(a, a, false)).join('')}</div></div>` : ''}</div>`;
+  }
+  // Açık tek seçim panelini ekranda düğmesinin altına (yer yoksa üstüne) sabitler
+  function tekKonum() {
+    const pop = root.querySelector('.ap-pop-tek'); if (!pop) return;
+    const btn = pop.parentElement.querySelector('.ap-tekbtn'); if (!btn) return;
+    const r = btn.getBoundingClientRect(), w = Math.min(520, window.innerWidth - 16);
+    Object.assign(pop.style, {position: 'fixed', width: w + 'px', left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px', overflow: 'auto'});
+    const alt = window.innerHeight - r.bottom - 12, ust = r.top - 12;
+    if (alt < 300 && ust > alt) Object.assign(pop.style, {top: 'auto', bottom: (window.innerHeight - r.top + 4) + 'px', maxHeight: Math.max(200, ust) + 'px'});
+    else Object.assign(pop.style, {bottom: 'auto', top: (r.bottom + 4) + 'px', maxHeight: Math.max(200, alt) + 'px'});
   }
   // ---- İzin ve geçici görev takibi: personelin hangi aylarda izin kullandığı / geçici görevlendirildiği (kayıtlı tüm aylık planlardan) ----
   async function takipYukle() {
@@ -2721,7 +2737,19 @@ function mount(root, opts = {}) {
       case 'arstat-ilce': { const l = istAdlari().filter(a => C.ilceAdi(a) === v), sec = S.arsivIstler = S.arsivIstler || [], hepsi = l.every(a => sec.includes(a)); S.arsivIstler = hepsi ? sec.filter(a => !l.includes(a)) : [...new Set([...sec, ...l])]; break; }
       case 'arstat-tek-pop': S.arstatAra = ''; S.tekIlce = ''; S.arstatAc = S.arstatAc === 'tek-' + v ? '' : 'tek-' + v; if (S.arstatAc) setTimeout(() => { const i = root.querySelector('#ap-tek-ara'); if (i) i.focus(); }, 0); break;
       case 'arstat-tek-ilce': S.tekIlce = S.tekIlce === v ? '' : v; break;
-      case 'arstat-tek-sec': if (t.dataset.k === 'n2') { S.n2.ist = v; S.n2.oneri = null; } else S.ist = v; S.arstatAc = ''; S.arstatAra = ''; S.tekIlce = ''; break;
+      case 'arstat-tek-sec': {
+        const k = t.dataset.k || ''; S.arstatAc = ''; S.arstatAra = ''; S.tekIlce = '';
+        if (k === 'n2') { S.n2.ist = v; S.n2.oneri = null; }
+        else if (k === 'ist') S.ist = v;
+        else if (k === 'gist') S.gIst = v;
+        else if (k === 'dist') S.disIst = v;
+        else if (k === 'rist') S.rotIst = v;
+        else if (k === 'gyh') S.gYeniHedef = v;
+        else if (k === 'fbirim') { S.filtre.birim = v; S.pSayfa = 0; }
+        else if (k.startsWith('rh:')) { S.rotHedef = S.rotHedef || {}; S.rotHedef[k.slice(3)] = v; }
+        else if (k.startsWith('f:')) { const [, id, f] = k.split(':'); if (!salt()) setField(id, f, v); }
+        break;
+      }
       case 'arstat-ist-tumu': S.arsivIstler = istAdlari(); break;
       case 'arstat-ist-temizle': S.arsivIstler = []; break;
       case 'arsiv-excel': arsivExcel(); return true;
@@ -3681,7 +3709,7 @@ function mount(root, opts = {}) {
       <td>${x.r.disarida.map(k => `<div>${esc(k.ad)} → ${esc(k.gorev.hedef)} ${x.b.ekipOf ? '<span class="ap-note">devam ediyor (ekip OF)</span>' : `<select class="ap-sel" data-id="${k.id}" data-f="istek" ${duz ? '' : 'disabled'}><option value="">Dönsün</option><option value="devam" ${k.istek === 'devam' ? 'selected' : ''}>Devam etsin</option></select>`} <button class="ap-btn sm" data-act="rot-don" data-id="${k.id}" ${duz ? '' : 'disabled'}>Görevi bitir</button></div>`).join('') || '<span class="ap-note">—</span>'}</td>
       <td>${x.r.adaylar.slice(0, 4).map((k, i) => `<div>${i + 1}. ${esc(k.ad)} <span class="ap-note">(${nedenMetin(k)}${k.dortB && !k.memBas ? ' · 4/B tarih yok' : ''})</span> <select class="ap-sel" data-id="${k.id}" data-f="istek" ${duz ? '' : 'disabled'}>${Object.entries(ISTEK).map(([v, t]) => `<option value="${v}" ${(k.istek || '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`).join('') || '<span class="ap-note">Aday yok</span>'}${x.r.gerekliler && x.r.gerekliler.length ? `<div class="ap-note" style="margin-top:4px" title="Bu kişiler çıkarsa istasyonda açık artacağı için dışarı gönderilmez">Nöbet branşını dolduruyor, gönderilmez: ${x.r.gerekliler.slice(0, 6).map(k => esc(k.ad)).join(', ')}${x.r.gerekliler.length > 6 ? ' …' : ''}</div>` : ''}</td></tr>`).join('');
     const oRows = oFiltre.map(o => `<tr><td><input type="checkbox" data-rot="${o.id}" ${o.hedef ? 'checked' : ''}></td><td>${esc(o.ad)}</td><td>${esc(o.kaynak)}${o.kaynakDurum === 'ihtiyac' ? ' <span class="ap-tag ap-t-ih" title="Bu istasyon zaten personel ihtiyacında">açık</span>' : o.kaynakDurum === 'fazla' ? ' <span class="ap-tag ap-t-fz">fazla</span>' : ''}</td>
-      <td><select class="ap-sel" id="ap-rh-${o.id}" title="${o.hedef ? '' : 'Bu kişi için uygun hedef (açığı olan, yapabildiği nöbet branşı uyan) istasyon yok; isterseniz elle seçebilirsiniz'}"><option value="" ${o.hedef ? '' : 'selected'}>${o.hedef ? '—' : ''}</option>${hedefAdlari.map(a => `<option ${a === o.hedef ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></td><td>${o.hedef ? (o.km === null ? 'KKM' : o.ayniIlce ? 'aynı ilçe' : (o.km >= 9999 ? '—' : o.km + ' km')) : '—'}</td><td>${esc(o.neden)}${o.rol ? ` · ${esc(o.rol)}` : ''}${o.uzun ? ' <span class="ap-tag" style="background:#e5e7eb;color:#374151">uzun süreli (ekip OF)</span>' : ''}</td></tr>`).join('');
+      <td title="${o.hedef ? '' : 'Bu kişi için uygun hedef (açığı olan, yapabildiği nöbet branşı uyan) istasyon yok; isterseniz elle seçebilirsiniz'}">${(() => { const h = (S.rotHedef || {})[o.id] !== undefined ? S.rotHedef[o.id] : (o.hedef || ''); return `<input type="hidden" id="ap-rh-${o.id}" value="${esc(h)}">${istTekHtml('rh:' + o.id, h, hedefAdlari, {kucuk: true, bos: '—'})}`; })()}</td><td>${o.hedef ? (o.km === null ? 'KKM' : o.ayniIlce ? 'aynı ilçe' : (o.km >= 9999 ? '—' : o.km + ' km')) : '—'}</td><td>${esc(o.neden)}${o.rol ? ` · ${esc(o.rol)}` : ''}${o.uzun ? ' <span class="ap-tag" style="background:#e5e7eb;color:#374151">uzun süreli (ekip OF)</span>' : ''}</td></tr>`).join('');
     const rSek = [['kota', 'İstasyon kotaları ve sıradakiler'], ['oner', `Önerilen çıkışlar (${oFiltre.length})`]], ra = rSek.some(x => x[0] === S.rotSekme) ? S.rotSekme : 'kota';
     const rNav = `<div class="ap-subnav ap-noprint">${rSek.map(([v, t]) => `<button class="${ra === v ? 'on' : ''}" data-act="rot-sekme" data-v="${v}">${t}</button>`).join('')}</div>`;
     const rKota = `<div class="ap-card"><h2>Aylık rotasyon — ${ayEtiket()}</h2>
@@ -3689,7 +3717,7 @@ function mount(root, opts = {}) {
       <div class="ap-row"><button class="ap-btn" data-act="oto-geri-cek" ${duz ? '' : 'disabled'} title="Dönmesi istasyonun açığını azaltacak, başka istasyona görevli personeli geri çağırır (devam etsin işaretliler, sağlık mazereti ve eğitim hariç)">Açığı olan istasyonların personelini geri çağır</button></div><p class="ap-note">Ayrıca: bir istasyonda ihtiyaç varken o nöbet branşını dolduran kişi dışarı önerilmez; personel listeleri yüklenince ve önceki aydan kopyalayınca açığı olan istasyonların dışarıdaki personeli otomatik geri çağrılır (Ayarlar'dan kapatılabilir).</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>İSTASYON</th><th>KOTA</th><th>ŞU AN DIŞARIDA</th><th>SIRADAKİLER (ilk 4)</th></tr></thead><tbody>${satir || '<tr><td colspan="4" class="ap-empty">Rotasyon gerektiren istasyon yok</td></tr>'}</tbody></table></div></div>`;
     const rOner = `<div class="ap-card">
-      <div class="ap-row"><h2 style="margin:0">Önerilen çıkışlar (${oFiltre.length}${rIst ? ' / ' + oner.length : ''})</h2><label class="ap-note" title="Seçilen istasyondan çıkanlar ve o istasyona gidenler listelenir">İstasyon <select class="ap-sel" data-act="rot-ist"><option value="">Tümü</option>${hedefAdlari.map(a => `<option ${a === rIst ? 'selected' : ''}>${esc(a)}</option>`).join('')}</select></label><label class="ap-note">Kaynak <select class="ap-sel" data-act="rot-kaynak"><option value="tum" ${S.rotKaynak !== 'fazla' ? 'selected' : ''}>Tüm istasyonlar (her istasyondan kota kadar)</option><option value="fazla" ${S.rotKaynak === 'fazla' ? 'selected' : ''}>Yalnızca mesaisi dolmayan (fazla) istasyonlar</option></select></label></div>
+      <div class="ap-row"><h2 style="margin:0">Önerilen çıkışlar (${oFiltre.length}${rIst ? ' / ' + oner.length : ''})</h2><label class="ap-note" title="Seçilen istasyondan çıkanlar ve o istasyona gidenler listelenir">İstasyon ${istTekHtml('rist', rIst, hedefAdlari, {bos: 'Tümü', kucuk: true})}</label><label class="ap-note">Kaynak <select class="ap-sel" data-act="rot-kaynak"><option value="tum" ${S.rotKaynak !== 'fazla' ? 'selected' : ''}>Tüm istasyonlar (her istasyondan kota kadar)</option><option value="fazla" ${S.rotKaynak === 'fazla' ? 'selected' : ''}>Yalnızca mesaisi dolmayan (fazla) istasyonlar</option></select></label></div>
       <div class="ap-row" style="margin:8px 0"><button class="ap-btn pri" data-act="rot-uygula" ${duz && oner.length ? '' : 'disabled'}>Seçilenleri görevlendir</button></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th></th><th>KİŞİ</th><th>KAYNAK</th><th>HEDEF</th><th>UZAKLIK</th><th>NEDEN</th></tr></thead><tbody>${oRows || '<tr><td colspan="6" class="ap-empty">Öneri yok</td></tr>'}</tbody></table></div>
       <div class="ap-row" style="margin-top:8px"><span class="ap-note">Görevlendirme ${ayEtiket()} ayını kapsar; sonraki aya kopyalanırken "devam etsin" işaretliler uzatılır, diğerleri döner.</span></div></div>`;
@@ -3936,7 +3964,7 @@ function mount(root, opts = {}) {
           toast(`${k.ad} ${k.birim} istasyonuna geri döndü.`); break;
         }
         case 'rot-don': { const k = kayit(t.dataset.id); if (k) mut(() => { k.gorev = null; if (k.durum === 'GEÇİCİ GÖREVDE') k.durum = ''; k.durumManuel = false; }, 'Rotasyon: görev bitirildi', k.ad); break; }
-        case 'rot-uygula': { let n = 0; S.toplu = true; try { root.querySelectorAll('[data-rot]:checked').forEach(c => { const k = kayit(c.dataset.rot), h = root.querySelector('#ap-rh-' + c.dataset.rot).value; const ofK = k && (S.plan.birimler.find(x => x.ad === k.birim) || {}).ekipOf; if (k && h && gorevlendir(k, h, ofK ? {bas: ayIlk(), bit: '', uzun: true, gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel', tarih: `${trTarih(ayIlk())} – (ekip OF, uzun süreli)`} : {...ayGorevTarih(), gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel'})) { if (k.istek === 'git') k.istek = ''; n++; } }); } finally { S.toplu = false; } otoHesapla(); kaydet(); toast(`${n} kişi görevlendirildi; planlanan nöbetler yeniden hesaplandı.`); break; }
+        case 'rot-uygula': { let n = 0; S.toplu = true; setTimeout(() => { S.rotHedef = {}; }, 0); try { root.querySelectorAll('[data-rot]:checked').forEach(c => { const k = kayit(c.dataset.rot), h = root.querySelector('#ap-rh-' + c.dataset.rot).value; const ofK = k && (S.plan.birimler.find(x => x.ad === k.birim) || {}).ekipOf; if (k && h && gorevlendir(k, h, ofK ? {bas: ayIlk(), bit: '', uzun: true, gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel', tarih: `${trTarih(ayIlk())} – (ekip OF, uzun süreli)`} : {...ayGorevTarih(), gerekce: 'PERSONEL İHTİYACI', kaynak: 'manuel'})) { if (k.istek === 'git') k.istek = ''; n++; } }); } finally { S.toplu = false; } otoHesapla(); kaydet(); toast(`${n} kişi görevlendirildi; planlanan nöbetler yeniden hesaplandı.`); break; }
         case 'kilavuz': S.modal = kilavuzHtml; break;
         case 'modal-kapat': S.modal = null; S.asos = null; break;
         case 'png': { const b = S.plan.birimler.find(x => x.ad === v); pngCiz(b).toBlob(bl => indir(bl, `${b.ad}-${S.y}-${C.pad(S.m)}.png`)); break; }
@@ -3970,6 +3998,8 @@ function mount(root, opts = {}) {
     setTimeout(odakUygula, 120);                  // değişiklik yoksa çizim olmaz; odak yine geçer
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.arstatAc) { S.arstatAc = ''; render(); } });
+  document.addEventListener('scroll', e => { if (String(S.arstatAc || '').startsWith('tek-') && root.isConnected && !(e.target && e.target.closest && e.target.closest('.ap-pop-tek'))) tekKonum(); }, true);      // sabit panel düğmesiyle birlikte kayar
+  window.addEventListener('resize', () => { if (String(S.arstatAc || '').startsWith('tek-')) tekKonum(); });
   document.addEventListener('keydown', e => { if (e.key !== 'Enter' || !e.target || e.target.id !== 'ap-tek-ara') return; const g = [...root.querySelectorAll('.ap-tlist [data-ara]')].filter(x => x.style.display !== 'none'); if (g.length === 1) { e.preventDefault(); g[0].click(); } });
   // Görevlendirmeler listesini yazdıkça süz (yeniden çizmeden)
   root.addEventListener('input', e => {
@@ -3980,14 +4010,14 @@ function mount(root, opts = {}) {
       const say = root.querySelector('#ap-pano-ara-say'); if (say) say.textContent = q ? `${n} / ${top} istasyon gösteriliyor (üstteki sayılar tüm istasyonlar içindir)` : '';
       const yok = root.querySelector('#ap-pano-ara-yok'); if (yok) yok.style.display = q && !n && top ? '' : 'none'; return;
     }
-    if (t && t.id === 'ap-tek-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(), il = S.tekIlce || ''; const l = [...root.querySelectorAll('.ap-tlist [data-ara]')]; l.forEach(x => { x.style.display = (!q || x.dataset.ara.includes(q)) && (!il || x.dataset.ilce === il) ? '' : 'none'; }); return; }
+    if (t && t.id === 'ap-tek-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(), il = S.tekIlce || ''; root.querySelectorAll('.ap-tlist [data-ara]').forEach(x => { x.style.display = (!q || x.dataset.ara.includes(q)) && (!il || x.dataset.ilce === il) ? '' : 'none'; }); root.querySelectorAll('.ap-tlist [data-ozel]').forEach(x => { x.style.display = q || il ? 'none' : ''; }); return; }
     if (t && t.id === 'ap-ist-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(); root.querySelectorAll('.ap-pop-ist [data-ara]').forEach(x => { x.style.display = !q || x.dataset.ara.includes(q) ? '' : 'none'; }); return; }
     if (t && (t.id === 'ap-d-kisi' || t.id === 'ap-d-ist')) {      // İstasyon dışı görevliler: aynı süzgeç, durum yeniden çizimde korunur
-      S.disAra = (root.querySelector('#ap-d-kisi') || {}).value || ''; S.disIst = (root.querySelector('#ap-d-ist') || {}).value || '';
+      S.disAra = (root.querySelector('#ap-d-kisi') || {}).value || ''; S.disIst = (root.querySelector('#ap-d-ist') || {value: S.disIst}).value || '';
       const q = C.TR(S.disAra).trim(); root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!S.disIst || r.dataset.kay === S.disIst) ? '' : 'none'; }); return;
     }
     if (!t || (t.id !== 'ap-g-kisi' && t.id !== 'ap-g-ist')) return;
-    S.gAra = (root.querySelector('#ap-g-kisi') || {}).value || ''; S.gIst = (root.querySelector('#ap-g-ist') || {}).value || '';
+    S.gAra = (root.querySelector('#ap-g-kisi') || {}).value || ''; S.gIst = (root.querySelector('#ap-g-ist') || {value: S.gIst}).value || '';
     const q = C.TR(S.gAra).trim(), ist = S.gIst;
     root.querySelectorAll('tr[data-ara]').forEach(r => { r.style.display = (!q || r.dataset.ara.includes(q)) && (!ist || r.dataset.kay === ist || r.dataset.hed === ist) ? '' : 'none'; });
   });

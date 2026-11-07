@@ -379,7 +379,19 @@
       case 'arstat-ilce': { const l = istAdlari().filter(a => C.ilceAdi(a) === v), sec = S.arsivIstler = S.arsivIstler || [], hepsi = l.every(a => sec.includes(a)); S.arsivIstler = hepsi ? sec.filter(a => !l.includes(a)) : [...new Set([...sec, ...l])]; break; }
       case 'arstat-tek-pop': S.arstatAra = ''; S.tekIlce = ''; S.arstatAc = S.arstatAc === 'tek-' + v ? '' : 'tek-' + v; if (S.arstatAc) setTimeout(() => { const i = root.querySelector('#ap-tek-ara'); if (i) i.focus(); }, 0); break;
       case 'arstat-tek-ilce': S.tekIlce = S.tekIlce === v ? '' : v; break;
-      case 'arstat-tek-sec': if (t.dataset.k === 'n2') { S.n2.ist = v; S.n2.oneri = null; } else S.ist = v; S.arstatAc = ''; S.arstatAra = ''; S.tekIlce = ''; break;
+      case 'arstat-tek-sec': {
+        const k = t.dataset.k || ''; S.arstatAc = ''; S.arstatAra = ''; S.tekIlce = '';
+        if (k === 'n2') { S.n2.ist = v; S.n2.oneri = null; }
+        else if (k === 'ist') S.ist = v;
+        else if (k === 'gist') S.gIst = v;
+        else if (k === 'dist') S.disIst = v;
+        else if (k === 'rist') S.rotIst = v;
+        else if (k === 'gyh') S.gYeniHedef = v;
+        else if (k === 'fbirim') { S.filtre.birim = v; S.pSayfa = 0; }
+        else if (k.startsWith('rh:')) { S.rotHedef = S.rotHedef || {}; S.rotHedef[k.slice(3)] = v; }
+        else if (k.startsWith('f:')) { const [, id, f] = k.split(':'); if (!salt()) setField(id, f, v); }
+        break;
+      }
       case 'arstat-ist-tumu': S.arsivIstler = istAdlari(); break;
       case 'arstat-ist-temizle': S.arsivIstler = []; break;
       case 'arsiv-excel': arsivExcel(); return true;

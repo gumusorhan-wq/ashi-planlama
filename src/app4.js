@@ -247,17 +247,31 @@
       <div class="ap-popalt"><span class="ap-note">İlçe düğmesi o ilçenin tüm istasyonlarını seçer / kaldırır</span><button class="ap-btn sm" data-pop data-act="arstat-pop" data-v="">Kapat ✕</button></div></div>` : ''}</div>`;
   }
   // Tek istasyon seçen ortak panel — HUSER ortak istasyon seçicisi (IstasyonSeciciTek) görünümü: 🚑 düğme, ara, sayılı ilçe düğmeleri, liste.
-  // anahtar: 'ist' (Modül 1 istasyon sayfası) / 'n2' (Modül 2). Seçim tıklayınca uygulanır, panel kapanır.
-  function istTekHtml(anahtar, secili, adlar) {
-    const acik = S.arstatAc === 'tek-' + anahtar, q = C.TR(S.arstatAra || '').trim(), ilceSec = S.tekIlce || '';
-    if (adlar.length <= 1) return `<b class="ap-tekad">🚑 ${esc(secili || '—')}</b>`;
+  // anahtar: seçimin nereye yazılacağı (arstat-tek-sec'te çözülür): 'ist', 'n2', 'gist', 'dist', 'rist', 'rh:<id>', 'f:<kayıtId>:<alan>'.
+  // ops: {bos: 'Tümü' gibi boş değer satırı, ek: [[değer, yazı]] özel satırlar, kapali: düzenleme yok, kucuk: tablo içi düğme, yazi: düğme yazısı}
+  // Panel ekranda sabit konumlanır (tablo kaydırma kutusu kesmesin); bkz. tekKonum().
+  function istTekHtml(anahtar, secili, adlar, ops = {}) {
+    const acik = S.arstatAc === 'tek-' + anahtar, q = C.TR(S.arstatAra || '').trim(), ilceSec = S.tekIlce || '', ek = ops.ek || [];
+    const ekSec = ek.find(([v]) => v === secili), yazi = ops.yazi != null ? ops.yazi : secili ? (ekSec ? ekSec[1] : secili) : (ops.bos || '—');
+    if (!ops.bos && !ek.length && adlar.length <= 1 || ops.kapali) return `<span class="ap-tekad${ops.kucuk ? ' sm' : ''}">${ops.kucuk ? '' : '🚑 '}${esc(yazi)}</span>`;
     const gruplar = new Map(); adlar.forEach(a => { const k = C.ilceAdi(a), g = gruplar.get(k) || {ad: ilceGoster(a), n: 0}; g.n++; gruplar.set(k, g); });
     const gizle = a => (ilceSec && C.ilceAdi(a) !== ilceSec) || (q && !C.TR(a + ' ' + ilceGoster(a)).includes(q));
-    return `<div class="ap-popwrap"><button class="ap-btn ap-tekbtn" data-pop data-act="arstat-tek-pop" data-v="${anahtar}" title="${esc(secili)}">🚑 <b>${esc(secili || '—')}</b> ▾</button>${acik ? `<div class="ap-pop ap-pop-ist" data-pop>
+    const satir = (v, t, ozel) => `<button class="${v === (secili || '') ? 'sec' : ''}${ozel ? ' ozel' : ''}" data-pop data-act="arstat-tek-sec" data-k="${esc(anahtar)}" data-v="${esc(v)}" ${ozel ? 'data-ozel' : `data-ara="${esc(C.TR(t + ' ' + ilceGoster(t)))}" data-ilce="${esc(C.ilceAdi(t))}"`} ${!ozel && gizle(t) ? 'style="display:none"' : ozel && (q || ilceSec) ? 'style="display:none"' : ''}><i></i>${esc(t)}</button>`;
+    return `<div class="ap-popwrap"><button class="ap-btn ap-tekbtn${ops.kucuk ? ' sm' : ''}${secili ? ' dolu' : ''}" data-pop data-act="arstat-tek-pop" data-v="${esc(anahtar)}" title="${esc(yazi)}">${ops.kucuk ? '' : '🚑 '}<b>${esc(yazi)}</b> ▾</button>${acik ? `<div class="ap-pop ap-pop-ist ap-pop-tek" data-pop>
       <div class="ap-row" style="justify-content:space-between"><b class="ap-poph">İSTASYON SEÇ</b><span class="ap-note">${adlar.length} birim</span></div>
       <input class="ap-in w" id="ap-tek-ara" data-pop placeholder="İlçe veya istasyon ara…" value="${esc(S.arstatAra || '')}" autocomplete="off">
       ${gruplar.size > 1 ? `<div class="ap-chips">${[...gruplar.entries()].map(([k, g]) => `<button class="ap-chip ${ilceSec === k ? 'sec' : C.ilceAdi(secili || '') === k ? 'kis' : ''}" data-pop data-act="arstat-tek-ilce" data-v="${esc(k)}">${esc(g.ad)} (${g.n})</button>`).join('')}</div>` : ''}
-      <div class="ap-tlist">${adlar.map(a => `<button class="${a === secili ? 'sec' : ''}" data-pop data-act="arstat-tek-sec" data-k="${anahtar}" data-v="${esc(a)}" data-ara="${esc(C.TR(a + ' ' + ilceGoster(a)))}" data-ilce="${esc(C.ilceAdi(a))}" ${gizle(a) ? 'style="display:none"' : ''}><i></i>${esc(a)}</button>`).join('')}</div></div>` : ''}</div>`;
+      <div class="ap-tlist">${ops.bos ? satir('', ops.bos, true) : ''}${ek.map(([v, t]) => satir(v, t, true)).join('')}${adlar.map(a => satir(a, a, false)).join('')}</div></div>` : ''}</div>`;
+  }
+  // Açık tek seçim panelini ekranda düğmesinin altına (yer yoksa üstüne) sabitler
+  function tekKonum() {
+    const pop = root.querySelector('.ap-pop-tek'); if (!pop) return;
+    const btn = pop.parentElement.querySelector('.ap-tekbtn'); if (!btn) return;
+    const r = btn.getBoundingClientRect(), w = Math.min(520, window.innerWidth - 16);
+    Object.assign(pop.style, {position: 'fixed', width: w + 'px', left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px', overflow: 'auto'});
+    const alt = window.innerHeight - r.bottom - 12, ust = r.top - 12;
+    if (alt < 300 && ust > alt) Object.assign(pop.style, {top: 'auto', bottom: (window.innerHeight - r.top + 4) + 'px', maxHeight: Math.max(200, ust) + 'px'});
+    else Object.assign(pop.style, {bottom: 'auto', top: (r.bottom + 4) + 'px', maxHeight: Math.max(200, alt) + 'px'});
   }
   // ---- İzin ve geçici görev takibi: personelin hangi aylarda izin kullandığı / geçici görevlendirildiği (kayıtlı tüm aylık planlardan) ----
   async function takipYukle() {
