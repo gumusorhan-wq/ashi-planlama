@@ -1334,11 +1334,11 @@ function mount(root, opts = {}) {
   // ---------- görünüm yardımcıları ----------
   // Satır rengi: ekran, PNG ve Excel'de aynı (planlama biriminin aylık dosyasındaki renk açıklaması)
   const RENK = {gelen: '#8DB4E2', giden: '#C0504D', izin: '#FFFF00', rapor: '#A6A6A6', analik: '#B1A0C7', uzun: '#9BBB59'};
-  const RENK_LEJANT = [['gelen', '1 aylık gelen personel'], ['giden', 'Giden personel'], ['izin', 'Yıllık izinli personel'], ['rapor', 'Raporlu personel'], ['analik', 'Analık hakkındaki personel (doğum, gebe, süt izni)'], ['uzun', 'Uzun süreli görevlendirme (3 ay ve üzeri)']];
+  const RENK_LEJANT = [['gelen', '1 aylık gelen personel'], ['giden', 'Giden personel'], ['izin', 'Yıllık izinli personel'], ['rapor', 'Raporlu personel'], ['analik', 'Analık hakkındaki personel (doğum, gebe, süt izni)'], ['uzun', 'Uzun süreli görevle gelen personel (3 ay ve üzeri)']];
   function satirRenk(k, gelen) {
     const D = durumlar(), d = k.durum || '';
     if (gelen || d === 'GEÇİCİ GÖREVLİ') return k.gorev && xlUzunGorev(k.gorev) ? RENK.uzun : RENK.gelen;   // 3 ay+ gelen de yeşil (uzun süreli)
-    if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[d] || {}).disarida) return xlUzunGorev(k.gorev) ? RENK.uzun : RENK.giden;
+    if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[d] || {}).disarida) return RENK.giden;   // kadrosunun olduğu yerde giden hep kırmızı; yeşil yalnız gittiği yerde (uzun süreli gelen)
     if (/RAPORLU/.test(d)) return RENK.rapor;
     if (/ANALIK|DOĞUM|GEBE|GEBELİK/.test(d) || k.sut > 0) return RENK.analik;
     if (D[d] && D[d].renk) return D[d].renk;
