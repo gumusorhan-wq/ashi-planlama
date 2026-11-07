@@ -291,19 +291,19 @@
       case 'n2-gonder': {
         const T = n2TeklifOzet(b); if (!n2Duzenlenir(b.ad)) break;
         const sorun = [T.fark ? `toplam nöbet gerekenden ${T.fark > 0 ? 'fazla' : 'eksik'} (${fmt(T.toplam)} / ${T.h.ihtiyac})` : '', T.asimSay ? `${T.asimSay} kişide üst sınır aşıldı` : ''].filter(Boolean);
-        if (sorun.length && !confirm('Uyarılar var: ' + sorun.join('; ') + '.\n\nYine de planlamaya gönderilsin mi?')) break;
+        if (sorun.length && !(await onay('Uyarılar var: ' + sorun.join('; ') + '.\n\nYine de planlamaya gönderilsin mi?'))) break;
         mut2(() => { const o = n2OnayYaz(b.ad); T.satir.forEach(x => { if (x.tutar) o.teklif[x.k.id] = x.tek; }); o.durum = 'gonderildi'; o.gonderZaman = Date.now(); o.ret = ''; }, 'İstasyon planı planlamaya gönderildi', `${b.ad}: ${T.degisenSay} değişiklik`);
         toast('Planınız planlama birimine gönderildi.'); break;
       }
-      case 'n2-hedef-oto': if (n2Duz() && confirm('Elle değiştirilen nöbet hedefleri otomatik sayılara dönsün mü?')) mut2(() => { n2Depo(b.ad).hedef = {}; }, 'Modül 2: nöbet hedefleri otomatiğe döndü', b.ad); break;
-      case 'n2-teklif-sifirla': if (n2Duzenlenir(b.ad) && confirm('Yaptığınız değişiklikler geri alınsın mı?')) mut2(() => { n2OnayYaz(b.ad).teklif = {}; }, 'İstasyon teklifi sıfırlandı', b.ad); break;
-      case 'talep-onayla': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if (confirm(`${bb.ad} istasyonunun planı kesin plana işlensin mi?`)) { talepOnayla(bb); toast(`${bb.ad} planı onaylandı.`); } break; }
+      case 'n2-hedef-oto': if (n2Duz() && (await onay('Elle değiştirilen nöbet hedefleri otomatik sayılara dönsün mü?'))) mut2(() => { n2Depo(b.ad).hedef = {}; }, 'Modül 2: nöbet hedefleri otomatiğe döndü', b.ad); break;
+      case 'n2-teklif-sifirla': if (n2Duzenlenir(b.ad) && (await onay('Yaptığınız değişiklikler geri alınsın mı?'))) mut2(() => { n2OnayYaz(b.ad).teklif = {}; }, 'İstasyon teklifi sıfırlandı', b.ad); break;
+      case 'talep-onayla': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if ((await onay(`${bb.ad} istasyonunun planı kesin plana işlensin mi?`))) { talepOnayla(bb); toast(`${bb.ad} planı onaylandı.`); } break; }
       case 'talep-reddet': { const bb = S.plan.birimler.find(x => x.ad === v), not = (root.querySelector('[id="ap-talep-not-' + v + '"]') || {}).value || ''; if (!bb || salt()) break; if (!not.trim()) { toast('Düzeltme isterken istasyona kısa bir not yazın.'); break; } mut(() => { const o = n2OnayYaz(bb.ad); o.durum = 'reddedildi'; o.ret = not.trim(); }, 'İstasyon planı için düzeltme istendi', `${bb.ad}: ${not.trim()}`); toast('Düzeltme istendi.'); break; }
-      case 'talep-geri-al': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if (confirm(`${bb.ad} istasyonunun onayı geri alınsın mı? ${(S.plan.onay[bb.ad] || {}).onceki ? 'Nöbet sayıları onaydan önceki değerlerine döner' : 'Bu onay eski sürümde yapıldığı için önceki değerler kayıtlı değil: nöbet kilitleri açılır ve planlanan nöbetler otomatik yeniden hesaplanır'}; istasyon yeniden onay bekler.`)) { const n = talepGeriAl(bb); toast(`${bb.ad} onayı geri alındı (${n} kişi).`); } break; }
-      case 'talep-hepsi': { const gel = S.plan.birimler.filter(x => x.tur === 'istasyon' && (S.plan.onay || {})[x.ad] && S.plan.onay[x.ad].durum === 'gonderildi'); if (salt() || !gel.length) break; if (confirm(`Gönderilen ${gel.length} istasyonun planı kesin plana işlensin mi?`)) { gel.forEach(talepOnayla); toast(`${gel.length} istasyon planı onaylandı.`); } break; }
+      case 'talep-geri-al': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if ((await onay(`${bb.ad} istasyonunun onayı geri alınsın mı? ${(S.plan.onay[bb.ad] || {}).onceki ? 'Nöbet sayıları onaydan önceki değerlerine döner' : 'Bu onay eski sürümde yapıldığı için önceki değerler kayıtlı değil: nöbet kilitleri açılır ve planlanan nöbetler otomatik yeniden hesaplanır'}; istasyon yeniden onay bekler.`))) { const n = talepGeriAl(bb); toast(`${bb.ad} onayı geri alındı (${n} kişi).`); } break; }
+      case 'talep-hepsi': { const gel = S.plan.birimler.filter(x => x.tur === 'istasyon' && (S.plan.onay || {})[x.ad] && S.plan.onay[x.ad].durum === 'gonderildi'); if (salt() || !gel.length) break; if ((await onay(`Gönderilen ${gel.length} istasyonun planı kesin plana işlensin mi?`))) { gel.forEach(talepOnayla); toast(`${gel.length} istasyon planı onaylandı.`); } break; }
       case 'n2-gorunum': S.n2.gorunum = v; break;
       case 'n2-istek': { const dp = n2Depo(b.ad), id = t.dataset.id, g = C.iso(S.y, S.m, +v); mut2(() => { const l = dp.istek[id] = dp.istek[id] || []; const i = l.indexOf(g); if (i >= 0) l.splice(i, 1); else l.push(g); if (!l.length) delete dp.istek[id]; }); break; }
-      case 'n2-istek-temizle': if (confirm('Bu istasyonun tüm istek günleri silinsin mi?')) mut2(() => { n2Depo(b.ad).istek = {}; }, 'Modül 2: istekler temizlendi', b.ad); break;
+      case 'n2-istek-temizle': if ((await onay('Bu istasyonun tüm istek günleri silinsin mi?'))) mut2(() => { n2Depo(b.ad).istek = {}; }, 'Modül 2: istekler temizlendi', b.ad); break;
       case 'n2-izin-ekle': {
         const id = root.querySelector('#ap-n2-izkisi').value, bas = root.querySelector('#ap-n2-izbas').value, bit = root.querySelector('#ap-n2-izbit').value;
         if (!id || !bas || !bit || bit < bas) { toast('Kişi, başlangıç ve bitiş tarihini (bitiş ≥ başlangıç) girin.'); break; }
@@ -311,14 +311,14 @@
       }
       case 'n2-izin-sil': mut2(() => { const dp = n2Depo(b.ad); dp.izin[t.dataset.id].splice(+v, 1); if (!dp.izin[t.dataset.id].length) delete dp.izin[t.dataset.id]; }); break;
       case 'n2-uret': {
-        const dp = n2Depo(b.ad); if (dp.liste && !confirm('Mevcut liste yeni oluşturulan listeyle değiştirilecek. Devam edilsin mi?')) break;
+        const dp = n2Depo(b.ad); if (dp.liste && !(await onay('Mevcut liste yeni oluşturulan listeyle değiştirilecek. Devam edilsin mi?'))) break;
         if (!n2Duz()) { toast('Düzenleme yetkiniz yok / ay kilitli.'); break; }
         S.n2.calisiyor = true; render(); await new Promise(r => setTimeout(r, 40));
         try { const G = n2Girdi(b), r = NC.uret(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 12000, seed: (Date.now() % 100000) + 1}); mut2(() => { dp.liste = r.liste; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.zorlandi ? ' (zorlandı)' : ''}`); toast(r.ceza === 0 ? 'Liste oluşturuldu: kural ihlali yok.' : r.sert === 0 ? `Liste oluşturuldu: boş yuva ve sert kural ihlali yok${r.zorlandi ? ' (zorlanarak)' : ''}; ${r.ihlal.length} küçük sapma (nöbet sayısı vb.) kaldı. Denetim sekmesine bakın.` : `Liste oluşturuldu; ${r.sert} sert ihlal kaldı (kadro bu kuralları sağlamaya yetmiyor olabilir). Denetim sekmesine bakın.`); }
         finally { S.n2.calisiyor = false; }
         break;
       }
-      case 'n2-liste-temizle': if (confirm('Liste silinsin mi?')) mut2(() => { n2Depo(b.ad).liste = null; }, 'Modül 2: liste temizlendi', b.ad); break;
+      case 'n2-liste-temizle': if ((await onay('Liste silinsin mi?'))) mut2(() => { n2Depo(b.ad).liste = null; }, 'Modül 2: liste temizlendi', b.ad); break;
       case 'n2-uygula': { const [i, j] = v.split(':').map(Number), s = S.n2.oneri.oneriler[i].secenekler[j], dp = n2Depo(b.ad); mut2(() => { dp.liste[s.gun][s.yuva] = s.yeni; }, 'Modül 2: öneri uygulandı', `${s.gun}. gün ${s.yuva} → ${s.yeniAd}`); break; }
       case 'n2-excel': n2Excel(b); return true;
       case 'arsiv-yaz': {
@@ -335,7 +335,7 @@
         }
         toast(`${n} ay arşive eklendi.`); break;
       }
-      case 'arsiv-sil': if (planlamaRol() && confirm(`${ayAd(v)} arşivi silinsin mi?`)) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
+      case 'arsiv-sil': if (planlamaRol() && (await onay(`${ayAd(v)} arşivi silinsin mi?`))) { await depo.del(arsivAnahtar(v)); delete S.arsivVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); } break;
       case 'arstat-aylar': S.arstatAc = S.arstatAc === 'ayno' && S.arstatAyAc === v ? '' : 'ayno'; S.arstatAyAc = v; break;
       case 'takip-pop': S.arstatAc = S.arstatAc === 'tk-' + v ? '' : 'tk-' + v; break;
       case 'takip-yil': { const T = S.takip, y = +v; T.yil = T.yil.includes(y) ? T.yil.filter(x => x !== y) : [...T.yil, y]; break; }
@@ -346,7 +346,7 @@
       case 'takip-gpop': S.takipPop = S.takipPop === v ? '' : v; break;      // geçici görev hücresi: yer / tarih açılır kutusu
       case 'takip-yenile': S.takipVeri = null; break;
       case 'takip-excel': takipExcel(); return true;
-      case 'arsiv-ay-sil': if (planlamaRol() && confirm(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`)) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;
+      case 'arsiv-ay-sil': if (planlamaRol() && (await onay(`${ayAd(v)} için arşiv kaydı ve gerçekleşen nöbet verisi silinsin mi? (Aylık plan silinmez.)`))) { await depo.del(arsivAnahtar(v)); await depo.del('gercek:' + v); if (S.arsivVeri) delete S.arsivVeri[v]; if (S.gercekVeri) delete S.gercekVeri[v]; S.arsivSecili = (S.arsivSecili || []).filter(x => x !== v); toast('Arşiv silindi.'); } break;
       case 'arsiv-ay': { const l = [...new Set(S.arsivSecili || [])]; S.arsivSecili = l.includes(v) ? l.filter(x => x !== v) : [...l, v]; break; }
       case 'arsiv-ay-hepsi': S.arsivSecili = Object.keys(S.arsivVeri); break;
       case 'arsiv-ay-hic': S.arsivSecili = []; break;
@@ -357,7 +357,7 @@
         const l = S.yuklemeler || [], x = l[+v]; if (!x || S.rol === 'salt_okur') break;
         const nAy = nAylari([x]), acik = !!S.plan && x.ay === ayAnahtari();
         if (nAy.length && acik && salt()) { toast('Bu ayın planı salt okunur (kilitli ya da başkası düzenliyor); bu yükleme şimdi silinemez.'); break; }
-        if (!confirm(nAy.length ? `"${x.ad}" yükleme kaydı ve bu dosyadan gelen nöbet verileri silinsin mi?\n\n${ayAd(x.ay)} planındaki nöbet rolü / sürücülük bilgileri (${nAy.map(ayAd).join(', ')}) ve başka bir yüklemede kullanılmayan gerçekleşen nöbet kayıtları silinir.` : `"${x.ad}" yükleme kaydı silinsin mi?\n\nNot: Personel listelerinin plana işlediği kişi ve izin bilgileri geri alınmaz; yalnızca yükleme kaydı silinir (ayın dosya durumu "bekleniyor" olur).`)) break;
+        if (!(await onay(nAy.length ? `"${x.ad}" yükleme kaydı ve bu dosyadan gelen nöbet verileri silinsin mi?\n\n${ayAd(x.ay)} planındaki nöbet rolü / sürücülük bilgileri (${nAy.map(ayAd).join(', ')}) ve başka bir yüklemede kullanılmayan gerçekleşen nöbet kayıtları silinir.` : `"${x.ad}" yükleme kaydı silinsin mi?\n\nNot: Personel listelerinin plana işlediği kişi ve izin bilgileri geri alınmaz; yalnızca yükleme kaydı silinir (ayın dosya durumu "bekleniyor" olur).`))) break;
         l.splice(+v, 1);
         if (nAy.length) {
           const ayniPlan = nAylari(l.filter(y => y.ay === x.ay)), geri = nAy.filter(a => !ayniPlan.includes(a));

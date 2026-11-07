@@ -86,10 +86,10 @@ function mount(root, opts = {}) {
     kaydetIptal(); await planYaz();
     toast(`${ayEtiket()} kilidi açıldı; plan "Kesinleşti" durumunda.`); render();
   }
-  function ayKilidiAcIste() {
+  async function ayKilidiAcIste() {
     if (S.rol !== 'yonetici') { toast('Ay kilidini yalnızca yönetici açabilir.'); return; }
     if (!S.plan || S.plan.durum !== 'kilitli' || !guncelAy()) return;
-    if (!confirm(`${ayEtiket()} ayının kilidi açılsın mı?\n\nPlan "Kesinleşti" durumuna döner ve yeniden düzenlenebilir. İşlem günlüğe yazılır.`)) { render(); return; }
+    if (!(await onay(`${ayEtiket()} ayının kilidi açılsın mı?\n\nPlan "Kesinleşti" durumuna döner ve yeniden düzenlenebilir. İşlem günlüğe yazılır.`))) { render(); return; }
     if (!kilitVar) { ayKilidiAc(); return; }
     S.kilitAcBekle = true; render();      // render → kilitGuncelle: 'ana' kilidi istenir; izin gelince onDegis ayKilidiAc'ı çağırır
   }

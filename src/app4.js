@@ -246,6 +246,21 @@
       <div class="ap-ilist">${tum.map(a => `<label data-ara="${esc(C.TR(a))}" ${gizle(a, ilceGoster(a)) ? 'style="display:none"' : ''}><input type="checkbox" data-pop data-act="arstat-ist" data-v="${esc(a)}" ${sec.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div>
       <div class="ap-popalt"><span class="ap-note">İlçe düğmesi o ilçenin tüm istasyonlarını seçer / kaldırır</span><button class="ap-btn sm" data-pop data-act="arstat-pop" data-v="">Kapat ✕</button></div></div>` : ''}</div>`;
   }
+  // Ortak onay penceresi — tarayıcının confirm() kutusu yerine (HUSER kit onayla ile aynı düzen).
+  // if (!(await onay('… silinsin mi?'))) return;  sil / kaldır / sıfırla / geri alınamaz → kırmızı; Enter = evet (tehlikelide değil), Esc = vazgeç
+  function onay(metin, ops = {}) {
+    const tehlikeli = ops.tehlikeli != null ? ops.tehlikeli : /sil|kaldır|sıfırla|geri alınamaz|SİL|KALDIR|SIFIRLA/.test(String(metin || ''));
+    return new Promise(coz => {
+      const d = document.createElement('div'); d.className = 'ap-modal ap-onay'; d.setAttribute('data-pop', '');
+      d.innerHTML = `<div role="alertdialog" aria-modal="true"><h3 class="${tehlikeli ? 'tehlike' : ''}">${ops.baslik ? esc(ops.baslik) : tehlikeli ? 'Dikkat' : 'Onay'}</h3><p>${esc(metin)}</p><div class="ap-onay-alt"><button class="ap-btn" data-o="0">Vazgeç</button><button class="ap-btn ${tehlikeli ? 'tehlike' : 'pri'}" data-o="1">${tehlikeli ? 'Evet, devam et' : 'Evet'}</button></div></div>`;
+      const tus = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); bit(false); } else if (e.key === 'Enter' && !tehlikeli) { e.preventDefault(); e.stopPropagation(); bit(true); } };
+      const bit = v => { document.removeEventListener('keydown', tus, true); d.remove(); coz(v); };
+      d.addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-o]'); if (b) bit(b.dataset.o === '1'); else if (e.target === d) bit(false); });
+      d.addEventListener('mousedown', e => e.stopPropagation());
+      document.addEventListener('keydown', tus, true);
+      root.appendChild(d); const f = d.querySelector(tehlikeli ? '[data-o="0"]' : '[data-o="1"]'); if (f) f.focus();
+    });
+  }
   // Tek istasyon seçen ortak panel — HUSER ortak istasyon seçicisi (IstasyonSeciciTek) görünümü: 🚑 düğme, ara, sayılı ilçe düğmeleri, liste.
   // anahtar: seçimin nereye yazılacağı (arstat-tek-sec'te çözülür): 'ist', 'n2', 'gist', 'dist', 'rist', 'rh:<id>', 'f:<kayıtId>:<alan>'.
   // ops: {bos: 'Tümü' gibi boş değer satırı, ek: [[değer, yazı]] özel satırlar, kapali: düzenleme yok, kucuk: tablo içi düğme, yazi: düğme yazısı}

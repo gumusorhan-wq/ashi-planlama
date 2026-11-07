@@ -1061,7 +1061,7 @@
         case 'oner': mut(() => oner(S.ist), 'Planlanan nöbet önerildi', S.ist); break;
         case 'tum-plan': {      // tek tuş: geri çağır → hesapla → rotasyon önerilerini görevlendir → yeniden hesapla
           if (salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
-          if (!confirm('Tüm planlama oluşturulsun mu?\n\n1) Açığı olan istasyonların dışarıdaki personeli geri çağrılır\n2) Planlanan nöbetler hesaplanır (kilitli değerler korunur)\n3) Rotasyon önerileri görevlendirme olarak uygulanır\n4) Nöbetler yeniden hesaplanır')) break;
+          if (!(await onay('Tüm planlama oluşturulsun mu?\n\n1) Açığı olan istasyonların dışarıdaki personeli geri çağrılır\n2) Planlanan nöbetler hesaplanır (kilitli değerler korunur)\n3) Rotasyon önerileri görevlendirme olarak uygulanır\n4) Nöbetler yeniden hesaplanır'))) break;
           S.toplu = true; let gc = 0, gv = 0;
           try {
             gc = acikGeriCek(true).length; otoHesapla();
@@ -1076,14 +1076,14 @@
           if (salt()) { toast(!guncelAy() ? 'Geçmiş aylar salt okunurdur; sıfırlanamaz.' : S.plan && S.plan.durum === 'kilitli' ? (S.rol === 'yonetici' ? 'Bu ay kilitli; önce "Kilidi aç" ile kilidi açın.' : 'Bu ay kilitli; kilidi yalnız yönetici açabilir.') : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); break; }
           // Ay sıfırdan başlar: plan + bu plan ayına yüklenen dosyaların kayıtları + onlardan gelen gerçekleşen nöbet verileri (başka bir ayın yüklemesinde de kullanılan nöbet ayı korunur)
           const ayK = ayAnahtari(), yl = (await depo.get('yuklemeler')) || [], buAy = yl.filter(x => x.ay === ayK), kalan = yl.filter(x => x.ay !== ayK), nAy = nAylari(buAy);
-          if (!confirm(`${ayEtiket()} planı TAMAMEN silinsin mi?\n\nPlan, bu aya yüklenen dosyalar (${buAy.length} kayıt) ve onlardan gelen nöbet verileri silinecek: kişiler, nöbet sayıları, görevlendirmeler, istasyon onayları, Modül 2 nöbet listeleri ve yükleme kayıtları${nAy.length ? `; gerçekleşen nöbet kayıtları (${[...new Set(nAy)].map(ayAd).join(', ')}) — başka bir ayın yüklemesinde de kullanılanlar korunur` : ''}. Arşiv kaydı ve diğer aylar etkilenmez. Bu işlem geri alınamaz (önce Ayarlar'dan JSON yedeği alabilirsiniz).`)) break;
+          if (!(await onay(`${ayEtiket()} planı TAMAMEN silinsin mi?\n\nPlan, bu aya yüklenen dosyalar (${buAy.length} kayıt) ve onlardan gelen nöbet verileri silinecek: kişiler, nöbet sayıları, görevlendirmeler, istasyon onayları, Modül 2 nöbet listeleri ve yükleme kayıtları${nAy.length ? `; gerçekleşen nöbet kayıtları (${[...new Set(nAy)].map(ayAd).join(', ')}) — başka bir ayın yüklemesinde de kullanılanlar korunur` : ''}. Arşiv kaydı ve diğer aylar etkilenmez. Bu işlem geri alınamaz (önce Ayarlar'dan JSON yedeği alabilirsiniz).`))) break;
           kaydetIptal(); await depo.del(anahtar(S.y, S.m));
           if (buAy.length) { await depo.put('yuklemeler', kalan); S.yuklemeler = kalan; await gercekTemizle(nAy, kalan); } S.plan = null; S.planAnahtarlari = (S.planAnahtarlari || []).filter(k => k !== anahtar(S.y, S.m)); S.ist = ''; S.sayfa = 'pano'; S.takipVeri = null; S.asos = null;
           toast(`${ayEtiket()} planı sıfırlandı.`); break;
         }
         case 'tum-sifirla': {      // tüm aylık planlar + arşiv + gerçekleşen nöbet + yükleme günlüğü (ayarlar korunur); yalnız yönetici
           if (S.rol !== 'yonetici') { toast('Yalnızca yönetici tüm verileri sıfırlayabilir.'); break; }
-          if (!confirm('TÜM aylık planlar, arşiv kayıtları, gerçekleşen nöbet verisi ve yükleme günlüğü silinecek (Ayarlar korunur). Bu işlem geri alınamaz.\n\nDevam edilsin mi?')) break;
+          if (!(await onay('TÜM aylık planlar, arşiv kayıtları, gerçekleşen nöbet verisi ve yükleme günlüğü silinecek (Ayarlar korunur). Bu işlem geri alınamaz.\n\nDevam edilsin mi?'))) break;
           if ((prompt('Onaylamak için SIFIRLA yazın:') || '').trim().toLocaleUpperCase('tr-TR') !== 'SIFIRLA') { toast('Vazgeçildi.'); break; }
           kaydetIptal(); const ks = ((await depo.keys()) || []).map(String).filter(k => /^(plan|arsiv|gercek):/.test(k) || k === 'yuklemeler'); for (const k of ks) await depo.del(k);
           S.plan = null; S.planAnahtarlari = []; S.arsivVeri = null; S.gercekVeri = null; S.yuklemeler = []; S.takipVeri = null; S.ist = ''; S.sayfa = 'pano'; S.asos = null; S.oncePlanBirim = new Map();
@@ -1099,7 +1099,7 @@
           break;
         }
         case 'kilit-ac': ayKilidiAcIste(); return;
-        case 'kisi-sil': { const k = kayit(t.dataset.id); if (k && confirm(`${k.ad} kaydı silinsin mi?`)) mut(() => { (S.plan.silinen = S.plan.silinen || []).unshift({...JSON.parse(JSON.stringify(k)), _silZaman: Date.now(), _silBirim: k.birim}); S.plan.silinen.length = Math.min(S.plan.silinen.length, 200); S.plan.kayitlar = S.plan.kayitlar.filter(x => x.id !== k.id); }, 'Kişi silindi', k.ad); break; }
+        case 'kisi-sil': { const k = kayit(t.dataset.id); if (k && (await onay(`${k.ad} kaydı silinsin mi?`))) mut(() => { (S.plan.silinen = S.plan.silinen || []).unshift({...JSON.parse(JSON.stringify(k)), _silZaman: Date.now(), _silBirim: k.birim}); S.plan.silinen.length = Math.min(S.plan.silinen.length, 200); S.plan.kayitlar = S.plan.kayitlar.filter(x => x.id !== k.id); }, 'Kişi silindi', k.ad); break; }
         case 'kisi-geri': { const sl = (S.plan.silinen || []).find(x => x.id === t.dataset.id); if (!sl) break; if (S.plan.kayitlar.some(x => x.id === sl.id || (sl.tc && x.tc === sl.tc))) { toast('Bu kişi zaten listede.'); break; } const {_silZaman, _silBirim, ...k0} = sl; mut(() => { S.plan.kayitlar.push(k0); S.plan.silinen = S.plan.silinen.filter(x => x.id !== sl.id); }, 'Silinen kişi geri getirildi', `${k0.ad} → ${k0.birim}`); toast(`${k0.ad} geri getirildi.`); break; }
         case 'tp-ay-ac': S.tp = S.tp && S.tp.tur === 'ay' ? null : {tur: 'ay', acik: [S.y]}; break;
         case 'tp-yil': if (S.tp) { const y = +v, ac = S.tp.acik || []; S.tp.acik = ac.includes(y) ? ac.filter(x => x !== y) : [...ac, y]; } break;
@@ -1132,7 +1132,7 @@
           if (salt()) break;
           const ist = (root.querySelector('#ap-g-ist') || {}).value || '', L = S.plan.kayitlar.filter(k => tarihsizGorev(k) && (!ist || k.birim === ist || k.gorev.hedef === ist));
           if (!L.length) { toast('Tarihi boş görevlendirme yok.'); break; }
-          if (!confirm(`${L.length} tarihi boş görevlendirme bitirilsin mi?${ist ? `\n(${ist} süzgeci)` : ''}\n\nBu kişiler kadro istasyonlarına döner. ASOS dosyası yeniden yüklense de aynı görev geri gelmez; gerekiyorsa yeniden görevlendirebilirsiniz. İşlem günlüğe yazılır.`)) break;
+          if (!(await onay(`${L.length} tarihi boş görevlendirme bitirilsin mi?${ist ? `\n(${ist} süzgeci)` : ''}\n\nBu kişiler kadro istasyonlarına döner. ASOS dosyası yeniden yüklense de aynı görev geri gelmez; gerekiyorsa yeniden görevlendirebilirsiniz. İşlem günlüğe yazılır.`))) break;
           tarihsizGorevleriBitir(L, 'Tarihi boş görevlendirme bitirildi (önceki ayın görevi)'); otoHesapla(); damgala(); kaydet(); toast(`${L.length} görevlendirme bitirildi.`); break;
         }
         case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); S.gAra = ''; break; }
@@ -1177,12 +1177,12 @@
           if (ac) { otoHesapla(); kaydet(); }
           toast(ac ? `${n} kişinin kilidi açıldı.` : `${n} kişinin nöbeti onaylandı (kilitlendi).`); break;
         }
-        case 'geri-cagir': { const b = S.plan.birimler.find(x => x.ad === v); if (!b) break; const n = geriCagirmaAdaylari(b).length; if (n && confirm(`${b.ad} ekibine bağlı, başka birimlere görevli ${n} personel geri çağrılsın mı?`)) toast(`${geriCagir(b)} personel geri çağrıldı.`); break; }
+        case 'geri-cagir': { const b = S.plan.birimler.find(x => x.ad === v); if (!b) break; const n = geriCagirmaAdaylari(b).length; if (n && (await onay(`${b.ad} ekibine bağlı, başka birimlere görevli ${n} personel geri çağrılsın mı?`))) toast(`${geriCagir(b)} personel geri çağrıldı.`); break; }
         case 'gorev-bitir': {
           const k = kayit(t.dataset.id); if (!k || !k.gorev) break;
           if (aileHek(k)) { toast('Aile hekimliğindeki personel kendi isteği olmadan geri çağrılamaz.'); break; }
           const disKurum = !k.gorev.hedef;
-          if (disKurum && !confirm(`${k.ad} kurum dışı bir yerde görevli (${k.gorev.yer}). Görev yine de bitirilsin mi?`)) break;
+          if (disKurum && !(await onay(`${k.ad} kurum dışı bir yerde görevli (${k.gorev.yer}). Görev yine de bitirilsin mi?`))) break;
           const hedef = k.gorev.hedef || k.gorev.yer;
           mut(() => { k.gorev = null; if (k.durum === 'GEÇİCİ GÖREVDE') k.durum = ''; k.durumManuel = false; k.istek = ''; }, 'Geçici görev bitirildi (geri gönderildi)', `${k.ad}: ${hedef} → ${k.birim}`);
           toast(`${k.ad} ${k.birim} istasyonuna geri döndü.`); break;
@@ -1207,7 +1207,7 @@
         case 'excel-ist': { const b = S.plan.birimler.find(x => x.ad === v), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, b.tur === 'bashekimlik' ? xlBashekimlik(b) : xlIstasyonSayfa(b, b.tur === 'kkm' ? 'KOMUTA KONTROL MERKEZİ' : ''), sheetAd(b.tur === 'bashekimlik' ? 'BAŞHEKİMLİK' : b.tur === 'kkm' ? 'KKM' : b.ad, new Set())); xlsxIndir(wb, `${b.ad}-${S.y}-${C.pad(S.m)}.xlsx`); break; }
         case 'excel-toplu': xlsxIndir(excelToplu(), `ASHI-Planlama-${S.y}-${C.pad(S.m)}.xlsx`); break;
         case 'yedek-al': indir(new Blob([JSON.stringify({surum: VERSION, plan: S.plan})], {type: 'application/json'}), `ashi-planlama-${S.y}-${C.pad(S.m)}.json`); break;
-        case 'yedek-yukle': { const f = await dosyaSec('.json', false); if (!f) break; try { const j = JSON.parse(new TextDecoder().decode(await dosyaOku(f))); if (!j.plan || !Array.isArray(j.plan.kayitlar)) throw new Error('Geçersiz yedek'); if (!confirm('Bu ayın planı yedekle değiştirilecek. Devam edilsin mi?')) break; S.plan = j.plan; logla('Yedekten yüklendi'); damgala(); kaydet(); } catch (er) { toast('Yedek okunamadı: ' + er.message); } break; }
+        case 'yedek-yukle': { const f = await dosyaSec('.json', false); if (!f) break; try { const j = JSON.parse(new TextDecoder().decode(await dosyaOku(f))); if (!j.plan || !Array.isArray(j.plan.kayitlar)) throw new Error('Geçersiz yedek'); if (!(await onay('Bu ayın planı yedekle değiştirilecek. Devam edilsin mi?'))) break; S.plan = j.plan; logla('Yedekten yüklendi'); damgala(); kaydet(); } catch (er) { toast('Yedek okunamadı: ' + er.message); } break; }
         default: if (await ekClick(a, v, t, e)) break; return;
       }
     } catch (er) { console.error(er); toast('Hata: ' + er.message); }
@@ -1273,7 +1273,7 @@
           const aciliyor = !t.checked && b.ekipOf, dis = aciliyor ? geriCagirmaAdaylari(b) : [];
           S.ayar.ofIst = (Array.isArray(S.ayar.ofIst) ? S.ayar.ofIst : []).filter(x => x !== b.ad); if (t.checked) S.ayar.ofIst.push(b.ad); await ayarKaydet();
           mut(() => { b.ekipOf = t.checked; }, t.checked ? 'Ekip OF işaretlendi' : 'Ekip OF kaldırıldı (ekip açıldı)', b.ad);
-          if (aciliyor && dis.length && confirm(`${b.ad} yeniden açılıyor. Başka birimlere görevli ${dis.length} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`)) toast(`${geriCagir(b)} personel geri çağrıldı.`);
+          if (aciliyor && dis.length && (await onay(`${b.ad} yeniden açılıyor. Başka birimlere görevli ${dis.length} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`))) toast(`${geriCagir(b)} personel geri çağrıldı.`);
         }
       }
       else if (a === 'hedef-yuv') { if (S.rol !== 'yonetici') return; S.ayar.hedefYuvarla = t.checked; await ayarKaydet(); if (S.plan) { otoHesapla(); kaydet(); } }

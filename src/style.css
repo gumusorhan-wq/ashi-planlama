@@ -256,3 +256,7 @@ table.tk td.tk-gr.tk-soluk{background:rgba(220,38,38,.06)}
 .ap-ayac{background:none;border:0;font:inherit;font-weight:700;cursor:pointer;color:inherit;padding:2px 4px;border-radius:6px}.ap-ayac:hover{background:rgba(31,95,168,.08)}
 .ap-yilac{background:none;border:0;font:inherit;cursor:pointer;padding:0;color:inherit}.ap-tpbtn{white-space:nowrap}
 .ap-gunbtn:not(.sec):not(.hs){color:#1e293b}
+
+.ap-onay{align-items:center;z-index:400}.ap-onay>div{max-width:460px;padding:0;overflow:hidden}.ap-onay h3{margin:0;padding:12px 18px;background:var(--ap-pri);color:#fff;font-size:15px}.ap-onay h3.tehlike{background:#dc2626}
+.ap-onay p{margin:0;padding:16px 18px;white-space:pre-line;line-height:1.5;font-size:14px}.ap-onay-alt{display:flex;justify-content:flex-end;gap:8px;padding:10px 18px;border-top:1px solid var(--ap-line);background:var(--ap-bg)}
+.ap-btn.tehlike{background:#dc2626;border-color:#dc2626;color:#fff}
