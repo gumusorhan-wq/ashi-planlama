@@ -43,6 +43,13 @@
       const b = plan.birimler.find(x => x.ad === g.hedef);
       if (b && b.tur === 'istasyon' && !ashiMetni(g.yer)) { g.hedef = null; degisti = true; }
     });
+    // 663 sayılı KHK kapsamında sözleşmeli çalışanlar (ASOS 'çalışma durumu'): nöbet tutmaz — eski planlarda durumları boş kalmıştı
+    plan.kayitlar.forEach(k => {
+      if (k.durumManuel || k.durum === 'SÖZLEŞMELİ ÇALIŞIYOR' || k.durumB) return;
+      if (/SOZLESMELI CALIS|663 SAYILI/.test(C.TR((k.calisma || '') + ' ' + (k.durumMetinA || '') + ' ' + (k.durumMetin || ''))) && !/AILE HEK/.test(C.TR(k.calisma || ''))) {
+        k.durumA = 'SÖZLEŞMELİ ÇALIŞIYOR'; k.durum = 'SÖZLEŞMELİ ÇALIŞIYOR'; degisti = true;
+      }
+    });
     const once = plan.birimler.length; birimTemizle(plan); if (plan.birimler.length !== once) degisti = true;
     return degisti;
   }
@@ -283,6 +290,7 @@
     if (/GECICI GOREVLI CALISIYOR/.test(t)) return 'GEÇİCİ GÖREVDE';
     if (/AILE HEK/.test(t)) return 'AİLE HEKİMLİĞİNDE';
     if (/UZMANLIK/.test(t)) return 'UZMANLIK EĞİTİMİ';
+    if (/SOZLESMELI CALIS|663 SAYILI/.test(t)) return 'SÖZLEŞMELİ ÇALIŞIYOR';      // 663 sayılı KHK kapsamında sözleşmeli: nöbet tutmaz
     return '';
   }
   const GEREKCE_ESLE = {'PERSONEL IHTIYACI': 'PERSONEL İHTİYACI', 'DIGER': 'DİĞER'};

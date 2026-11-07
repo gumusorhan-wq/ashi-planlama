@@ -71,6 +71,7 @@ const APCore = (() => {
     'MESAİ USULÜ':         {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
     'NÖBET USULÜ':         {renk: null,      nobetYok: false, mesaiYok: false},
     'AİLE HEKİMLİĞİNDE':   {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true,  disarida: true, disKurum: true},
+    'SÖZLEŞMELİ ÇALIŞIYOR': {renk: '#D9D9D9', nobetYok: true, mesaiYok: true, disarida: true, disKurum: true},      // 663 sayılı KHK vb. sözleşmeyle başka kurumda: nöbet tutmaz
     'NÖBET MUAFİYETİ':     {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
     'UZMANLIK EĞİTİMİ':    {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
     'PASİF':               {renk: '#EEEEEE', nobetYok: true,  mesaiYok: true,  pasif: true}
@@ -84,7 +85,7 @@ const APCore = (() => {
       [/ANALIK.*MESAI|ANALIK MESAI/, 'ANALIK MESAİ'], [/ANALIK/, 'ANALIK HAKKI'],
       [/RISKLI GEBE/, 'RİSKLİ GEBELİK'], [/GEBE/, 'GEBE MESAİ'],
       [/HEYET/, 'HEYET RAPORLU'], [/RAPOR/, 'RAPORLU'],
-      [/AILE HEK/, 'AİLE HEKİMLİĞİNDE'], [/UZMANLIK/, 'UZMANLIK EĞİTİMİ'],
+      [/AILE HEK/, 'AİLE HEKİMLİĞİNDE'], [/UZMANLIK/, 'UZMANLIK EĞİTİMİ'], [/SOZLESMELI CALIS|663 SAYILI/, 'SÖZLEŞMELİ ÇALIŞIYOR'],
       [/UCRETSIZ/, 'ÜCRETSİZ İZİN'], [/ASKER/, 'ASKERLİK İZNİ'], [/YARI|YART/, 'YARI ZAMANLI'],
       [/SAGLIK MAZ.*MESAI|MAZERET.*MESAI|SAGLIK MAZ/, 'SAĞLIK MAZERETİ MESAİ'],
       [/NOBET MUAF/, 'NÖBET MUAFİYETİ'], [/MESAI USULU/, 'MESAİ USULÜ'], [/NOBET USULU/, 'NÖBET USULÜ']
