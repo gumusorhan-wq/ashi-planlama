@@ -1084,13 +1084,13 @@
         case 'tum-sifirla': {      // tüm aylık planlar + arşiv + gerçekleşen nöbet + yükleme günlüğü (ayarlar korunur); yalnız yönetici
           if (S.rol !== 'yonetici') { toast('Yalnızca yönetici tüm verileri sıfırlayabilir.'); break; }
           if (!(await onay('TÜM aylık planlar, arşiv kayıtları, gerçekleşen nöbet verisi ve yükleme günlüğü silinecek (Ayarlar korunur). Bu işlem geri alınamaz.\n\nDevam edilsin mi?'))) break;
-          if ((prompt('Onaylamak için SIFIRLA yazın:') || '').trim().toLocaleUpperCase('tr-TR') !== 'SIFIRLA') { toast('Vazgeçildi.'); break; }
+          if (((await sor('Bu işlem geri alınamaz. Onaylamak için SIFIRLA yazın:')) || '').trim().toLocaleUpperCase('tr-TR') !== 'SIFIRLA') { toast('Vazgeçildi.'); break; }
           kaydetIptal(); const ks = ((await depo.keys()) || []).map(String).filter(k => /^(plan|arsiv|gercek):/.test(k) || k === 'yuklemeler'); for (const k of ks) await depo.del(k);
           S.plan = null; S.planAnahtarlari = []; S.arsivVeri = null; S.gercekVeri = null; S.yuklemeler = []; S.takipVeri = null; S.ist = ''; S.sayfa = 'pano'; S.asos = null; S.oncePlanBirim = new Map();
           toast(`${ks.length} kayıt silindi; uygulama sıfırlandı.`); break;
         }
         case 'oner-hepsi': mut(() => S.plan.birimler.forEach(b => oner(b.ad)), 'Tüm istasyonlarda planlanan önerildi', ''); toast('Planlanan nöbetler önerildi (kilitli olanlar korundu).'); break;
-        case 'kisi-ekle': { const ad = prompt('Ad Soyad:'); if (!ad) break; const un = prompt('Ünvan (ör. ATT, DOKTOR, SÜREKLİ İŞÇİ):', 'ATT') || 'ATT'; mut(() => S.plan.kayitlar.push({id: uid(), ad: ad.toLocaleUpperCase('tr-TR'), tc: '', unvan: un, sinif: C.sinifTespit(un) || 'memur', birim: S.ist, durum: '', durumMetin: '', izin: [], planlanan: null, kilit: false, gorev: null, dortB: C.dortB(un), memBas: ''}), 'Kişi eklendi', `${ad} → ${S.ist}`); break; }
+        case 'kisi-ekle': { const ad = await sor('Ad Soyad:'); if (!ad) break; const un = (await sor('Ünvan (ör. ATT, DOKTOR, SÜREKLİ İŞÇİ):', 'ATT')) || 'ATT'; mut(() => S.plan.kayitlar.push({id: uid(), ad: ad.toLocaleUpperCase('tr-TR'), tc: '', unvan: un, sinif: C.sinifTespit(un) || 'memur', birim: S.ist, durum: '', durumMetin: '', izin: [], planlanan: null, kilit: false, gorev: null, dortB: C.dortB(un), memBas: ''}), 'Kişi eklendi', `${ad} → ${S.ist}`); break; }
         case 'idari-ac': S.idariAc = S.idariAc === t.dataset.id ? '' : t.dataset.id; break;
         case 'idari-sec': {      // Başhekimlik / KKM nöbeti: otomatik (rapordan) / elle tutar / elle tutmaz
           if (!planlamaRol()) { toast('Bu durumu yalnız planlama yetkilileri değiştirebilir.'); break; }

@@ -261,6 +261,19 @@
       root.appendChild(d); const f = d.querySelector(tehlikeli ? '[data-o="0"]' : '[data-o="1"]'); if (f) f.focus();
     });
   }
+  // Ortak yazı sorusu — prompt() yerine; Tamam → yazılan metin, Vazgeç/Esc → null
+  function sor(metin, vars = '') {
+    return new Promise(coz => {
+      const d = document.createElement('div'); d.className = 'ap-modal ap-onay'; d.setAttribute('data-pop', '');
+      d.innerHTML = `<div role="dialog" aria-modal="true"><h3>Bilgi girin</h3><p>${esc(metin)}</p><div style="padding:0 18px 14px"><input class="ap-in w" data-sor value="${esc(vars)}" autocomplete="off"></div><div class="ap-onay-alt"><button class="ap-btn" data-o="0">Vazgeç</button><button class="ap-btn pri" data-o="1">Tamam</button></div></div>`;
+      const inp = d.querySelector('[data-sor]');
+      const tus = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); bit(null); } else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); bit(inp.value); } };
+      const bit = v => { document.removeEventListener('keydown', tus, true); d.remove(); coz(v); };
+      d.addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-o]'); if (b) bit(b.dataset.o === '1' ? inp.value : null); else if (e.target === d) bit(null); });
+      d.addEventListener('mousedown', e => e.stopPropagation());
+      document.addEventListener('keydown', tus, true); root.appendChild(d); inp.focus(); inp.select();
+    });
+  }
   // Tek istasyon seçen ortak panel — HUSER ortak istasyon seçicisi (IstasyonSeciciTek) görünümü: 🚑 düğme, ara, sayılı ilçe düğmeleri, liste.
   // anahtar: seçimin nereye yazılacağı (arstat-tek-sec'te çözülür): 'ist', 'n2', 'gist', 'dist', 'rist', 'rh:<id>', 'f:<kayıtId>:<alan>'.
   // ops: {bos: 'Tümü' gibi boş değer satırı, ek: [[değer, yazı]] özel satırlar, kapali: düzenleme yok, kucuk: tablo içi düğme, yazi: düğme yazısı}
