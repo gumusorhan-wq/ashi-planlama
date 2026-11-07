@@ -614,7 +614,9 @@
   const ILCE_SIRA = ['YUNUSEMRE', 'SEHZADELER', 'SARUHANLI', 'AKHISAR', 'SOMA', 'GOLMARMARA', 'KIRKAGAC', 'GORDES', 'DEMIRCI', 'KOPRUBASI', 'AHMETLI', 'TURGUTLU', 'SALIHLI', 'ALASEHIR', 'SARIGOL', 'KULA', 'SELENDI'];
   const xlTarihler = metin => [...String(metin || '').matchAll(/(\d{2}\.\d{2}\.\d{4})/g)].map(x => x[1]);
   const xlGorevMetin = k => { const g = k.gorev; if (!g || !(g.hedef || g.yer)) return ''; return [g.hedef || g.yer, g.tarih, g.gerekce && !/PERSONEL İHTİYACI/.test(g.gerekce) ? g.gerekce : ''].filter(Boolean).join(' / '); };
-  const xlUzunGorev = g => !!g && (g.uzun || (() => { const t = gorevTarihleri(g); if (!t.bas || !t.bit) return false; return (Date.parse(t.bit) - Date.parse(t.bas)) / 864e5 >= 89; })());
+  // Uzun süreli (3 ay ve üzeri): elle işaretli, ya da tarih aralığı ≥ 89 gün, ya da bitişi yazılmamış görev plan ayının sonunda 89 günü doldurmuş
+  const xlUzunGorev = g => !!g && (g.uzun || (() => { const t = gorevTarihleri(g); if (!t.bas) return false;
+    const son = t.bit || new Date(Date.UTC(S.y, S.m, 0)).toISOString().slice(0, 10); return (Date.parse(son) - Date.parse(t.bas)) / 864e5 >= 89; })());
   const xlUnvan = k => { const u = C.TR(k.unvan || ''); if (k.sinif !== 'isci' && /SOFOR/.test(u)) return 'Şoför'; if (/HIZMETLI/.test(u)) return 'Hizmetli'; return unvanKisa(k); };
   const xlIsci = k => /ISCI/.test(C.TR((k.kadroTur || '') + ' ' + (k.unvan || ''))) || k.sinif === 'isci';
   const xlSurucu = k => (xlIsci(k) || /SOFOR|SURUCU/.test(C.TR(k.unvan || ''))) && !/HIZMETLI/.test(C.TR(k.unvan || ''));

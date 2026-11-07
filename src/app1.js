@@ -170,7 +170,7 @@ function mount(root, opts = {}) {
   const RENK_LEJANT = [['gelen', '1 aylık gelen personel'], ['giden', 'Giden personel'], ['izin', 'Yıllık izinli personel'], ['rapor', 'Raporlu personel'], ['analik', 'Analık hakkındaki personel (doğum, gebe, süt izni)'], ['uzun', 'Uzun süreli görevlendirme (3 ay ve üzeri)']];
   function satirRenk(k, gelen) {
     const D = durumlar(), d = k.durum || '';
-    if (gelen || d === 'GEÇİCİ GÖREVLİ') return RENK.gelen;
+    if (gelen || d === 'GEÇİCİ GÖREVLİ') return k.gorev && xlUzunGorev(k.gorev) ? RENK.uzun : RENK.gelen;   // 3 ay+ gelen de yeşil (uzun süreli)
     if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[d] || {}).disarida) return xlUzunGorev(k.gorev) ? RENK.uzun : RENK.giden;
     if (/RAPORLU/.test(d)) return RENK.rapor;
     if (/ANALIK|DOĞUM|GEBE|GEBELİK/.test(d) || k.sut > 0) return RENK.analik;
