@@ -1483,7 +1483,7 @@ function mount(root, opts = {}) {
       <div class="ap-yanic">${m1 ? `<div class="ap-ysec">MODÜL 1 · PLANLAMA</div>${m1Sec.map(s1).join('')}` : ''}
         <div class="ap-ysec">MODÜL 2 · NÖBET LİSTESİ</div>${s2}
         ${m1 && veri.length ? `<div class="ap-ysec">VERİ</div>${veri.map(s1).join('')}` : ''}</div>
-      <button type="button" class="ap-ydar" data-act="yan-dar" title="${S.yanDar ? 'Menüyü genişlet' : 'Menüyü daralt'}" aria-label="${S.yanDar ? 'Menüyü genişlet' : 'Menüyü daralt'}">${S.yanDar ? '›' : '‹'}<span class="ap-ytx">${S.yanDar ? '' : 'Menüyü daralt'}</span></button></nav>`;
+      <button type="button" class="ap-ydar" data-act="yan-dar" title="${S.yanDar ? 'Menüyü genişlet' : 'Menüyü daralt'}" aria-label="${S.yanDar ? 'Menüyü genişlet' : 'Menüyü daralt'}">${S.yanDar ? '»' : '«'}<span class="ap-ytx">${S.yanDar ? '' : 'Menüyü daralt'}</span></button></nav>`;
   }
 
   function bosHtml() {
