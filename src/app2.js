@@ -16,7 +16,7 @@
       ${S.plan && guncelAy() && (S.rol === 'yonetici' || S.rol === 'planlayici') ? durumSecHtml(d) : ''}
       ${opts.kullanici ? '' : `<label class="ap-note" title="Rol (demo)"><select class="ap-sel" data-act="rol">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`}</div>`;
   }
-  const SAYFALAR = [['pano', 'Pano'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['personel', 'Personel'], ['takip', 'İzin / görev takibi'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['ayar', 'Ayarlar']];
+  const SAYFALAR = [['pano', 'Ana Sayfa'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['personel', 'Personel'], ['takip', 'İzin / görev takibi'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['ayar', 'Ayarlar']];
   // Değişiklik günlüğü sekmesi yoktur (günlük arka planda tutulur); sayfalarda "Son kayıt" damgası görünür
   const sayfaListesi = () => SAYFALAR.filter(([k]) => k !== 'takip' || planlamaRol());
   const navHtml = () => S.modul === 2 ? `<div class="ap-nav">${N2_SEKME.filter(([k]) => k === 'plan' || n2Acik()).map(([k, t]) => `<button class="${(n2Acik() ? S.n2.sekme : 'plan') === k ? 'on' : ''}" data-act="n2-sekme" data-v="${k}">${t}</button>`).join('')}</div>` : `<div class="ap-nav">${sayfaListesi().map(([k, t]) => `<button class="${S.sayfa === k ? 'on' : ''}" data-act="sayfa" data-v="${k}">${t}${k === 'talep' && talepSay() ? ` <span class="ap-tag ap-t-ih">${talepSay()}</span>` : ''}</button>`).join('')}</div>`;
