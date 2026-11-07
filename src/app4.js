@@ -291,6 +291,55 @@
       ${gruplar.size > 1 ? `<div class="ap-chips">${[...gruplar.entries()].map(([k, g]) => `<button class="ap-chip ${ilceSec === k ? 'sec' : C.ilceAdi(secili || '') === k ? 'kis' : ''}" data-pop data-act="arstat-tek-ilce" data-v="${esc(k)}">${esc(g.ad)} (${g.n})</button>`).join('')}</div>` : ''}
       <div class="ap-tlist">${ops.bos ? satir('', ops.bos, true) : ''}${ek.map(([v, t]) => satir(v, t, true)).join('')}${adlar.map(a => satir(a, a, false)).join('')}</div></div>` : ''}</div>`;
   }
+  // Sürüm 13.8 (kararlar madde 17): düz <select class="ap-sel"> kutuları ortak seçim düğmesine dönüşür.
+  // Kutu DOM'da gizli kalır; seçilen değer ona yazılıp 'change' tetiklenir — bütün eski işleyiciler aynen çalışır.
+  // Düğme kutunun sınıflarını taşır (genişlik/yazı boyu kuralları aynen geçerli). Panel ekrana sabit; 12'den çok seçenekte arama kutusu.
+  let ssPop = null, ssSel = null;
+  function ssKapat() { if (ssPop) { ssPop.remove(); ssPop = null; ssSel = null; } }
+  function seciciDonustur() {
+    ssKapat();
+    root.querySelectorAll('select.ap-sel').forEach(sel => {
+      if (sel.dataset.ss) return; sel.dataset.ss = '1';
+      const o = sel.options[sel.selectedIndex], b = document.createElement('button');
+      b.type = 'button'; b.className = sel.className + ' ap-ssbtn'; b.disabled = sel.disabled; b.title = sel.title || (o ? o.text : '');
+      if (sel.id) b.dataset.ssFor = sel.id;
+      b.innerHTML = `<span>${esc(o ? o.text : '—')}</span><i>▾</i>`;
+      sel.style.display = 'none'; sel.after(b);
+      b.addEventListener('mousedown', e => e.stopPropagation());
+      b.addEventListener('click', e => { e.stopPropagation(); if (ssSel === sel) ssKapat(); else ssAc(sel, b); });
+    });
+  }
+  function ssKonum(b) {
+    if (!ssPop) return; const pop = ssPop.firstElementChild, r = b.getBoundingClientRect();
+    const w = Math.min(Math.max(r.width, 220), 440, window.innerWidth - 16);
+    Object.assign(pop.style, {position: 'fixed', width: w + 'px', left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px'});
+    const alt = window.innerHeight - r.bottom - 12, ust = r.top - 12;
+    if (alt < 240 && ust > alt) Object.assign(pop.style, {top: 'auto', bottom: (window.innerHeight - r.top + 4) + 'px', maxHeight: Math.min(420, ust) + 'px'});
+    else Object.assign(pop.style, {bottom: 'auto', top: (r.bottom + 4) + 'px', maxHeight: Math.min(420, Math.max(160, alt)) + 'px'});
+  }
+  function ssAc(sel, b) {
+    ssKapat(); ssSel = sel;
+    const cok = sel.options.length > 12, host = document.createElement('div');
+    host.className = root.className + ' ap-sshost';
+    host.innerHTML = `<div class="ap-pop ap-sspop" data-pop>${cok ? '<input class="ap-in ap-ssara" placeholder="Ara…" autocomplete="off">' : ''}<div class="ap-tlist">${[...sel.options].map((o, i) =>
+      `<button type="button" data-i="${i}" class="${i === sel.selectedIndex ? 'sec' : ''}" ${o.disabled ? 'disabled' : ''} data-ara="${esc(C.TR(o.text))}"><i></i><span>${esc(o.text)}</span></button>`).join('')}</div></div>`;
+    document.body.appendChild(host); ssPop = host; ssKonum(b);
+    const ara = host.querySelector('.ap-ssara'), liste = host.querySelector('.ap-tlist');
+    const secEt = i => { ssKapat(); b.focus(); if (i !== sel.selectedIndex) { sel.selectedIndex = i; sel.dispatchEvent(new Event('change', {bubbles: true})); } };
+    host.addEventListener('mousedown', e => e.stopPropagation());
+    host.addEventListener('click', e => { e.stopPropagation(); const x = e.target.closest('[data-i]'); if (x && !x.disabled) secEt(+x.dataset.i); });
+    host.addEventListener('keydown', e => {
+      const g = [...liste.querySelectorAll('[data-i]')].filter(x => x.style.display !== 'none' && !x.disabled), i = g.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = g[Math.max(0, Math.min(g.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))]; if (n) n.focus(); }
+      else if (e.key === 'Enter' && e.target === ara) { e.preventDefault(); if (g.length) secEt(+g[0].dataset.i); }
+      else if (e.key === 'Escape') { e.stopPropagation(); ssKapat(); b.focus(); }
+    });
+    if (ara) { ara.addEventListener('input', () => { const q = C.TR(ara.value).trim(); liste.querySelectorAll('[data-i]').forEach(x => { x.style.display = !q || x.dataset.ara.includes(q) ? '' : 'none'; }); }); ara.focus(); }
+    else { const s = liste.querySelector('.sec') || liste.querySelector('[data-i]'); if (s) { s.focus(); s.scrollIntoView({block: 'nearest'}); } }
+  }
+  document.addEventListener('mousedown', () => ssKapat());
+  document.addEventListener('scroll', e => { if (ssPop && !(e.target && e.target.closest && e.target.closest('.ap-sspop'))) ssKapat(); }, true);
+  window.addEventListener('resize', () => ssKapat());
   // Açık tek seçim panelini ekranda düğmesinin altına (yer yoksa üstüne) sabitler
   function tekKonum() {
     const pop = root.querySelector('.ap-pop-tek'); if (!pop) return;

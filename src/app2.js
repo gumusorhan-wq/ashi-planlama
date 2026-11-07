@@ -566,6 +566,7 @@
         if (sayisal || hucre.every(c => c.classList.contains('num') || (!(c.textContent || '').trim() && !c.querySelector('input,select')))) { th.classList.add('num'); hucre.forEach(c => c.classList.add('num')); }
       });
     });
+    seciciDonustur();
     toastCiz();
     ustYerlestir();
     tekKonum();
