@@ -269,3 +269,10 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 .ap-sshost{position:fixed!important;top:0;left:0;width:0;height:0;min-height:0!important;background:none!important;z-index:95;overflow:visible}
 .ap-sspop{padding:8px;overflow:auto;display:flex;flex-direction:column;gap:6px;z-index:95}.ap-sspop .ap-tlist{max-height:none;overflow:visible}.ap-sspop .ap-ssara{width:100%}
 .ap-sspop .ap-tlist button{white-space:normal;line-height:1.3}.ap-sspop .ap-tlist button:focus{outline:2px solid var(--ap-pri);outline-offset:-2px}
+
+/* Sürüm 13.16: çoklu istasyon listesi 112 seçim paneli gibi — tek sütun, çerçeveli satırlar, kare kutu yerine yuvarlak işaret */
+.ap-pop .ap-ilist{display:block;border:1px solid var(--ap-line);border-top:1px solid var(--ap-line);padding:0;max-height:260px}
+.ap-pop .ap-ilist label{padding:6px 12px;border-bottom:1px solid var(--ap-line);gap:10px}.ap-pop .ap-ilist label:last-child{border-bottom:0}
+.ap-pop .ap-ilist label:has(input:checked){background:color-mix(in srgb,var(--ap-pri) 8%,transparent);color:var(--ap-pri);font-weight:700}
+.ap-pop input[type=checkbox]{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;border:1px solid #94a3b8;background:var(--ap-card);margin:0;flex:none;cursor:pointer}
+.ap-pop input[type=checkbox]:checked{background:var(--ap-pri);border-color:var(--ap-pri);box-shadow:inset 0 0 0 2px var(--ap-card)}
