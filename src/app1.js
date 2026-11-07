@@ -139,8 +139,19 @@ function mount(root, opts = {}) {
     S.planAnahtarlari = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort();
     if (S.plan && !S.ist) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     if (S.plan && S.ist && !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
+    if (S.plan && opts.ozelGun) { try { await ortakOzelYukle(); } catch (e) { console.warn('ortak özel günler', e); } }
     try { bitenGorevleriKapat(); } catch (e) { console.warn('biten görev kontrolü', e); }
     try { await kisaGelenKontrol(); } catch (e) { console.warn('kısa görev kontrolü', e); }
+  }
+  // Sürüm 13.6 (HUSER): özel günler İK ile ortak, sunucuda il bazında. Plan içindeki eski tanımlar bir kez ortak listeye taşınır;
+  // sonra plan.ozel her yüklemede ortak listenin bu aya düşen kısmıyla değiştirilir (hesaplar plan.ozel'i kullanmaya devam eder).
+  async function ortakOzelYukle() {
+    const ay = `${S.y}-${C.pad(S.m)}`, eski = S.plan.ozel || {};
+    if (Object.keys(eski).length) { try { await opts.ozelGun.aktar(ay, eski); } catch (e) { /* yetki yoksa sessiz */ } }
+    const d = await opts.ozelGun.liste(ay);
+    S.ozelYaz = !!d.yazabilir;
+    const g = {}; Object.entries(d.gunler || {}).forEach(([t, v]) => { g[t] = {tur: v.tur, ekleyen: v.ekleyen || ''}; });
+    S.plan.ozel = g;
   }
   const bosPlan = () => ({ay: `${S.y}-${C.pad(S.m)}`, durum: 'taslak', birimler: [], kayitlar: [], ozel: {}, log: [], disKurum: [], olusturma: Date.now()});
 

@@ -1136,8 +1136,26 @@
           tarihsizGorevleriBitir(L, 'Tarihi boş görevlendirme bitirildi (önceki ayın görevi)'); otoHesapla(); damgala(); kaydet(); toast(`${L.length} görevlendirme bitirildi.`); break;
         }
         case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); S.gAra = ''; break; }
-        case 'og-ekle': { const d = root.querySelector('#ap-og-t').value, tur = root.querySelector('#ap-og-tur').value; if (!d) { toast('Tarih seçin.'); break; } delete tarihSec().og; mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break; }
-        case 'og-sil': mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
+        case 'og-tur': S.ogTur = v; break;
+        case 'og-ekle': {
+          const d = root.querySelector('#ap-og-t').value, tur = S.ogTur || 'bayram'; if (!d) { toast('Tarih seçin.'); break; } delete tarihSec().og;
+          if (opts.ozelGun) {     // ortak liste: önce sunucu, sonra plandaki kopya
+            try { await opts.ozelGun.ekle(d, tur); } catch (e) { break; }
+            S.plan.ozel[d] = {tur, ekleyen: damgaAd()};
+            if (!salt()) mut(() => {}, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); else toast('Özel gün eklendi (ortak liste).');
+            break;
+          }
+          mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break;
+        }
+        case 'og-sil':
+          if (opts.ozelGun) {
+            if (!(await onay(`${v.split('-').reverse().join('.')} özel günü ortak listeden silinsin mi? İK modülünden de kalkar.`))) break;
+            try { await opts.ozelGun.sil(v); } catch (e) { break; }
+            delete S.plan.ozel[v];
+            if (!salt()) mut(() => {}, 'Özel gün silindi', v); else toast('Özel gün silindi (ortak liste).');
+            break;
+          }
+          mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
         case 'liste': { const i = v.indexOf(':'), tip = v.slice(0, i), d = v.slice(i + 1), ozelAd = t.dataset.ad || ''; S.filtre = {q: '', durum: tip === 'durum' ? d : '', birim: '', sinif: tip === 'sinif' ? d : '', ozel: tip === 'ozel' ? d : '', ozelAd}; S.pSayfa = 0; S.sayfa = 'personel'; break; }
         case 'f-ozel-sil': S.filtre = {...S.filtre, ozel: '', ozelAd: ''}; S.pSayfa = 0; break;
         case 'plan-bos': S.plan = bosPlan(); logla('Boş plan oluşturuldu'); damgala(); kaydet(); S.sayfa = 'ist'; break;

@@ -1315,8 +1315,19 @@ function mount(root, opts = {}) {
     S.planAnahtarlari = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort();
     if (S.plan && !S.ist) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
     if (S.plan && S.ist && !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || {}).ad || '';
+    if (S.plan && opts.ozelGun) { try { await ortakOzelYukle(); } catch (e) { console.warn('ortak özel günler', e); } }
     try { bitenGorevleriKapat(); } catch (e) { console.warn('biten görev kontrolü', e); }
     try { await kisaGelenKontrol(); } catch (e) { console.warn('kısa görev kontrolü', e); }
+  }
+  // Sürüm 13.6 (HUSER): özel günler İK ile ortak, sunucuda il bazında. Plan içindeki eski tanımlar bir kez ortak listeye taşınır;
+  // sonra plan.ozel her yüklemede ortak listenin bu aya düşen kısmıyla değiştirilir (hesaplar plan.ozel'i kullanmaya devam eder).
+  async function ortakOzelYukle() {
+    const ay = `${S.y}-${C.pad(S.m)}`, eski = S.plan.ozel || {};
+    if (Object.keys(eski).length) { try { await opts.ozelGun.aktar(ay, eski); } catch (e) { /* yetki yoksa sessiz */ } }
+    const d = await opts.ozelGun.liste(ay);
+    S.ozelYaz = !!d.yazabilir;
+    const g = {}; Object.entries(d.gunler || {}).forEach(([t, v]) => { g[t] = {tur: v.tur, ekleyen: v.ekleyen || ''}; });
+    S.plan.ozel = g;
   }
   const bosPlan = () => ({ay: `${S.y}-${C.pad(S.m)}`, durum: 'taslak', birimler: [], kayitlar: [], ozel: {}, log: [], disKurum: [], olusturma: Date.now()});
 
@@ -1802,13 +1813,14 @@ function mount(root, opts = {}) {
   }
 
   function ozelHtml() {
-    const o = ozel(), duz = !salt();
+    const o = ozel(), ortak = !!opts.ozelGun, duz = ortak ? !!S.ozelYaz : !salt(), tur = S.ogTur || 'bayram';
     const liste = Object.entries(o).sort();
     const tatil = []; for (let d = 1; d <= C.gunSayisi(S.y, S.m); d++) { const i = C.iso(S.y, S.m, d), w = C.RESMI[i]; if (w !== undefined) tatil.push(`${i.split('-').reverse().join('.')} ${w === 'A' ? '(arife, 5 saat)' : '(resmî tatil)'}`); }
     return `<div class="ap-two"><div class="ap-card"><h2>Özel gün ekle</h2><div class="ap-row">${tarihDugme('og', 'tek', {min: C.iso(S.y, S.m, 1), max: C.iso(S.y, S.m, C.gunSayisi(S.y, S.m)), idler: ['ap-og-t']})}
-      <select class="ap-sel" id="ap-og-tur">${Object.entries(C.OZEL_TUR).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><button class="ap-btn pri" data-act="og-ekle" ${duz ? '' : 'disabled'}>Ekle</button></div>
+      <span class="ap-seg">${Object.entries(C.OZEL_TUR).map(([k, v]) => `<button class="ap-btn${k === tur ? ' on' : ''}" data-act="og-tur" data-v="${k}">${v}</button>`).join('')}</span><button class="ap-btn pri" data-act="og-ekle" ${duz ? '' : 'disabled'}>Ekle</button></div>
+      ${ortak ? `<p class="ap-note"><b>Ortak liste:</b> buradaki özel günler İK (ASHİ nöbet) modülüyle aynıdır; birinde eklenen ötekinde de görünür.${duz ? '' : ' Ekleme / silme için Planlama ya da İK yükleme yetkisi gerekir.'}</p>` : ''}
       <p class="ap-note">Bayram, resmî tatil ve idari izin günü tüm personelin mesaisinden tam gün düşer (hafta içiyse). Yarım gün 5 saattir. Kişiye özel idari izin için ilgili kişinin izin türünü <b>İDARİ İZİN</b> seçip gün sayısını girin.</p>
-      <h2>Eklenenler</h2>${liste.map(([t, v]) => `<div class="ap-row"><b>${t.split('-').reverse().join('.')}</b> ${C.OZEL_TUR[v.tur]} <button class="ap-btn sm dng" data-act="og-sil" data-v="${t}" ${duz ? '' : 'disabled'}>Sil</button></div>`).join('') || '<span class="ap-note">Yok</span>'}</div>
+      <h2>Eklenenler</h2>${liste.map(([t, v]) => `<div class="ap-row"><b>${t.split('-').reverse().join('.')}</b> ${C.OZEL_TUR[v.tur]}${v.ekleyen ? ` <span class="ap-note">· ${esc(v.ekleyen)}</span>` : ''} <button class="ap-btn sm dng" data-act="og-sil" data-v="${t}" ${duz ? '' : 'disabled'}>Sil</button></div>`).join('') || '<span class="ap-note">Yok</span>'}</div>
       <div class="ap-card"><h2>${ayEtiket()} takvimi</h2><div>Memur aylık mesai: <b>${fmt(C.ayMesai(S.y, S.m, false, o))} saat</b> → hedef <b>${fmt(C.hedefNobet(C.ayMesai(S.y, S.m, false, o), 'memur', false).birim)}</b> nöbet</div>
       <div>İşçi aylık mesai: <b>${fmt(C.ayMesai(S.y, S.m, true, o))} saat</b> → hedef <b>${C.hedefNobet(C.ayMesai(S.y, S.m, true, o), 'isci', false, {isciDusulen: S.ayar.isciDusulen}).adet}</b> × 12 saatlik nöbet</div>
       <p class="ap-note">Memur: hafta içi günler (resmî tatil hariç) × 8 saat ÷ 24, üst 0,5'e. İşçi: pazar ve tatil hariç günler × 7,5 saat ÷ ${S.ayar.isciDusulen}, alt tam sayıya.</p>
@@ -3944,8 +3956,26 @@ function mount(root, opts = {}) {
           tarihsizGorevleriBitir(L, 'Tarihi boş görevlendirme bitirildi (önceki ayın görevi)'); otoHesapla(); damgala(); kaydet(); toast(`${L.length} görevlendirme bitirildi.`); break;
         }
         case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); S.gAra = ''; break; }
-        case 'og-ekle': { const d = root.querySelector('#ap-og-t').value, tur = root.querySelector('#ap-og-tur').value; if (!d) { toast('Tarih seçin.'); break; } delete tarihSec().og; mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break; }
-        case 'og-sil': mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
+        case 'og-tur': S.ogTur = v; break;
+        case 'og-ekle': {
+          const d = root.querySelector('#ap-og-t').value, tur = S.ogTur || 'bayram'; if (!d) { toast('Tarih seçin.'); break; } delete tarihSec().og;
+          if (opts.ozelGun) {     // ortak liste: önce sunucu, sonra plandaki kopya
+            try { await opts.ozelGun.ekle(d, tur); } catch (e) { break; }
+            S.plan.ozel[d] = {tur, ekleyen: damgaAd()};
+            if (!salt()) mut(() => {}, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); else toast('Özel gün eklendi (ortak liste).');
+            break;
+          }
+          mut(() => { S.plan.ozel[d] = {tur}; }, 'Özel gün eklendi', `${d} ${C.OZEL_TUR[tur]}`); break;
+        }
+        case 'og-sil':
+          if (opts.ozelGun) {
+            if (!(await onay(`${v.split('-').reverse().join('.')} özel günü ortak listeden silinsin mi? İK modülünden de kalkar.`))) break;
+            try { await opts.ozelGun.sil(v); } catch (e) { break; }
+            delete S.plan.ozel[v];
+            if (!salt()) mut(() => {}, 'Özel gün silindi', v); else toast('Özel gün silindi (ortak liste).');
+            break;
+          }
+          mut(() => { delete S.plan.ozel[v]; }, 'Özel gün silindi', v); break;
         case 'liste': { const i = v.indexOf(':'), tip = v.slice(0, i), d = v.slice(i + 1), ozelAd = t.dataset.ad || ''; S.filtre = {q: '', durum: tip === 'durum' ? d : '', birim: '', sinif: tip === 'sinif' ? d : '', ozel: tip === 'ozel' ? d : '', ozelAd}; S.pSayfa = 0; S.sayfa = 'personel'; break; }
         case 'f-ozel-sil': S.filtre = {...S.filtre, ozel: '', ozelAd: ''}; S.pSayfa = 0; break;
         case 'plan-bos': S.plan = bosPlan(); logla('Boş plan oluşturuldu'); damgala(); kaydet(); S.sayfa = 'ist'; break;

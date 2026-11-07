@@ -389,13 +389,14 @@
   }
 
   function ozelHtml() {
-    const o = ozel(), duz = !salt();
+    const o = ozel(), ortak = !!opts.ozelGun, duz = ortak ? !!S.ozelYaz : !salt(), tur = S.ogTur || 'bayram';
     const liste = Object.entries(o).sort();
     const tatil = []; for (let d = 1; d <= C.gunSayisi(S.y, S.m); d++) { const i = C.iso(S.y, S.m, d), w = C.RESMI[i]; if (w !== undefined) tatil.push(`${i.split('-').reverse().join('.')} ${w === 'A' ? '(arife, 5 saat)' : '(resmî tatil)'}`); }
     return `<div class="ap-two"><div class="ap-card"><h2>Özel gün ekle</h2><div class="ap-row">${tarihDugme('og', 'tek', {min: C.iso(S.y, S.m, 1), max: C.iso(S.y, S.m, C.gunSayisi(S.y, S.m)), idler: ['ap-og-t']})}
-      <select class="ap-sel" id="ap-og-tur">${Object.entries(C.OZEL_TUR).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select><button class="ap-btn pri" data-act="og-ekle" ${duz ? '' : 'disabled'}>Ekle</button></div>
+      <span class="ap-seg">${Object.entries(C.OZEL_TUR).map(([k, v]) => `<button class="ap-btn${k === tur ? ' on' : ''}" data-act="og-tur" data-v="${k}">${v}</button>`).join('')}</span><button class="ap-btn pri" data-act="og-ekle" ${duz ? '' : 'disabled'}>Ekle</button></div>
+      ${ortak ? `<p class="ap-note"><b>Ortak liste:</b> buradaki özel günler İK (ASHİ nöbet) modülüyle aynıdır; birinde eklenen ötekinde de görünür.${duz ? '' : ' Ekleme / silme için Planlama ya da İK yükleme yetkisi gerekir.'}</p>` : ''}
       <p class="ap-note">Bayram, resmî tatil ve idari izin günü tüm personelin mesaisinden tam gün düşer (hafta içiyse). Yarım gün 5 saattir. Kişiye özel idari izin için ilgili kişinin izin türünü <b>İDARİ İZİN</b> seçip gün sayısını girin.</p>
-      <h2>Eklenenler</h2>${liste.map(([t, v]) => `<div class="ap-row"><b>${t.split('-').reverse().join('.')}</b> ${C.OZEL_TUR[v.tur]} <button class="ap-btn sm dng" data-act="og-sil" data-v="${t}" ${duz ? '' : 'disabled'}>Sil</button></div>`).join('') || '<span class="ap-note">Yok</span>'}</div>
+      <h2>Eklenenler</h2>${liste.map(([t, v]) => `<div class="ap-row"><b>${t.split('-').reverse().join('.')}</b> ${C.OZEL_TUR[v.tur]}${v.ekleyen ? ` <span class="ap-note">· ${esc(v.ekleyen)}</span>` : ''} <button class="ap-btn sm dng" data-act="og-sil" data-v="${t}" ${duz ? '' : 'disabled'}>Sil</button></div>`).join('') || '<span class="ap-note">Yok</span>'}</div>
       <div class="ap-card"><h2>${ayEtiket()} takvimi</h2><div>Memur aylık mesai: <b>${fmt(C.ayMesai(S.y, S.m, false, o))} saat</b> → hedef <b>${fmt(C.hedefNobet(C.ayMesai(S.y, S.m, false, o), 'memur', false).birim)}</b> nöbet</div>
       <div>İşçi aylık mesai: <b>${fmt(C.ayMesai(S.y, S.m, true, o))} saat</b> → hedef <b>${C.hedefNobet(C.ayMesai(S.y, S.m, true, o), 'isci', false, {isciDusulen: S.ayar.isciDusulen}).adet}</b> × 12 saatlik nöbet</div>
       <p class="ap-note">Memur: hafta içi günler (resmî tatil hariç) × 8 saat ÷ 24, üst 0,5'e. İşçi: pazar ve tatil hariç günler × 7,5 saat ÷ ${S.ayar.isciDusulen}, alt tam sayıya.</p>
