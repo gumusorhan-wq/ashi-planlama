@@ -1382,12 +1382,12 @@ function mount(root, opts = {}) {
     return ATT_RE.test(C.TR((k.unvan || '') + ' ' + (k.kadroBrans || ''))) ? 2 : 3;
   }
   // satirMap: istasyon hesabındaki satırlar (id → {grup}); verilmezse grup kişiden hesaplanır
-  // Başhekimlik / KKM gibi nöbet hesabı olmayan birimlerde sıra unvandan: doktor → AABT → ATT → diğer sağlık → diğer (idari, sürücü olmayan işçi) → sürücü → işçi sürücü
+  // Başhekimlik / KKM gibi nöbet hesabı olmayan birimlerde sıra unvandan: doktor → AABT → ATT → diğer sağlık → diğer (idari) → sürücü → işçi sürücü → diğer işçi
   function idariSira(k) {
     const u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
     if (k.sinif === 'doktor' || /TABIP|DOKTOR|HEKIM|UZMAN DR/.test(u)) return 0;
     const surucu = /SOFOR|SURUCU/.test(u);
-    if (k.sinif === 'isci' || /ISCI/.test(u)) return surucu ? 7 : 4;      // sürücü olmayan işçi idari personelle
+    if (k.sinif === 'isci' || /ISCI/.test(u)) return surucu ? 7 : 8;      // sürücü olmayan işçi en altta
     if (/\bAABT\b|AMBULANS VE ACIL BAKIM|PARAMEDIK|TEKNIKER/.test(u)) return 1;
     if (/\bATT\b|ACIL TIP TEKNISYEN/.test(u)) return 2;
     if (surucu) return 5;
