@@ -1337,6 +1337,7 @@ function mount(root, opts = {}) {
   const RENK_LEJANT = [['gelen', '1 aylık gelen personel'], ['giden', 'Giden personel'], ['izin', 'Yıllık izinli personel'], ['rapor', 'Raporlu personel'], ['analik', 'Analık hakkındaki personel (doğum, gebe, süt izni)'], ['uzun', 'Uzun süreli görevle gelen personel (3 ay ve üzeri)']];
   function satirRenk(k, gelen) {
     const D = durumlar(), d = k.durum || '';
+    if (gizliKisi(k)) return (D[d] && D[d].renk) || RENK.rapor;   // aile hekimliği / uzmanlık eğitimi: pasif (gri), görev bilgisi olsa da kırmızı olmaz
     if (gelen || d === 'GEÇİCİ GÖREVLİ') return k.gorev && xlUzunGorev(k.gorev) ? RENK.uzun : RENK.gelen;   // 3 ay+ gelen de yeşil (uzun süreli)
     if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[d] || {}).disarida) return RENK.giden;   // kadrosunun olduğu yerde giden hep kırmızı; yeşil yalnız gittiği yerde (uzun süreli gelen)
     if (/RAPORLU/.test(d)) return RENK.rapor;
