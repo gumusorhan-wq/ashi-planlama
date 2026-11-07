@@ -1222,6 +1222,7 @@
     setTimeout(odakUygula, 120);                  // değişiklik yoksa çizim olmaz; odak yine geçer
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.arstatAc) { S.arstatAc = ''; render(); } });
+  document.addEventListener('keydown', e => { if (e.key !== 'Enter' || !e.target || e.target.id !== 'ap-tek-ara') return; const g = [...root.querySelectorAll('.ap-tlist [data-ara]')].filter(x => x.style.display !== 'none'); if (g.length === 1) { e.preventDefault(); g[0].click(); } });
   // Görevlendirmeler listesini yazdıkça süz (yeniden çizmeden)
   root.addEventListener('input', e => {
     const t = e.target;
@@ -1231,6 +1232,7 @@
       const say = root.querySelector('#ap-pano-ara-say'); if (say) say.textContent = q ? `${n} / ${top} istasyon gösteriliyor (üstteki sayılar tüm istasyonlar içindir)` : '';
       const yok = root.querySelector('#ap-pano-ara-yok'); if (yok) yok.style.display = q && !n && top ? '' : 'none'; return;
     }
+    if (t && t.id === 'ap-tek-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(), il = S.tekIlce || ''; const l = [...root.querySelectorAll('.ap-tlist [data-ara]')]; l.forEach(x => { x.style.display = (!q || x.dataset.ara.includes(q)) && (!il || x.dataset.ilce === il) ? '' : 'none'; }); return; }
     if (t && t.id === 'ap-ist-ara') { S.arstatAra = t.value; const q = C.TR(t.value).trim(); root.querySelectorAll('.ap-pop-ist [data-ara]').forEach(x => { x.style.display = !q || x.dataset.ara.includes(q) ? '' : 'none'; }); return; }
     if (t && (t.id === 'ap-d-kisi' || t.id === 'ap-d-ist')) {      // İstasyon dışı görevliler: aynı süzgeç, durum yeniden çizimde korunur
       S.disAra = (root.querySelector('#ap-d-kisi') || {}).value || ''; S.disIst = (root.querySelector('#ap-d-ist') || {}).value || '';

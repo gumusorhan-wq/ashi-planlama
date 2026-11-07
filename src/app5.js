@@ -49,7 +49,7 @@
 
   function n2UstHtml(b) {
     const kisit = n2Kendi(), ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (kisit === null || x.ad === kisit));
-    return `<div class="ap-card"><div class="ap-row"><label>İstasyon <select class="ap-sel" data-n2="ist">${ists.map(x => `<option ${x.ad === b.ad ? 'selected' : ''}>${esc(x.ad)}</option>`).join('')}</select></label>
+    return `<div class="ap-card"><div class="ap-row"><span class="ap-note">İstasyon</span>${istTekHtml('n2', b.ad, ists.map(x => x.ad))}
       <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span></div>${damgaHtml(((S.plan.nobet || {})[b.ad] || {}).damga)}</div>`;
   }
   function n2Html() {
@@ -377,6 +377,9 @@
       case 'arstat-yil': S.arstatYil[v] = !(S.arstatYil[v] != null ? S.arstatYil[v] : false); break;
       case 'arstat-yil-hepsi': { const l = Object.keys(S.arsivVeri || {}).concat(Object.keys(S.gercekVeri || {})).filter((x, i, ar) => x.slice(0, 4) === v && ar.indexOf(x) === i), sec = S.arsivSecili = S.arsivSecili || [], hepsi = l.every(x => sec.includes(x)); S.arsivSecili = hepsi ? sec.filter(x => !l.includes(x)) : [...new Set([...sec, ...l])]; break; }
       case 'arstat-ilce': { const l = istAdlari().filter(a => C.ilceAdi(a) === v), sec = S.arsivIstler = S.arsivIstler || [], hepsi = l.every(a => sec.includes(a)); S.arsivIstler = hepsi ? sec.filter(a => !l.includes(a)) : [...new Set([...sec, ...l])]; break; }
+      case 'arstat-tek-pop': S.arstatAra = ''; S.tekIlce = ''; S.arstatAc = S.arstatAc === 'tek-' + v ? '' : 'tek-' + v; if (S.arstatAc) setTimeout(() => { const i = root.querySelector('#ap-tek-ara'); if (i) i.focus(); }, 0); break;
+      case 'arstat-tek-ilce': S.tekIlce = S.tekIlce === v ? '' : v; break;
+      case 'arstat-tek-sec': if (t.dataset.k === 'n2') { S.n2.ist = v; S.n2.oneri = null; } else S.ist = v; S.arstatAc = ''; S.arstatAra = ''; S.tekIlce = ''; break;
       case 'arstat-ist-tumu': S.arsivIstler = istAdlari(); break;
       case 'arstat-ist-temizle': S.arsivIstler = []; break;
       case 'arsiv-excel': arsivExcel(); return true;

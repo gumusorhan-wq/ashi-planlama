@@ -246,6 +246,19 @@
       <div class="ap-ilist">${tum.map(a => `<label data-ara="${esc(C.TR(a))}" ${gizle(a, ilceGoster(a)) ? 'style="display:none"' : ''}><input type="checkbox" data-pop data-act="arstat-ist" data-v="${esc(a)}" ${sec.includes(a) ? 'checked' : ''}> ${esc(a)}</label>`).join('')}</div>
       <div class="ap-popalt"><span class="ap-note">İlçe düğmesi o ilçenin tüm istasyonlarını seçer / kaldırır</span><button class="ap-btn sm" data-pop data-act="arstat-pop" data-v="">Kapat ✕</button></div></div>` : ''}</div>`;
   }
+  // Tek istasyon seçen ortak panel — HUSER ortak istasyon seçicisi (IstasyonSeciciTek) görünümü: 🚑 düğme, ara, sayılı ilçe düğmeleri, liste.
+  // anahtar: 'ist' (Modül 1 istasyon sayfası) / 'n2' (Modül 2). Seçim tıklayınca uygulanır, panel kapanır.
+  function istTekHtml(anahtar, secili, adlar) {
+    const acik = S.arstatAc === 'tek-' + anahtar, q = C.TR(S.arstatAra || '').trim(), ilceSec = S.tekIlce || '';
+    if (adlar.length <= 1) return `<b class="ap-tekad">🚑 ${esc(secili || '—')}</b>`;
+    const gruplar = new Map(); adlar.forEach(a => { const k = C.ilceAdi(a), g = gruplar.get(k) || {ad: ilceGoster(a), n: 0}; g.n++; gruplar.set(k, g); });
+    const gizle = a => (ilceSec && C.ilceAdi(a) !== ilceSec) || (q && !C.TR(a + ' ' + ilceGoster(a)).includes(q));
+    return `<div class="ap-popwrap"><button class="ap-btn ap-tekbtn" data-pop data-act="arstat-tek-pop" data-v="${anahtar}" title="${esc(secili)}">🚑 <b>${esc(secili || '—')}</b> ▾</button>${acik ? `<div class="ap-pop ap-pop-ist" data-pop>
+      <div class="ap-row" style="justify-content:space-between"><b class="ap-poph">İSTASYON SEÇ</b><span class="ap-note">${adlar.length} birim</span></div>
+      <input class="ap-in w" id="ap-tek-ara" data-pop placeholder="İlçe veya istasyon ara…" value="${esc(S.arstatAra || '')}" autocomplete="off">
+      ${gruplar.size > 1 ? `<div class="ap-chips">${[...gruplar.entries()].map(([k, g]) => `<button class="ap-chip ${ilceSec === k ? 'sec' : C.ilceAdi(secili || '') === k ? 'kis' : ''}" data-pop data-act="arstat-tek-ilce" data-v="${esc(k)}">${esc(g.ad)} (${g.n})</button>`).join('')}</div>` : ''}
+      <div class="ap-tlist">${adlar.map(a => `<button class="${a === secili ? 'sec' : ''}" data-pop data-act="arstat-tek-sec" data-k="${anahtar}" data-v="${esc(a)}" data-ara="${esc(C.TR(a + ' ' + ilceGoster(a)))}" data-ilce="${esc(C.ilceAdi(a))}" ${gizle(a) ? 'style="display:none"' : ''}><i></i>${esc(a)}</button>`).join('')}</div></div>` : ''}</div>`;
+  }
   // ---- İzin ve geçici görev takibi: personelin hangi aylarda izin kullandığı / geçici görevlendirildiği (kayıtlı tüm aylık planlardan) ----
   async function takipYukle() {
     const anahtarlar = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort(), veri = {};
