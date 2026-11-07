@@ -16,13 +16,13 @@
       ${S.plan && guncelAy() && (S.rol === 'yonetici' || S.rol === 'planlayici') ? durumSecHtml(d) : ''}
       ${opts.kullanici ? '' : `<label class="ap-note" title="Rol (demo)"><select class="ap-sel" data-act="rol">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`}</div>`;
   }
-  const SAYFALAR = [['pano', 'Ana Sayfa'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['personel', 'Personel'], ['takip', 'İzin / görev takibi'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['ayar', 'Ayarlar']];
+  const SAYFALAR = [['ana', 'Ana Sayfa'], ['pano', 'Pano'], ['ist', 'İstasyon'], ['gorev', 'Görevlendirme'], ['personel', 'Personel'], ['takip', 'İzin / görev takibi'], ['ozel', 'Özel günler'], ['stat', 'İstatistik'], ['arsiv', 'Arşiv'], ['arstat', 'Arşiv istatistikleri'], ['ayar', 'Ayarlar']];
   // Değişiklik günlüğü sekmesi yoktur (günlük arka planda tutulur); sayfalarda "Son kayıt" damgası görünür
   const sayfaListesi = () => SAYFALAR.filter(([k]) => k !== 'takip' || planlamaRol());
   const navHtml = () => S.modul === 2 ? `<div class="ap-nav">${N2_SEKME.filter(([k]) => k === 'plan' || n2Acik()).map(([k, t]) => `<button class="${(n2Acik() ? S.n2.sekme : 'plan') === k ? 'on' : ''}" data-act="n2-sekme" data-v="${k}">${t}</button>`).join('')}</div>` : `<div class="ap-nav">${sayfaListesi().map(([k, t]) => `<button class="${S.sayfa === k ? 'on' : ''}" data-act="sayfa" data-v="${k}">${t}${k === 'talep' && talepSay() ? ` <span class="ap-tag ap-t-ih">${talepSay()}</span>` : ''}</button>`).join('')}</div>`;
 
   // ---- Gömülü mod sol menüsü (112stoktakip İstatistik / İK modülleriyle aynı görsel dil) ----
-  const YAN_IC = {pano: 'M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z', ist: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6', gorev: 'M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4', talep: 'M4 4h16v12H4zM4 13h5l1 3h4l1-3h5', personel: 'M9 11a4 4 0 100-8 4 4 0 000 8zM2 21v-1a7 7 0 0114 0v1M17 11a3 3 0 100-6M22 21v-1a5 5 0 00-4-5', takip: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4M8 15l2.5 2.5L16 12', ozel: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01', stat: 'M4 20V10M10 20V4M16 20v-7M22 20H2', arsiv: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4', arstat: 'M3 3v18h18M7 15l4-4 3 3 6-6', ayar: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z', log: 'M4 6h16M4 12h16M4 18h10',
+  const YAN_IC = {ana: 'M3 11l9-8 9 8M5 9v12h14V9M9 21v-7h6v7', pano: 'M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z', ist: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6', gorev: 'M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4', talep: 'M4 4h16v12H4zM4 13h5l1 3h4l1-3h5', personel: 'M9 11a4 4 0 100-8 4 4 0 000 8zM2 21v-1a7 7 0 0114 0v1M17 11a3 3 0 100-6M22 21v-1a5 5 0 00-4-5', takip: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4M8 15l2.5 2.5L16 12', ozel: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01', stat: 'M4 20V10M10 20V4M16 20v-7M22 20H2', arsiv: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4', arstat: 'M3 3v18h18M7 15l4-4 3 3 6-6', ayar: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z', log: 'M4 6h16M4 12h16M4 18h10',
     'n2-plan': 'M9 4h6v3H9zM6 5H5v16h14V5h-1M8 12h8M8 16h5', 'n2-istek': 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4M10 13l4 4M14 13l-4 4', 'n2-liste': 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', 'n2-denetim': 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4', 'n2-paket': 'M12 3v12M7 10l5 5 5-5M4 21h16'};
   const yanIc = n => `<span class="ap-yic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${YAN_IC[n] || YAN_IC.log}"/></svg></span>`;
   const YAN_VERI = ['arsiv', 'arstat', 'ayar'];
@@ -110,6 +110,29 @@
         ${gelen}${cikan}${net}${Math.abs(plFark) > 0.01 ? `<div class="ap-note" style="margin-top:6px" title="Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}: kilitli değer ya da nöbet branşı kısıtı">Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}</div>` : ''}</div>`;
   }
 
+  // Sürüm 13.28: modül Ana Sayfası (Depo / Teknik ana sayfası gibi) — ön bilgi kartları + hızlı erişim. Pano ve öteki sayfalar değişmedi.
+  function anaHtml() {
+    const ists = S.plan.birimler.filter(b => b.tur === 'istasyon');
+    let ih = 0, pl = 0, of = 0, oner = 0, kisiOner = 0, elle = 0;
+    ists.forEach(b => { if (b.ekipOf) { of++; return; } const h = hesapla(b); ih += h.ihtiyac; pl += planlananToplam(h); if (h.ihtiyacTur === 'oner') { oner++; kisiOner += h.ihtiyacKisi; } else if (h.ihtiyacTur === 'elle') elle++; });
+    const aktif = S.plan.kayitlar.filter(k => !(durumlar()[k.durum] || {}).pasif && !aileHek(k)).length;
+    const gorev = S.plan.kayitlar.filter(k => k.gorev && (k.gorev.hedef || k.gorev.yer)).length;
+    const d = S.plan.durum, durumAd = d === 'kesin' ? 'Kesinleşti' : d === 'kilit' ? 'Kilitli' : 'Taslak', oran = ih ? Math.round(pl / ih * 100) : 0;
+    const kart = (baslik, deger, alt, git, renk) => `<div class="ap-ana-kart"><span>${baslik}</span><b${renk ? ` style="color:${renk}"` : ''}>${deger}</b><small>${alt}${git ? ` <a href="#" data-act="yan1" data-v="${git}">ayrıntı</a>` : ''}</small></div>`;
+    const hizli = sayfaListesi().filter(([k]) => k !== 'ana').map(([k, t]) => `<button type="button" class="ap-ana-git" data-act="yan1" data-v="${k}">${yanIc(k)}<span>${t}</span></button>`).join('')
+      + `<button type="button" class="ap-ana-git" data-act="yan2" data-v="plan">${yanIc('n2-plan')}<span>Nöbet hedefleri</span></button>`;
+    return `<div class="ap-ana">
+      <div class="ap-ana-kartlar">
+        ${kart('Dönem', `${AYLAR[S.m]} ${S.y}`, `Plan durumu: ${durumAd}`, '', '')}
+        ${kart('Açık istasyon', ists.length - of, of ? `${of} ekip OF (kapalı)` : 'Kapalı ekip yok', 'pano', '')}
+        ${kart('Aktif personel', aktif, `${S.plan.kayitlar.length} kayıt`, 'personel', '')}
+        ${kart('Planlanan nöbet', `${fmt(pl)} / ${fmt(ih)}`, `%${oran} planlandı`, 'pano', oran >= 100 ? 'var(--ap-ok)' : '')}
+        ${kart('Personel önerilen', oner, oner ? `${kisiOner} kişi gelmeli` : 'Öneri yok', 'gorev', oner ? 'var(--ap-bad)' : '')}
+        ${kart('Görevlendirme', gorev, elle ? `${elle} istasyon elle karar bekliyor` : 'geçici görevli personel', 'gorev', '')}
+      </div>
+      <div class="ap-card ap-ana-hizli"><h3>Hızlı erişim</h3><div class="ap-ana-git-l">${hizli}</div></div>
+    </div>`;
+  }
   function panoHtml() {
     const ists = S.plan.birimler.filter(b => b.tur === 'istasyon'), isciTam = C.hedefNobet(C.ayMesai(S.y, S.m, true, S.plan.ozel || {}), 'isci', false, {isciDusulen: S.ayar.isciDusulen}).birim;
     let ih = 0, kap = 0, pl = 0, acik = 0, fazla = 0, fm = 0, azk = 0, of = 0, kisiOner = 0, elle = 0;
@@ -459,12 +482,12 @@
   function sayfaHtml() {
     if (S.modul === 2) return n2Html();
     if (!S.plan) return bosHtml();
-    if (!SAYFALAR.some(x => x[0] === S.sayfa)) S.sayfa = 'pano';
+    if (!SAYFALAR.some(x => x[0] === S.sayfa)) S.sayfa = 'ana';
     const ic = sayfaGovde();      // önce gövde: istasyon sayfası seçili istasyonu (S.ist) burada belirler
     return sayfaBasHtml() + ic;
   }
   function sayfaGovde() {
-    return ({pano: panoHtml, ist: istHtml, gorev: gorevHtml, personel: personelHtml, ozel: ozelHtml, stat: statHtml, talep: talepHtml, ayar: ayarHtml, arsiv: arsivHtml, arstat: arstatHtml, takip: takipHtml}[S.sayfa] || panoHtml)();
+    return ({ana: anaHtml, pano: panoHtml, ist: istHtml, gorev: gorevHtml, personel: personelHtml, ozel: ozelHtml, stat: statHtml, talep: talepHtml, ayar: ayarHtml, arsiv: arsivHtml, arstat: arstatHtml, takip: takipHtml}[S.sayfa] || panoHtml)();
   }
   // Plan kutusunda Enter: değer kaydedilir ve odak alt satırın plan kutusuna geçer
   const PLAN_KUTU = 'input[data-f=planlanan], input[data-n2=teklif]';

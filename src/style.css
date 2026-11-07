@@ -276,3 +276,14 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 .ap-pop .ap-ilist label:has(input:checked){background:color-mix(in srgb,var(--ap-pri) 8%,transparent);color:var(--ap-pri);font-weight:700}
 .ap-pop input[type=checkbox]{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;border:1px solid #94a3b8;background:var(--ap-card);margin:0;flex:none;cursor:pointer}
 .ap-pop input[type=checkbox]:checked{background:var(--ap-pri);border-color:var(--ap-pri);box-shadow:inset 0 0 0 2px var(--ap-card)}
+
+/* Sürüm 13.28: Ana Sayfa (Depo ana sayfası düzeni) */
+.ap-ana-kartlar{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:16px}
+.ap-ana-kart{background:var(--ap-card);border:1px solid var(--ap-line);padding:20px;display:flex;flex-direction:column;gap:8px}
+.ap-ana-kart span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ap-mut)}
+.ap-ana-kart b{font-size:28px;font-weight:700;line-height:1.1;color:var(--ap-ink)}
+.ap-ana-kart small{font-size:12px;color:var(--ap-mut)}.ap-ana-kart small a{color:var(--ap-pri);font-weight:600}
+.ap-ana-hizli h3{margin:0 0 14px;font-size:14px;letter-spacing:.06em;text-transform:uppercase}
+.ap-ana-git-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.ap-ana-git{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--ap-line);background:var(--ap-card);color:var(--ap-ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;text-align:left}
+.ap-ana-git:hover{border-color:var(--ap-pri);color:var(--ap-pri)}.ap-ana-git .ap-yic{color:var(--ap-mut)}

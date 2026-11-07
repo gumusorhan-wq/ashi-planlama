@@ -1053,7 +1053,7 @@
         case 'ozet-sekme': S.ozetSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;
         case 'pano-filtre': S.panoFiltre = S.panoFiltre === v ? '' : v; break;
-        case 'guncel-ay': { S.y = GUNCEL_Y; S.m = GUNCEL_M; S.ist = ''; await planYukle(); S.sayfa = 'pano'; break; }
+        case 'guncel-ay': { S.y = GUNCEL_Y; S.m = GUNCEL_M; S.ist = ''; await planYukle(); S.sayfa = 'ana'; break; }
         case 'arsiv-ac': { const [yy, mm] = String(v).split('-').map(Number); S.y = yy; S.m = mm; S.ist = ''; await planYukle(); S.modul = 1; S.sayfa = S.plan ? 'pano' : 'pano'; break; }
         case 'ay-': case 'ay+': { const d = a === 'ay+' ? 1 : -1; S.m += d; if (S.m > 12) { S.m = 1; S.y++; } if (S.m < 1) { S.m = 12; S.y--; } S.ist = ''; await planYukle(); if (S.plan && planOnar(S.plan)) { otoHesapla(); kaydet(); } break; }
         case 'ist-ac': S.ist = v; S.sayfa = 'ist'; break;
@@ -1086,7 +1086,7 @@
           if (!(await onay('TÜM aylık planlar, arşiv kayıtları, gerçekleşen nöbet verisi ve yükleme günlüğü silinecek (Ayarlar korunur). Bu işlem geri alınamaz.\n\nDevam edilsin mi?'))) break;
           if (((await sor('Bu işlem geri alınamaz. Onaylamak için SIFIRLA yazın:')) || '').trim().toLocaleUpperCase('tr-TR') !== 'SIFIRLA') { toast('Vazgeçildi.'); break; }
           kaydetIptal(); const ks = ((await depo.keys()) || []).map(String).filter(k => /^(plan|arsiv|gercek):/.test(k) || k === 'yuklemeler'); for (const k of ks) await depo.del(k);
-          S.plan = null; S.planAnahtarlari = []; S.arsivVeri = null; S.gercekVeri = null; S.yuklemeler = []; S.takipVeri = null; S.ist = ''; S.sayfa = 'pano'; S.asos = null; S.oncePlanBirim = new Map();
+          S.plan = null; S.planAnahtarlari = []; S.arsivVeri = null; S.gercekVeri = null; S.yuklemeler = []; S.takipVeri = null; S.ist = ''; S.sayfa = 'ana'; S.asos = null; S.oncePlanBirim = new Map();
           toast(`${ks.length} kayıt silindi; uygulama sıfırlandı.`); break;
         }
         case 'oner-hepsi': mut(() => S.plan.birimler.forEach(b => oner(b.ad)), 'Tüm istasyonlarda planlanan önerildi', ''); toast('Planlanan nöbetler önerildi (kilitli olanlar korundu).'); break;
@@ -1184,7 +1184,7 @@
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
           S.arsivVeri = null;
-          kaydet(); S.modal = null; S.asos = null; S.sayfa = 'pano'; if (!S.ist || !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || S.plan.birimler[0] || {}).ad || '';
+          kaydet(); S.modal = null; S.asos = null; S.sayfa = 'ana'; if (!S.ist || !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || S.plan.birimler[0] || {}).ad || '';
           toast('Personel listeleri uygulandı.'); break;
         }
         case 'pano-mod': { S.ayar.panoMod = v === 'mesai' ? 'mesai' : 'fazla'; await ayarKaydet(); if (S.plan && !salt()) { otoHesapla(); damgala(); kaydet(); } break; }
