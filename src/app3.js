@@ -552,7 +552,7 @@
   }
   function birimSatirlari(b) {
     const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
-    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)).filter(k => !gizliKisi(k)).sort(nobetSirala(sm));      // aile hekimliği / uzmanlık eğitimi çıktılarda yer almaz; branş sırası istasyon sayfasıyla aynı
+    const kis = S.plan.kayitlar.filter(k => k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)).filter(k => !gizliKisi(k)).sort(nobetSirala(sm, b.tur !== 'istasyon'));      // aile hekimliği / uzmanlık eğitimi çıktılarda yer almaz; branş sırası istasyon sayfasıyla aynı
     return kis.map(k => {
       const gelen = k.birim !== b.ad;
       return {k, gelen, renk: satirRenk(k, gelen), sinif: k.sinif,
@@ -591,7 +591,7 @@
   function excelIstasyonSayfa(b) {
     const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
     // Kendi kadrosundaki (görevde dışarıda olanlar hariç) ve buraya geçici görevli gelen personel; branş sırasıyla (doktor → AABT → ATT → diğer memur → sürücü ATT → işçi)
-    const kis = S.plan.kayitlar.filter(k => { if (gizliKisi(k)) return false; const giden = k.birim === b.ad && (D[k.durum] || {}).disarida && k.gorev && (k.gorev.hedef || k.gorev.yer) && k.gorev.hedef !== b.ad; return !giden && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)); }).sort(nobetSirala(sm));
+    const kis = S.plan.kayitlar.filter(k => { if (gizliKisi(k)) return false; const giden = k.birim === b.ad && (D[k.durum] || {}).disarida && k.gorev && (k.gorev.hedef || k.gorev.yer) && k.gorev.hedef !== b.ad; return !giden && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)); }).sort(nobetSirala(sm, b.tur !== 'istasyon'));
     const mesaiK = k => { const s = sm.get(k.id); if (s) return s.nobetYok ? 0 : s.mesai; try { return C.kisiMesai(k, S.y, S.m, ozel(), D); } catch (e) { return 0; } };
     const tahmini = k => { const mesai = mesaiK(k); if (!(mesai > 0)) { const s = sm.get(k.id), dt = D[k.durum] || {}, du = k.durum ? ` (${k.durum})` : ''; if (izinAyGun(k) >= C.gunSayisi(S.y, S.m)) return 'İzinli/raporlu (tüm ay)'; if ((s && s.nobetYok) || dt.nobetYok) return 'Nöbet yok' + du; if (dt.mesaiYok) return 'Mesai yok' + du; return 'Mesai yok'; } if (isciK(k)) return `${Math.floor(mesai / 12 + 1e-9)} Nöbet`; const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`; };
     const isciK = k => /ISCI/.test(C.TR((k.kadroTur || '') + ' ' + (k.unvan || ''))) || k.sinif === 'isci';
@@ -645,7 +645,7 @@
   // İstasyon / KKM sayfası: AD-SOYAD, UNVAN, G.GÖREV DURUMU, İZİNLER (gün + tür), TAHMİNİ NÖBET, GEÇİCİ GÖREV YERİ TARİH ARALIĞI, YOLLUK DURUMU, AÇIKLAMA
   function xlIstasyonSayfa(b, baslik) {
     const D = durumlar(), h = b.tur === 'istasyon' ? hesapla(b) : null, sm = new Map(); if (h) h.satir.forEach(s => sm.set(s.k.id, s));
-    const kis = S.plan.kayitlar.filter(k => !gizliKisi(k) && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida))).sort(nobetSirala(sm));
+    const kis = S.plan.kayitlar.filter(k => !gizliKisi(k) && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida))).sort(nobetSirala(sm, b.tur !== 'istasyon'));
     const bas = ['AD-SOYAD', 'UNVAN', 'G.GÖREV DURUMU', 'İZİNLER', '', 'TAHMİNİ NÖBET', 'GEÇİCİ GÖREV YERİ TARİH ARALIĞI', 'YOLLUK DURUMU', 'AÇIKLAMA'], W = bas.length;
     const aoa = [[baslik || (b.ad + (b.tur === 'istasyon' ? ' NOLU ASHİ' : '')) + (b.ekipOf ? ' — EKİP OF' : '')], bas], stil = {}, grup = k => k.sinif === 'doktor' ? 0 : xlSurucu(k) ? 2 : 1;
     const ayrac = []; let onceki = null, izinTop = 0, izinKisi = 0, aktif = 0; const ort = {0: [], 1: [], 2: []};
@@ -684,7 +684,7 @@
     return ws;
   }
   function xlBashekimlik(b) {
-    const D = durumlar(), kis = S.plan.kayitlar.filter(k => !gizliKisi(k) && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida))).sort(nobetSirala(new Map()));
+    const D = durumlar(), kis = S.plan.kayitlar.filter(k => !gizliKisi(k) && (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida))).sort(nobetSirala(new Map(), true));
     const aoa = [['BAŞHEKİMLİK PERSONEL BİLGİLERİ'], ['SN', 'AD-SOYAD', 'UNVAN', 'AÇIKLAMA', 'NÖBET', 'GÖREVİ / DURUMU', 'GEÇİCİ GÖREV TARİHLERİ']], renk = {};
     kis.forEach((k, i) => { const gelen = k.birim !== b.ad; renk[aoa.length] = xlSatirRenk(k, gelen); aoa.push([i + 1, k.ad, xlUnvan(k), k.aciklama || '', idariNobetVar(k) ? 'NÖBET TUTAR' : '', gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), gelen ? `${k.birim} / ${(k.gorev && k.gorev.tarih) || ''}` : (xlGorevMetin(k) || cikGorev(k))]); });
     return xlSayfa(aoa, {cols: [5, 32, 16, 30, 14, 30, 44], merges: [{s: {r: 0, c: 0}, e: {r: 0, c: 6}}], stil: (r, c) => r === 0 ? (c === 0 ? {font: {bold: true, sz: 14}, hiza: {horizontal: 'center'}} : null) : r === 1 ? {font: {bold: true}, kenar: true, dolgu: 'DCE6F1', sar: true} : {kenar: true, dolgu: renk[r] || ''}});

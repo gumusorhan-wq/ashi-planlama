@@ -215,7 +215,19 @@ function mount(root, opts = {}) {
     return ATT_RE.test(C.TR((k.unvan || '') + ' ' + (k.kadroBrans || ''))) ? 2 : 3;
   }
   // satirMap: istasyon hesabındaki satırlar (id → {grup}); verilmezse grup kişiden hesaplanır
-  const kisiSirala = satirMap => (a, b) => (gizliKisi(a) - gizliKisi(b)) || (bransSira(a, satirMap && satirMap.get(a.id) && satirMap.get(a.id).grup) - bransSira(b, satirMap && satirMap.get(b.id) && satirMap.get(b.id).grup)) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad || '', b.ad || '');
+  // Başhekimlik / KKM gibi nöbet hesabı olmayan birimlerde sıra unvandan: doktor → AABT → ATT → diğer sağlık → diğer (idari, sürücü olmayan işçi) → sürücü → işçi sürücü
+  function idariSira(k) {
+    const u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
+    if (k.sinif === 'doktor' || /TABIP|DOKTOR|HEKIM|UZMAN DR/.test(u)) return 0;
+    const surucu = /SOFOR|SURUCU/.test(u);
+    if (k.sinif === 'isci' || /ISCI/.test(u)) return surucu ? 7 : 4;      // sürücü olmayan işçi idari personelle
+    if (/\bAABT\b|AMBULANS VE ACIL BAKIM|PARAMEDIK|TEKNIKER/.test(u)) return 1;
+    if (/\bATT\b|ACIL TIP TEKNISYEN/.test(u)) return 2;
+    if (surucu) return 5;
+    if (/HEMSIRE|EBE\b|SAGLIK|TEKNISYEN|ECZACI|BIYOLOG|PSIKOLOG|DIYETISYEN|FIZYOTERAPIST|LABORANT|RADYOLOJI/.test(u)) return 3;
+    return 4;
+  }
+  const kisiSirala = (satirMap, idari) => (a, b) => (gizliKisi(a) - gizliKisi(b)) || (idari ? idariSira(a) - idariSira(b) : 0) || (bransSira(a, satirMap && satirMap.get(a.id) && satirMap.get(a.id).grup) - bransSira(b, satirMap && satirMap.get(b.id) && satirMap.get(b.id).grup)) || ((a.sira ?? 1e9) - (b.sira ?? 1e9)) || trCollator.compare(a.ad || '', b.ad || '');
   const nobetSirala = kisiSirala;
   const personelSirala = kisiSirala(null);
   // Başhekimlik / KKM nöbeti: Nöbet Listesi Raporunun İdari / Komuta satırlarından; son 6 ayda nöbet kaydı olan kişi "nöbet tutar" sayılır

@@ -231,7 +231,7 @@
     const istas = b.tur === 'istasyon', h = istas ? hesapla(b) : null;
     const disSay = S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef).length;
     const satirMap = new Map(); if (h) h.satir.forEach(s => satirMap.set(s.k.id, s));
-    kis.sort(nobetSirala(satirMap));
+    kis.sort(nobetSirala(satirMap, !istas));
     const p = h ? planlananToplam(h) : 0;
     let son = '', rows = '';
     const mesEksik = [];
