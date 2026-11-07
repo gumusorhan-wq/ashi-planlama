@@ -287,3 +287,11 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 .ap-ana-git-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .ap-ana-git{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--ap-line);background:var(--ap-card);color:var(--ap-ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;text-align:left}
 .ap-ana-git:hover{border-color:var(--ap-pri);color:var(--ap-pri)}.ap-ana-git .ap-yic{color:var(--ap-mut)}
+/* HUSER 13.38: telefonda Pano yana kaymasın — arama satırındaki açıklama sarar, özet kartları alt satıra geçer */
+@media (max-width:760px){
+  .ap-pano-ara{display:flex;width:100%;min-width:0}
+  .ap-pano-ara .ap-in{width:100%}
+  .ap-pano-ara .ap-note{white-space:normal;min-width:0;flex:1 1 100%}
+  .ap-sum.ap-sum1{flex-wrap:wrap;overflow-x:visible}
+  .ap-sum1>div{flex:1 1 calc(33.333% - 8px);min-width:96px}
+}
