@@ -1389,7 +1389,8 @@ function mount(root, opts = {}) {
     if (k.sinif === 'doktor' || /TABIP|DOKTOR|HEKIM|UZMAN DR/.test(u)) return 0;
     const surucu = /SOFOR|SURUCU/.test(u);
     if (k.sinif === 'isci' || /ISCI/.test(u)) return surucu ? 7 : 8;      // sürücü olmayan işçi en altta
-    if (/\bAABT\b|AMBULANS VE ACIL BAKIM|PARAMEDIK|TEKNIKER/.test(u)) return 1;
+    const br = C.TR(k.kadroBrans || '');
+    if (/\bAABT\b|AMBULANS VE ACIL BAKIM|PARAMEDIK/.test(u) || (/TEKNIKER/.test(C.TR(k.unvan || '')) && (!br || /ACIL|AMBULANS|TEKNIKER/.test(br)))) return 1;
     if (/\bATT\b|ACIL TIP TEKNISYEN/.test(u)) return 2;
     if (surucu) return 5;
     if (/HEMSIRE|EBE\b|SAGLIK|TEKNISYEN|ECZACI|BIYOLOG|PSIKOLOG|DIYETISYEN|FIZYOTERAPIST|LABORANT|RADYOLOJI/.test(u)) return 3;
@@ -3270,7 +3271,16 @@ function mount(root, opts = {}) {
     const u = C.TR((k.unvan || '') + ' ' + (k.kadroBrans || '') + ' ' + (k.kadroTur || ''));
     if (k.sinif === 'isci') return 'SÜREKLİ İŞÇİ';
     if (k.sinif === 'doktor') return /DHY|DIS HEK|ACIL TIP HEK/.test(u) && /DHY/.test(u) ? 'DHY DOKTOR' : 'DOKTOR';
-    return (k.dortB ? '4/B ' : '') + (/\bSRC\b/.test(u) ? 'SRC ' : '') + C.kadroTip(k);
+    return (k.dortB ? '4/B ' : '') + (/\bSRC\b/.test(u) ? 'SRC ' : '') + saglikUnvan(k);
+  }
+  // Ünvan sütunu: yalnız gerçekten AABT / ATT olanlar kısaltılır; sağlık teknikeri ancak branşı acil / ambulans (ya da boş) ise AABT,
+  // tıbbi sekreter vb. branşlı tekniker ile hemşire, ebe, idari ünvanlar kendi adıyla yazılır
+  function saglikUnvan(k) {
+    const un = C.TR(k.unvan || ''), br = C.TR(k.kadroBrans || ''), u = un + ' ' + br;
+    if (/\bAABT\b|AMBULANS VE ACIL BAKIM|PARAMEDIK/.test(u)) return 'AABT';
+    if (/\bATT\b|ACIL TIP TEKNISYEN/.test(u)) return 'ATT';
+    if (/TEKNIKER/.test(un)) return !br || /ACIL|AMBULANS|TEKNIKER/.test(br) ? 'AABT' : String(k.kadroBrans).trim().toLocaleUpperCase('tr-TR');
+    return String(k.unvan || '').trim().toLocaleUpperCase('tr-TR') || 'ATT';
   }
   const izinTur = k => [...new Set((k.izin || []).filter(i => sayi(i.gun) > 0).map(i => i.tur || 'İZİN'))].join(', ');
   function cikDurum(k) {

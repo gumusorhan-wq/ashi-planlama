@@ -221,7 +221,8 @@ function mount(root, opts = {}) {
     if (k.sinif === 'doktor' || /TABIP|DOKTOR|HEKIM|UZMAN DR/.test(u)) return 0;
     const surucu = /SOFOR|SURUCU/.test(u);
     if (k.sinif === 'isci' || /ISCI/.test(u)) return surucu ? 7 : 8;      // sürücü olmayan işçi en altta
-    if (/\bAABT\b|AMBULANS VE ACIL BAKIM|PARAMEDIK|TEKNIKER/.test(u)) return 1;
+    const br = C.TR(k.kadroBrans || '');
+    if (/\bAABT\b|AMBULANS VE ACIL BAKIM|PARAMEDIK/.test(u) || (/TEKNIKER/.test(C.TR(k.unvan || '')) && (!br || /ACIL|AMBULANS|TEKNIKER/.test(br)))) return 1;
     if (/\bATT\b|ACIL TIP TEKNISYEN/.test(u)) return 2;
     if (surucu) return 5;
     if (/HEMSIRE|EBE\b|SAGLIK|TEKNISYEN|ECZACI|BIYOLOG|PSIKOLOG|DIYETISYEN|FIZYOTERAPIST|LABORANT|RADYOLOJI/.test(u)) return 3;
