@@ -3339,7 +3339,9 @@ function mount(root, opts = {}) {
     const D = durumlar(), mesai = xlMesai(k, sm, gelen);
     if (!(mesai > 0)) { const s = sm && sm.get(k.id), dt = D[k.durum] || {}, du = k.durum ? ` (${k.durum})` : ''; if (izinAyGun(k) >= C.gunSayisi(S.y, S.m)) return 'İzinli/raporlu (tüm ay)'; if ((s && s.nobetYok) || dt.nobetYok) return 'Nöbet yok' + du; if (dt.mesaiYok) return 'Mesai yok' + du; return 'Mesai yok'; }
     if (xlIsci(k)) { const pl = sm && sm.get(k.id) && k.planlanan != null ? Math.round(k.planlanan / C.ADIM) : C.hedefNobet(mesai, 'isci', false, {isciDusulen: S.ayar.isciDusulen}).adet; return `${pl} Nöbet`; }      // ekrandaki gibi: planlanan (yoksa hedef) 12 saatlik nöbet adedi
-    const n = Math.floor(mesai / 24 + 1e-9), sa = Math.round((mesai - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`;
+    // İstasyon ekranında planlanan (elle ya da azami nöbete göre ayarlanan) varsa o yazılır; yoksa mesaiden: 7,67 → '7 Nöbet + 16 Saat'
+    const s = sm && sm.get(k.id), saat = s && !s.nobetYok && k.planlanan != null ? sayi(k.planlanan) * 24 : mesai;
+    const n = Math.floor(saat / 24 + 1e-9), sa = Math.round((saat - n * 24) * 10) / 10; return sa > 0 ? `${n} Nöbet + ${fmt(sa)} Saat` : `${n} Nöbet`;
   }
   const xlSatirRenk = (k, gelen) => { const r = satirRenk(k, gelen); return r ? hex(r) : ''; };
   // Hücre biçimi: Times New Roman, ince kenarlık; başlık kalın ve ortalı
@@ -3366,17 +3368,23 @@ function mount(root, opts = {}) {
       if (onceki != null && g !== onceki) { stil[aoa.length] = {dolgu: XL_RENK.sep}; ayrac.push(aoa.length); aoa.push(new Array(W).fill('')); }
       onceki = g;
       const iz = izinAyGun(k), mesai = xlMesai(k, sm, gelen), giden = !gelen && k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[k.durum] || {}).disarida;
-      if (iz) { izinTop += iz; izinKisi++; } if (mesai > 0 && !giden) { aktif++; ort[g].push(mesai / 24); }
+      if (iz) { izinTop += iz; izinKisi++; } if (mesai > 0 && !giden) { aktif++; const sx = sm.get(k.id); ort[g].push(sx && !sx.nobetYok && k.planlanan != null ? sayi(k.planlanan) : mesai / 24); }
       stil[aoa.length] = {dolgu: xlSatirRenk(k, gelen)};
       aoa.push([k.ad, xlUnvan(k), gelen ? 'GEÇİCİ GÖREVLİ' : cikDurum(k), iz ? Math.round(iz * 100) / 100 : '', iz ? izinTur(k) : '', giden ? '' : xlTahmini(k, sm, gelen),
         gelen ? `${k.birim}${(S.plan.birimler.find(x => x.ad === k.birim) || {}).tur === 'istasyon' ? ' NOLU ASHİ' : ''}${k.gorev && k.gorev.tarih ? ' / ' + k.gorev.tarih : ''}` : (xlGorevMetin(k) || cikGorev(k)), (k.gorev && k.gorev.yolluk) || '', k.aciklama || '']);
     });
     const son = aoa.length; aoa.push([]);
     const ozet = [['AKTİF ÇALIŞAN:', aktif], ['TOPLAM KULLANILAN İZİN SAYISI:', Math.round(izinTop * 100) / 100], ['İZİN KULLANAN PERSONEL SAYISI:', izinKisi], ['DOKTOR Ortalama Nöbet (24 saat):', 0], ['YSP Ortalama Nöbet (24 saat):', 1], ['Sürücü Ortalama Nöbet (24 saat):', 2]];
+    // İstasyon ekranındaki 'Plan: 93,02 / 93' ve nöbet branşları: toplam planlanan / ihtiyaç (24 saatlik nöbet)
+    if (h && !b.ekipOf) {
+      const r2 = v => Math.round(v * 100) / 100, pt = r2(planlananToplam(h));
+      ozet.push(['PLANLANAN NÖBET TOPLAMI:', `${fmt(pt)} / ${fmt(r2(h.ihtiyac))} (ihtiyaç)`]);
+      if (istMod(b) !== 'mesai' && azamiDeger(b)) ozet.push(['AZAMİ NÖBET (kişi başı):', azamiDeger(b)]);
+    }
     const r0 = aoa.length;
     for (let i = 0; i < Math.max(ozet.length, XL_LEJANT.length); i++) {
       const sat = new Array(W).fill(''), o = ozet[i];
-      if (o) { sat[0] = o[0]; sat[1] = i >= 3 ? (ort[o[1]].length ? Math.round(ort[o[1]].reduce((x, y) => x + y, 0) / ort[o[1]].length * 100) / 100 : '') : o[1]; }
+      if (o) { sat[0] = o[0]; sat[1] = i >= 3 && i <= 5 ? (ort[o[1]].length ? Math.round(ort[o[1]].reduce((x, y) => x + y, 0) / ort[o[1]].length * 100) / 100 : '') : o[1]; }
       if (XL_LEJANT[i]) sat[6] = XL_LEJANT[i][0];
       aoa.push(sat);
     }
