@@ -416,7 +416,14 @@ const NobetCore = (() => {
   function adetHazirla(kisiler, gun) {
     const isci = kisiler.filter(k => k.grup === 'isci'), diger = kisiler.filter(k => k.grup !== 'isci');
     isci.forEach(k => { k.yarim = Math.max(0, Math.floor((k.planlanan || 0) * 2 + 1e-6)); k.adet = 0; });
-    const dz = isciDuzen(isci.map(k => k.yarim), gun); isci.forEach((k, i) => { k.yarim = dz.uh[i]; });
+    let dz = isciDuzen(isci.map(k => k.yarim), gun); isci.forEach((k, i) => { k.yarim = dz.uh[i]; k.isciDusen = 0; });
+    // 657'ye tabi personel (memur / doktor) mesaisinin altında kalmamalı; işçi eksi kalabilir. Memurların planlanan saati, işçi vardiyalarından kalan
+    // saate sığmıyorsa işçinin vardiyası azaltılır (kişi başı ayda en çok 2 vardiya; eksik saat işçi bakiyesine yazılır, sonraki aya devreder).
+    const memurSaat = diger.reduce((x, k) => x + (k.planlanan || 0) * 24, 0), bosSaat = d => (gun * 2 + (gun - d.D2)) * 24 - d.D1 * 12;
+    for (let g = 0; g < 200 && memurSaat > bosSaat(dz) + 1e-6; g++) {
+      const ad = isci.filter(k => k.yarim > 0 && k.isciDusen < 2).sort((a, c) => c.yarim - a.yarim)[0]; if (!ad) break;
+      ad.yarim--; ad.isciDusen++; dz = isciDuzen(isci.map(k => k.yarim), gun); isci.forEach((k, i) => { k.yarim = dz.uh[i]; });
+    }
     const gerek = gun * 2 + (gun - dz.D2);
     diger.forEach(k => { k.adet = Math.floor((k.planlanan || 0) + 1e-6); k.kesir = (k.planlanan || 0) - k.adet; });
     let fark = gerek - diger.reduce((x, k) => x + k.adet, 0);
@@ -427,7 +434,7 @@ const NobetCore = (() => {
     const ustu = k => k.ust == null ? 99 : k.ust;
     while (fark > 0) { const L = diger.filter(k => k.adet < ustu(k)); const aday = sirala(L.filter(k => !dolu(k)))[0] || sirala(L)[0]; if (!aday) break; aday.adet++; aday.kesir -= 1; fark--; }
     while (fark < 0) { const L = diger.filter(k => k.adet > 0), tasan = L.filter(k => tekGrup[k.grup] && grupTop(k.grup) > gun); const aday = (tasan.length ? tasan : L).sort((a, b) => (a.kesir) - (b.kesir) || b.adet - a.adet)[0]; if (!aday) break; aday.adet--; aday.kesir += 1; fark++; }
-    return {gerek, gunIsci: dz.D1 + dz.D2, isciCift: dz.D2, kombi: dz.D1, kalanFark: fark};
+    return {gerek, gunIsci: dz.D1 + dz.D2, isciCift: dz.D2, kombi: dz.D1, kalanFark: fark, isciDusen: isci.reduce((x, k) => x + k.isciDusen, 0)};
   }
   return {adetHazirla, kapasiteAnalizi, isciDuzen, kombiYerlestir, uretAsync, hazirla, denetle, uret, oneriler, bos, YETENEK, KURAL, YUVA_AD, KOD, gunSayisi, iso};
 })();

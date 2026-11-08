@@ -57,4 +57,8 @@ assert.ok(!N.YETENEK.ke.includes('sur'));
   const say = {}; for (let d = 1; d <= 30; d++) ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { const id = z.liste[d][t]; if (id != null) say[id] = (say[id] || 0) + (t === 'surG' || t === 'surA' ? 0.5 : 1); });
   az.forEach(k => assert.ok((say[k.id] || 0) <= k.adet, k.id + ' adedinden fazla: ' + say[k.id]));
   assert.strictEqual(z.bos, kp.gunSay, 'boş yuva sayısı kapasite açığına eşit: ' + z.bos + ' / ' + kp.gunSay); assert.strictEqual(z.sert, 0, 'boşluk dışında sert ihlal kalmamalı: ' + JSON.stringify(z.say)); }
+// memur (657) mesai altına düşmesin: memur saati yetmezse önce işçi vardiyası azalır (en çok 2)
+{ const ks = [...[1, 2, 3, 4, 5, 6, 7, 8].map(i => ({id: i, grup: 'ka', planlanan: 8, ust: 8})), ...[9, 10].map(i => ({id: i, grup: 'ysp', planlanan: 8, ust: 8})), {id: 12, grup: 'ysp', planlanan: 8, ust: 8}, {id: 11, grup: 'isci', planlanan: 8.5}];
+  const o = N.adetHazirla(ks, 30); assert.strictEqual(ks.find(k => k.grup === 'isci').yarim, 15, 'işçi 17 → 15 vardiya'); assert.strictEqual(o.isciDusen, 2); }
+{ const ks = [...[1, 2, 3].map(i => ({id: i, grup: 'ka', planlanan: 7, ust: 8})), {id: 4, grup: 'isci', planlanan: 8.5}]; N.adetHazirla(ks, 30); assert.strictEqual(ks[3].yarim, 17, 'kadro azken işçi düşmez'); }
 console.log('nöbet çekirdek testleri geçti');
