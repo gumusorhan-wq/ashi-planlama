@@ -178,12 +178,12 @@
     const izinler = G.girdi.kisiler.flatMap(k => (dp.izin[k.id] || []).map((z, i) => ({k, z, i})));
     return `<div class="ap-card"><h2>İstek takvimi — nöbet istenmeyen günler</h2>
       <p class="ap-note">Bir hücreye tıklayarak o kişinin <b>nöbet istemediği günü</b> işaretleyin (✕), tekrar tıklayınca kalkar. <b>İ</b>: izinli gün (ASOS'tan gelen izinler ve aşağıdan eklenenler); <b>·</b>: yıllık izin öncesi ${G.kural.izinOnce} günlük otomatik boşluk. Otomatik liste önce bu günleri ve izinleri gözetir; mümkün olmazsa istek günü sona kalır ve denetimde uyarı verir.</p>
-      <div class="ap-toolbar" style="margin:8px 0 10px"><button class="ap-btn" data-act="n2-istek-temizle" ${duz ? '' : 'disabled'}>Tüm istekleri temizle</button><button class="ap-btn pri" data-act="n2-sekme" data-v="liste">Nöbet listesine geç →</button>
+      <div class="ap-toolbar" data-ust style="margin:8px 0 10px"><button class="ap-btn" data-act="n2-istek-temizle" ${duz ? '' : 'disabled'}>Tüm istekleri temizle</button><button class="ap-btn pri" data-act="n2-sekme" data-v="liste">Nöbet listesine geç →</button>
         <span style="border-left:1px solid var(--ap-line);height:28px;margin:0 4px"></span><b>İzin aralığı ekle</b><select class="ap-sel" id="ap-n2-izkisi" title="Yıllık izin başlamadan önceki ${G.kural.izinOnce} gün nöbet yazılmaz, izin süresince de yazılmaz. ASOS'tan tarihli gelen izinler otomatik tanınır.">${kisiSec}</select>${tarihDugme('n2iz', 'aralik', {idler: ['ap-n2-izbas', 'ap-n2-izbit'], bos: 'İzin başlangıç – bitiş'})}<button class="ap-btn pri" data-act="n2-izin-ekle" ${duz ? '' : 'disabled'}>Ekle</button></div>
       ${izinler.length ? `<div style="margin-top:8px">${izinler.map(({k, z, i}) => `<div class="ap-row"><b>${esc(k.ad)}</b> ${z.bas.split('-').reverse().join('.')} – ${z.bit.split('-').reverse().join('.')} <button class="ap-btn sm dng" data-act="n2-izin-sil" data-id="${k.id}" data-v="${i}" ${duz ? '' : 'disabled'}>Sil</button></div>`).join('')}</div>` : ''}</div>
 
 
-      <div class="ap-card"><div class="ap-tw"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}</tr></thead><tbody>${sat}</tbody></table></div>
+      <div class="ap-card"><div class="ap-tw ap-tw-kutu"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}</tr></thead><tbody>${sat}</tbody></table></div>
 </div>`;
   }
 
@@ -223,7 +223,7 @@
     const kisiGoruntu = S.n2.gorunum === 'kisi';
     const kisiTablo = () => {
       const bas = [...Array(N)].map((_, i) => `<th class="n2d">${i + 1}</th>`).join('');
-      return `<div class="ap-tw"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}<th>Liste</th><th>Hedef</th></tr></thead><tbody>${sayim.map(({k, birim, hedef}) => {
+      return `<div class="ap-tw ap-tw-kutu"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}<th>Liste</th><th>Hedef</th></tr></thead><tbody>${sayim.map(({k, birim, hedef}) => {
         const p = H.byId.get(k.id), c = [...Array(N)].map((_, i) => { const g = i + 1; const xs = []; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (L[g][t] === k.id) xs.push(NC.KOD[t] + (L[g].bol && L[g].bol[t] ? '½' : '')); if (L[g].bol && L[g].bol[t] && L[g].bol[t].id === k.id) xs.push(NC.KOD[t] + '½'); }); const x = xs.join('+'); return `<td class="n2c ${x ? 'nb' : p.izin.has(g) ? 'iz' : p.istek.has(g) ? 'is' : ''}">${x || (p.izin.has(g) ? 'İ' : p.istek.has(g) ? '✕' : '')}</td>`; }).join('');
         return `<tr><td class="n2n">${esc(k.ad)}</td>${c}<td class="num"><b>${fmt(birim)}</b></td><td class="num ${Math.abs(birim - hedef) > 0.05 ? 'n2e' : ''}">${fmt(hedef)}</td></tr>`; }).join('')}</tbody></table></div><p class="ap-note">E: ekip şefi · Y: YSP · S: sürücü (24 saat) · G: sürücü gündüz 09:00–21:00 · A: sürücü gece 21:00–09:00 · ½: bölünmüş nöbet (12 saat ya da saatine göre)</p>`; };
     const lSek = [['liste', 'Nöbet listesi'], ['kisi', 'Kişi başına nöbet']], la = lSek.some(x => x[0] === S.n2.altSekme) ? S.n2.altSekme : 'liste';
@@ -242,7 +242,7 @@
       <span class="ap-sp"></span><button class="ap-btn ${kisiGoruntu ? '' : 'pri'}" data-act="n2-gorunum" data-v="yuva">Gün görünümü</button><button class="ap-btn ${kisiGoruntu ? 'pri' : ''}" data-act="n2-gorunum" data-v="kisi">Kişi görünümü</button></div>
       ${kap.toplam > 0 ? `<div class="ap-ek ap-ek-c" style="margin-top:8px"><b>Kadro yetmiyor${dp.liste ? '' : `: yaklaşık ${fmt(kap.toplam)} nöbet boş kalacak (${Object.entries(kap.bos).map(([k, n]) => `${NC.YUVA_AD[k]} ${fmt(n)} gün`).join(', ')})`}.</b> Kimseye mesaisinden / azami nöbetinden fazla nöbet yazılmaz; boş nöbetler listede <b>— BOŞ —</b> olarak kalır. Planlamadan personel isteyin. (Ekip şefi: doktor / AABT · sürücü: işçi ya da sürücülüğü doğrulanmış AABT / ATT.)</div>` : ''}
       <div id="ap-n2-ilerleme" style="margin-top:8px">${dp.liste ? n2DurumYazi(d, L, N) : '<span class="ap-note">Henüz liste yok. Önce istek takvimini doldurun, sonra <b>Otomatik nöbet listesi oluştur</b> düğmesine basın.</span>'}</div></div>
-      <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 saat)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz<br><span class="ap-note">09:00–21:00</span></th><th>Sürücü gece<br><span class="ap-note">21:00–09:00</span></th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>`;
+      <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw ap-tw-kutu"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 saat)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz<br><span class="ap-note">09:00–21:00</span></th><th>Sürücü gece<br><span class="ap-note">21:00–09:00</span></th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>`;
     return lNav + (la === 'kisi' ? lKisi : lListe);
   }
 

@@ -297,3 +297,10 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 }
 
 .ap-sum .ap-click .ap-tk-git{display:block;margin-top:6px;font-size:12px;font-weight:600;color:var(--ap-pri)}.ap-sum .ap-click.on .ap-tk-git{color:var(--ap-ok)}
+
+/* Sürüm 13.56: geniş takvim tabloları kendi kutusunda kayar; gün başlığı üstte, personel sütunu solda sabit kalır */
+.ap-tw.ap-tw-kutu{max-height:calc(100vh - var(--ap-ust-h, 0px) - 40px);overflow:auto}
+.ap-tw.ap-tw-kutu thead th{position:sticky;top:0;z-index:3;background:var(--ap-pri2,#e8f0fb)}
+.ap-tw.ap-tw-kutu table.n2 td.n2n,.ap-tw.ap-tw-kutu table.n2 thead th:first-child{position:sticky;left:0;z-index:2;background:var(--ap-card,#fff)}
+.ap-tw.ap-tw-kutu table.n2 thead th:first-child{z-index:4;background:var(--ap-pri2,#e8f0fb)}
+@media (max-width:760px){.ap-tw.ap-tw-kutu{max-height:none}}
