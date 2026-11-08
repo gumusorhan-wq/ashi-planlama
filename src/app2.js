@@ -229,6 +229,11 @@
     if (acik.length) {
       const yapar = {es: 'doktor / AABT', ysp: 'AABT / ATT', sur: 'işçi ya da sürücülüğü doğrulanmış AABT / ATT'};
       sat.push(`<b>${acik.map(y => `${AD[y]} ${fmt(pa.rem[y])} nöbet açık`).join(', ')}</b> — bu nöbeti tutabilecek kişinin planı dolu. Gereken: ${acik.map(y => yapar[y]).join('; ')}.`);
+      if (pa.rem.sur > 0.05) {      // sürücü açığı: kimin sürücü sayıldığı, kimin sayılmadığı ve nedeni
+        const es = {degil: S.ayar.surDegilEsik / 100}, sur = h.satir.filter(x => !x.nobetYok && ['ka', 'sy', 'isci'].includes(x.grup)), deg = h.satir.filter(x => !x.nobetYok && x.k.sinif === 'memur' && (x.grup === 'ke' || x.grup === 'ysp'));
+        const pct = x => { const d = C.surucuDurumu(x.k, es); return d.kaynak === 'kayit' ? `sürücü %${Math.round(100 * d.pay)}` : d.kaynak === 'manuel' ? 'elle: sürücü değil' : 'kayıt yok'; };
+        sat.push(`Sürücü sayılan: <b>${sur.length} kişi</b> (planı ${fmt(sur.reduce((t, x) => t + sayi(x.k.planlanan), 0))} nöbet; ${fmt(pa.fill.ka.sur + pa.fill.sy.sur + pa.fill.isci.sur)} nöbeti sürücüye yazılabiliyor). ${deg.length ? `Sürücü <b>sayılmayan</b>: ${deg.map(x => `${esc(x.k.ad)} (${pct(x)})`).join(', ')} — nöbet kayıtlarında sürücü payı %${S.ayar.surDegilEsik == null ? 15 : S.ayar.surDegilEsik}'in altında ya da kayıt yok. Sürücü olarak nöbet tutuyorsa <b>NÖBET ROLÜ</b> sütunundan "Sürücü dahil" seçin.` : ''}`);
+      }
       if (fazla.length) sat.push(`Aynı istasyonda ${fazla.map(g => `${C.GRUP_AD[g]} ${fmt(pa.fazla[g])} nöbet`).join(', ')} yazılı ama açık branşa giremiyor. <b>Çözüm:</b> bu gruptan biri başka istasyona, açık branşı tutabilen biri bu istasyona (değişim) ya da açık branşı tutabilen kişilerin planını artırın.`);
       else sat.push(`<b>Çözüm:</b> açık branşı tutabilen kişilerin planını artırın (azami nöbete kadar) ya da personel isteyin${h.ihtiyacTur === 'oner' ? ` — rotasyon önerisi: <b>${h.ihtiyacKisi} kişi</b> gelmeli` : h.ihtiyacTur === 'elle' ? ' — açık bir kişinin ay boyu mesaisine yetmiyor: kısa görevlendirme' : ''}.`);
     } else if (fazla.length) sat.push(`<b>${fazla.map(g => `${C.GRUP_AD[g]} ${fmt(pa.fazla[g])} nöbet`).join(', ')} fazla yazılı</b>: nöbet branşları dolu, bu nöbetler kullanılmaz. Planı azaltın ya da kişi başka istasyona gitsin.`);
