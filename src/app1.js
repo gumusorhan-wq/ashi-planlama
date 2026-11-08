@@ -142,7 +142,38 @@ function mount(root, opts = {}) {
     if (S.plan && opts.ozelGun) { try { await ortakOzelYukle(); } catch (e) { console.warn('ortak özel günler', e); } }
     try { bitenGorevleriKapat(); } catch (e) { console.warn('biten görev kontrolü', e); }
     try { await kisaGelenKontrol(); } catch (e) { console.warn('kısa görev kontrolü', e); }
+    try { await isciBakiyeYukle(); } catch (e) { S.isciBakiye = null; console.warn('işçi bakiyesi', e); }
   }
+  // İşçi saat bakiyesi (Ocak 2027'den itibaren): üç aylık dönemde (Oca–Mar, Nis–Haz, Tem–Eyl, Eki–Ara) her ay çalışılan vardiya × düşülen saat ile
+  // gereken mesai farkı sonraki aya devreder. Çalışılan: o ayın Nöbet Listesi Raporu (ASOS, gerçekleşen) → yoksa Modül 2 nöbet listesi → yoksa plan.
+  // Dönem başında bakiye sıfırdan başlar; dönemin son ayında kalan bakiye hatırlatılır. S.isciBakiye: kişi id → {devir, aylar:[{ay, gereken, vardiya, fark, kaynak}]}
+  const BAKIYE_BAS = '2027-01';
+  const ceyrekAylari = (y, m) => { const q0 = Math.floor((m - 1) / 3) * 3 + 1, o = []; for (let x = q0; x < m; x++) o.push(`${y}-${C.pad(x)}`); return o; };
+  const bakiyeAcik = (y, m) => `${y}-${C.pad(m)}` >= BAKIYE_BAS;
+  async function isciBakiyeYukle() {
+    S.isciBakiye = null; if (!S.plan || !bakiyeAcik(S.y, S.m)) return;
+    const iscis = S.plan.kayitlar.filter(k => k.sinif === 'isci'); if (!iscis.length) return;
+    const D = S.ayar.isciDusulen || 11, out = {};
+    iscis.forEach(k => { out[k.id] = {devir: 0, aylar: []}; });
+    for (const a of ceyrekAylari(S.y, S.m).filter(x => x >= BAKIYE_BAS)) {
+      const [ya, ma] = a.split('-').map(Number), pa = await depo.get(anahtar(ya, ma)), g = await depo.get('gercek:' + a);
+      if (!pa) continue;
+      iscis.forEach(k => {
+        const kk = pa.kayitlar.find(x => (k.tc && x.tc === k.tc) || x.id === k.id || C.TR(x.ad || '') === C.TR(k.ad || '')); if (!kk) return;
+        const gereken = C.kisiMesai(kk, ya, ma, pa.ozel || {}, durumlar()); let vardiya = null, kaynak = '';
+        const gk = g && g.kisi && g.kisi.filter(x => C.TR(x.ad || '') === C.TR(kk.ad || ''));
+        if (gk && gk.length) { vardiya = Math.round(gk.reduce((t, x) => t + (x.nobet || 0), 0) * 2); kaynak = 'ASOS'; }
+        else { const L = pa.nobet && pa.nobet[kk.birim] && pa.nobet[kk.birim].liste;
+          if (L) { vardiya = 0; for (let d = 1; d < L.length; d++) { const x = L[d]; if (!x) continue; ['surG', 'surA'].forEach(t => { if (x[t] === kk.id) vardiya++; }); ['es', 'ysp', 'sur'].forEach(t => { if (x[t] === kk.id) vardiya += 2; }); } kaynak = 'Nöbet listesi'; }
+          else { vardiya = Math.round(sayi(kk.planlanan) * 2); kaynak = 'Plan'; } }
+        const fark = Math.round((vardiya * D - gereken) * 100) / 100;
+        out[k.id].aylar.push({ay: a, gereken: Math.round(gereken * 100) / 100, vardiya, fark, kaynak}); out[k.id].devir = Math.round((out[k.id].devir - fark) * 100) / 100;
+      });
+    }
+    S.isciBakiye = out;
+  }
+  // Dönemin son ayı mı (Mart, Haziran, Eylül, Aralık)
+  const ceyrekSonu = m => m % 3 === 0;
   // Sürüm 13.6 (HUSER): özel günler İK ile ortak, sunucuda il bazında. Plan içindeki eski tanımlar bir kez ortak listeye taşınır;
   // sonra plan.ozel her yüklemede ortak listenin bu aya düşen kısmıyla değiştirilir (hesaplar plan.ozel'i kullanmaya devam eder).
   async function ortakOzelYukle() {
@@ -170,7 +201,7 @@ function mount(root, opts = {}) {
   const istMod = b => b && b.azamiMemur != null ? 'fazla' : S.ayar.panoMod;
   const azamiDeger = b => b && b.azamiMemur != null ? b.azamiMemur : S.ayar.azamiMemur;
   function hesaplaCtx(plan, y, m, birim, kisiler) {
-    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, hedefYuvarla: !!S.ayar.hedefYuvarla, azamiMemur: istMod(birim) === 'mesai' ? 0 : azamiDeger(birim), isciEk: 0, mod: istMod(birim), surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik, attEsIzin: birim.tur === 'istasyon' && birim.tip !== 'A1'}, birim.ekipOf ? 0 : birim.yuva);
+    return C.istasyonHesap(kisiler || kisCtx(plan, birim.ad), y, m, plan.ozel || {}, durumlar(), {isciDusulen: S.ayar.isciDusulen, isciDevir: plan === S.plan ? S.isciBakiye : null, hedefYuvarla: !!S.ayar.hedefYuvarla, azamiMemur: istMod(birim) === 'mesai' ? 0 : azamiDeger(birim), isciEk: 0, mod: istMod(birim), surEsik: S.ayar.surEsik, surDegilEsik: S.ayar.surDegilEsik, attEsIzin: birim.tur === 'istasyon' && birim.tip !== 'A1'}, birim.ekipOf ? 0 : birim.yuva);
   }
   const hesapla = birim => hesaplaCtx(S.plan, S.y, S.m, birim);
   const planlananToplam = (hesap) => hesap.satir.filter(s => !s.nobetYok).reduce((a, s) => a + sayi(s.k.planlanan), 0);

@@ -56,5 +56,5 @@ assert.ok(!N.YETENEK.ke.includes('sur'));
   const gz = {y: 2026, m: 11, kisiler: az}, z = N.uret(gz, {sureMs: 800, deneme: 2, seed: 5, zorlaMs: 3000}), kp = N.kapasiteAnalizi(gz);
   const say = {}; for (let d = 1; d <= 30; d++) ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { const id = z.liste[d][t]; if (id != null) say[id] = (say[id] || 0) + (t === 'surG' || t === 'surA' ? 0.5 : 1); });
   az.forEach(k => assert.ok((say[k.id] || 0) <= k.adet, k.id + ' adedinden fazla: ' + say[k.id]));
-  assert.strictEqual(z.bos, kp.toplam, 'boş yuva sayısı kapasite açığına eşit: ' + z.bos + ' / ' + kp.toplam); assert.strictEqual(z.sert, 0, 'boşluk dışında sert ihlal kalmamalı: ' + JSON.stringify(z.say)); }
+  assert.strictEqual(z.bos, kp.gunSay, 'boş yuva sayısı kapasite açığına eşit: ' + z.bos + ' / ' + kp.gunSay); assert.strictEqual(z.sert, 0, 'boşluk dışında sert ihlal kalmamalı: ' + JSON.stringify(z.say)); }
 console.log('nöbet çekirdek testleri geçti');

@@ -4,7 +4,7 @@
   const N2_SEKME = [['plan', 'Nöbet hedefleri'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
   const IHLAL_AD = {donus: 'İzin / rapor dönüşü nöbetsiz', eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği', gunGece: 'İşçi gündüz / gece dengesizliği'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
-  // İstasyon sorumlusu, planlama onaylanmadan (Kesinleştir / Ayı kilitle) kendi istasyonunun planlamasını ve nöbet listesi araçlarını göremez
+  // İstasyon sorumlusu, plan kesinleşmeden (İstasyonlara gönder) kendi istasyonunun hiçbir sayısını ve nöbet listesi araçlarını göremez
   const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
   const n2Acik = () => S.rol !== 'istasyon' || n2Onayli();
   const n2Kendi = () => { const kisit = S.rol === 'istasyon' && opts.kullanici && opts.kullanici.birim; if (!kisit || !S.plan) return null; const a = C.istAnahtar(kisit); const b = S.plan.birimler.find(x => x.tur === 'istasyon' && (x.ad === kisit || (a && C.istAnahtar(x.ad) === a))); return b ? b.ad : ''; };
@@ -45,6 +45,11 @@
       ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (x[t] != null) ekle(x[t], gun, t); }); Object.entries(x.bol || {}).forEach(([t, bb]) => { if (bb && x[t] != null) ekle(bb.id, gun, t); }); } });
     return out;
   }
+  // İstasyonun nöbet listesinde boş kalacak günler (Pano, Nöbet hedefleri ve Nöbet listesi aynı hesabı gösterir)
+  // Liste oluşturulmuşsa listedeki gerçek boşluklar, yoksa kişilerin nöbet adetlerinden tahmin (kaynak: 'liste' | 'tahmin'); 0,5 gün = 12 saatlik vardiya
+  function n2BosTahmin(b) { try { if (!S.plan || b.ekipOf) return null; const dp = (S.plan.nobet || {})[b.ad];
+    if (dp && dp.liste) { const o = n2Bosluk(dp.liste, NC.gunSayisi(S.y, S.m)), bos = {}; if (o.es) bos.es = o.es; if (o.ysp) bos.ysp = o.ysp; if (o.sur || o.surYari) bos.sur = o.sur + o.surYari / 2; return {kaynak: 'liste', bos, toplam: o.es + o.ysp + o.sur + o.surYari / 2}; }
+    const G = n2Girdi(b); return {...NC.kapasiteAnalizi(G.girdi, G.kural), kaynak: 'tahmin'}; } catch (e) { console.warn('boş tahmini', e); return null; } }
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
 
   function n2UstHtml(b) {
@@ -55,7 +60,9 @@
   function n2Html() {
     if (!S.plan) return `<div class="ap-card ap-empty"><h2>Modül 2 — İstasyon nöbet listesi</h2><p>Bu ay için plan yok. Önce Modül 1'den personel listelerini yükleyin.</p></div>`;
     const b = n2Birim(); if (!b) return '<div class="ap-card ap-empty">Açık istasyon yok.</div>';
-    let s = n2Acik() ? S.n2.sekme : 'plan';
+    // plan taslakken istasyon sorumlusu hiçbir sayıyı görmez (taslak değişebilir)
+    if (!n2Acik()) return n2UstHtml(b) + `<div class="ap-card ap-empty"><h2>${ayEtiket()} planı henüz kesinleşmedi</h2><p>Planlama birimi planı kesinleştirip istasyonlara gönderdiğinde nöbet hedefleriniz ve nöbet listesi araçları burada açılır.</p></div>`;
+    const s = S.n2.sekme;
     // 12.47'den beri planlama onayı yok: plan kesinleşince istasyon nöbet listesi araçlarını doğrudan kullanır
     return n2UstHtml(b) + ({plan: n2PlanHtml, istek: n2IstekHtml, liste: n2ListeHtml, denetim: n2DenetimHtml, paket: n2PaketHtml}[s] || n2PlanHtml)(b);
   }
@@ -75,20 +82,47 @@
     const toplam = satir.reduce((a, x) => a + x.tek, 0), mevcutT = satir.reduce((a, x) => a + (x.tutar ? x.mevcut : 0), 0);
     return {h, o, satir, toplam, mevcutT, fark: Math.abs(toplam - h.ihtiyac) < 0.05 ? 0 : Math.round((toplam - h.ihtiyac) * 100) / 100, asimSay: satir.filter(x => x.asim).length, degisenSay: satir.filter(x => x.degisti).length};
   }
+  // İşçi saat bakiyesi satırları: bu ayın mesaisi, önceki aylardan devreden, yazılabilecek vardiya (aşağı yuvarlanır), ay sonunda kalan
+  function isciBakiyeSatir(h) {
+    const D = S.ayar.isciDusulen || 11;
+    return h.satir.filter(s => s.k.sinif === 'isci' && !s.nobetYok).map(s => { const vardiya = Math.round((s.hedef || 0) * 2), kalan = Math.round((vardiya * D - (s.mesai + (s.devir || 0))) * 100) / 100, B = (S.isciBakiye || {})[s.k.id];
+      return {s, vardiya, kalan, aylar: B ? B.aylar : []}; });
+  }
+  const saatYazi = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v))} saat`;
+  function isciBakiyeHtml(h) {
+    if (!bakiyeAcik(S.y, S.m)) return '';
+    const R = isciBakiyeSatir(h); if (!R.length) return '';
+    const son = ceyrekSonu(S.m), q0 = Math.floor((S.m - 1) / 3) * 3 + 1, donem = `${AYLAR[q0]}–${AYLAR[q0 + 2]}`, D = S.ayar.isciDusulen || 11;
+    return `<div class="ap-card"><h2>İşçi saat bakiyesi — ${donem} dönemi</h2>
+      <p class="ap-note">İşçi her vardiyada 12 saat tutar (mesaiden ${fmt(D)} saat düşülür) ve mesaisinin üstüne yazılmaz: vardiya sayısı aşağı yuvarlanır. Eksik kalan saat sonraki aya devreder; ${donem} dönemi sonunda kalan bakiye hatırlatılır. Önceki ayın çalışılan vardiyası ASOS Nöbet Listesi Raporundan alınır; rapor yüklenmemişse nöbet listesinden.</p>
+      ${son ? `<div class="ap-ek ap-ek-c" style="margin-bottom:8px"><b>Dönem bu ay kapanıyor.</b> Ay sonunda kalan bakiye bir sonraki döneme devretmez; gerekiyorsa elle düzeltin.</div>` : ''}
+      ${tabloHtml(['İşçi', 'Bu ayın mesaisi', 'Önceki aylardan', 'Yazılacak vardiya (12 sa.)', 'Bu ay farkı', son ? 'Dönem sonu kalan' : 'Dönem toplamı (ay sonu)'], R.map(x => [esc(x.s.k.ad), `${fmt(x.s.mesai)} saat`,
+        x.aylar.length ? `<span title="${esc(x.aylar.map(a => `${ayAd(a.ay)}: ${a.vardiya} vardiya, gereken ${fmt(a.gereken)} sa., fark ${saatYazi(a.fark)} (${a.kaynak})`).join('\n'))}">${saatYazi(-(x.s.devir || 0) || 0)}</span>` : '—',
+        x.vardiya, saatYazi(Math.round((x.vardiya * D - x.s.mesai) * 100) / 100), `<b class="${x.kalan < 0 ? 'n2eks' : ''}">${saatYazi(x.kalan)}</b>`]))}</div>`;
+  }
+  function isciBakiyeUyari(ists) {
+    if (!S.plan || !bakiyeAcik(S.y, S.m) || !ceyrekSonu(S.m)) return '';
+    const R = ists.filter(b => !b.ekipOf).flatMap(b => isciBakiyeSatir(hesapla(b)).map(x => ({...x, b}))).filter(x => Math.abs(x.kalan) >= 0.01);
+    if (!R.length) return '';
+    const q0 = S.m - 2;
+    return `<div class="ap-ek ap-ek-c" style="margin-bottom:10px"><b>Hatırlatma: işçilerin ${AYLAR[q0]}–${AYLAR[S.m]} saat dönemi bu ay kapanıyor.</b> ${R.length} işçide dönem sonunda bakiye kalacak (toplam ${saatYazi(R.reduce((t, x) => t + x.kalan, 0))}).
+      <details><summary class="ap-note">İşçileri göster</summary>${tabloHtml(['İstasyon', 'İşçi', 'Dönem sonu kalan'], R.map(x => [esc(x.b.ad), esc(x.s.k.ad), saatYazi(x.kalan)]))}</details></div>`;
+  }
   function n2PlanHtml(b) {
     // Kişi başı nöbet sayısı bağlayıcı değildir ve planlamaya beyan edilmez: istasyonun ihtiyacı (gün × 3 nöbet branşı) mesai hedefi ve azami nöbete göre otomatik dağıtılır; liste bu sayılarla oluşturulur
     const h = hesapla(b), ks = n2Kisiler(b), dp = n2Depo(b.ad), L = dp.liste, D = durumlar(), duz = n2Duz();
     const yazilan = id => { if (!L) return null; let t = 0; for (let g = 1; g < L.length; g++) { const x = L[g]; if (!x) continue; ['es', 'ysp', 'sur'].forEach(y => { if (x[y] === id) t += x.bol && x.bol[y] ? (24 - x.bol[y].saat) / 24 : 1; }); ['surG', 'surA'].forEach(y => { if (x[y] === id) t += 0.5; }); Object.entries(x.bol || {}).forEach(([y, bb]) => { if (bb && bb.id === id && x[y] != null) t += bb.saat / 24; }); } return Math.round(t * 100) / 100; };
     const disari = h.satir.filter(s => !gizliKisi(s.k) && (s.nobetYok || (D[s.k.durum] || {}).disarida));
-    const sat = ks.map(k => { const y = yazilan(k.id), f = y == null ? 0 : Math.round((y - k.planlanan) * 100) / 100; return `<tr><td>${esc(k.ad)}</td><td>${esc(k.brans || '')}</td><td>${esc(NB_AD[k.grup] || '')}</td><td class="num">${duz ? `<input class="ap-in n ${k.azamiF != null && k.planlanan > k.azamiF + 1e-9 ? 'n2e' : ''}" type="number" min="0" step="0.01" data-n2="hedef" data-id="${k.id}" value="${k.planlanan}" title="Otomatik: ${fmt(k.otoHedef)}${k.azamiF != null ? ' · üst sınır ' + fmt(k.azamiF) : ''}">` : `<b>${fmt(k.planlanan)}</b>`}${k.elle ? ` <span class="ap-note" title="Otomatik ${fmt(k.otoHedef)}">elle</span>` : ''}</td><td class="num">${y == null ? '' : `<b>${fmt(y)}</b>`}</td><td class="num">${f ? `<span class="${f > 0 ? 'n2art' : 'n2eks'}">${f > 0 ? '+' : ''}${fmt(f)}</span>` : ''}</td></tr>`; }).join('');
-    const toplam = ks.reduce((a, k) => a + (k.planlanan || 0), 0), elleSay = ks.filter(k => k.elle).length, fark = Math.round((toplam - h.ihtiyac) * 100) / 100, asim = ks.filter(k => k.azamiF != null && k.planlanan > k.azamiF + 1e-9).length;
+    const sat = ks.map(k => { const y = yazilan(k.id), f = y == null ? 0 : Math.round((y - k.planlanan) * 100) / 100; return `<tr><td>${esc(k.ad)}</td><td>${esc(k.brans || '')}</td><td>${esc(NB_AD[k.grup] || '')}</td><td class="num">${duz ? `<input class="ap-in n ${k.azamiF != null && k.planlanan > k.azamiF + 1e-9 ? 'n2e' : ''}" type="text" inputmode="decimal" data-n2="hedef" data-id="${k.id}" value="${fmt(k.planlanan)}" title="Otomatik: ${fmt(k.otoHedef)}${k.azamiF != null ? ' · üst sınır ' + fmt(k.azamiF) : ''}">` : `<b>${fmt(k.planlanan)}</b>`}${k.elle ? ` <span class="ap-note" title="Otomatik ${fmt(k.otoHedef)}">elle</span>` : ''}</td><td class="num">${y == null ? '' : `<b>${fmt(y)}</b>`}</td><td class="num">${f ? `<span class="${f > 0 ? 'n2art' : 'n2eks'}">${f > 0 ? '+' : ''}${fmt(f)}</span>` : ''}</td></tr>`; }).join('');
+    const kp = n2BosTahmin(b), toplam = ks.reduce((a, k) => a + (k.planlanan || 0), 0), elleSay = ks.filter(k => k.elle).length, fark = Math.round((toplam - h.ihtiyac) * 100) / 100, asim = ks.filter(k => k.azamiF != null && k.planlanan > k.azamiF + 1e-9).length;
     return `<div class="ap-card"><h2>${esc(b.ad)} — ${ayEtiket()} nöbet hedefleri</h2>
-      <p class="ap-note">İstasyonun ihtiyacı <b>${h.ihtiyac}</b> nöbet (${NC.gunSayisi(S.y, S.m)} gün × 3 nöbet branşı). Kişi başı sayı önce mesai hedefine ve azami nöbete göre <b>otomatik</b> gelir; istasyon <b>Hedef nöbet</b> sütunundan dilediği gibi değiştirebilir (planlamaya bildirilmez). Otomatik nöbet listesi bu sayılara göre oluşturulur; küsuratlar bölünmüş nöbetle (16/8, 12/12) karşılanır.</p>
-      ${fark || asim ? `<div class="ap-ek ap-ek-c" style="margin-bottom:8px"><b>Dikkat:</b> ${[fark ? `toplam ${fmt(toplam)}, gereken ${h.ihtiyac} (${fark > 0 ? '+' : ''}${fmt(fark)}) — eşit değilse listede boş ya da fazla nöbet kalır` : '', asim ? `${asim} kişide azami nöbet aşıldı` : ''].filter(Boolean).join(' · ')}</div>` : ''}
+      <p class="ap-note">Ayda <b>${h.ihtiyac}</b> nöbet gerekir (${NC.gunSayisi(S.y, S.m)} gün × 3 nöbet branşı: ekip şefi, YSP, sürücü). Kişi başı sayı mesaiye ve azami nöbete göre <b>otomatik</b> gelir; gerekirse <b>Hedef nöbet</b> sütunundan değiştirin. Nöbet listesi bu sayılarla oluşturulur; kimseye bu sayıdan fazla nöbet yazılmaz. Küsuratlar bölünmüş nöbetle (8 + 16, 12 + 12 saat) karşılanır. İşçi 12 saatlik vardiya tutar (yarım nöbet sayılır).</p>
+      ${kp && kp.toplam ? `<div class="ap-ek ap-ek-c" style="margin-bottom:8px"><b>Kadro yetmiyor:</b> ${kp.kaynak === 'liste' ? 'nöbet listesinde' : 'bu sayılarla nöbet listesinde yaklaşık'} ${Object.entries(kp.bos).map(([k2, n]) => `${NC.YUVA_AD[k2]} ${fmt(n)} gün`).join(', ')} boş ${kp.kaynak === 'liste' ? 'kaldı' : 'kalır'}. Planlamadan personel isteyin.</div>` : ''}
+      ${fark > 0 || asim ? `<div class="ap-ek ap-ek-c" style="margin-bottom:8px"><b>Dikkat:</b> ${[fark > 0 ? `toplam ${fmt(toplam)}, gereken ${h.ihtiyac}: ${fmt(fark)} nöbet fazla yazılmış (listede kullanılmaz)` : '', asim ? `${asim} kişide azami nöbet aşıldı` : ''].filter(Boolean).join(' · ')}</div>` : ''}
       ${duz && elleSay ? `<div class="ap-row" style="margin-bottom:8px"><span class="ap-note">${elleSay} kişide sayı elle değiştirildi.</span><button class="ap-btn" data-act="n2-hedef-oto">Otomatik sayılara dön</button></div>` : ''}
       <div class="ap-sum ap-sum1" style="margin-bottom:10px"><div><b>${fmt(toplam)} / ${h.ihtiyac}</b><span>Dağıtılan / gereken nöbet</span></div><div><b>${ks.length}</b><span>Nöbet tutan kişi</span></div></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Kadro</th><th>Nöbet branşı</th><th>Hedef nöbet</th><th>Listede</th><th>Fark</th></tr></thead><tbody>${sat || '<tr><td colspan="6" class="ap-empty">Nöbet tutan kişi yok</td></tr>'}</tbody></table></div>
-      ${disari.length ? `<p class="ap-note" style="margin-top:8px">Nöbet tutmayan / başka yerde olan: ${disari.map(s => esc(s.k.ad)).join(', ')}</p>` : ''}</div>`;
+      ${disari.length ? `<p class="ap-note" style="margin-top:8px">Nöbet tutmayan / başka yerde olan: ${disari.map(s => esc(s.k.ad)).join(', ')}</p>` : ''}</div>${isciBakiyeHtml(h)}`;
   }
   // Modül 1: istasyonlardan gelen talepler
   function talepHtml() {
@@ -205,7 +239,7 @@
       <button class="ap-btn" data-act="n2-liste-temizle" ${duz && dp.liste ? '' : 'disabled'}>Listeyi temizle</button>
       <button class="ap-btn" data-act="n2-excel" ${dp.liste ? '' : 'disabled'}>Excel çıktısı</button>
       <span class="ap-sp"></span><button class="ap-btn ${kisiGoruntu ? '' : 'pri'}" data-act="n2-gorunum" data-v="yuva">Gün görünümü</button><button class="ap-btn ${kisiGoruntu ? 'pri' : ''}" data-act="n2-gorunum" data-v="kisi">Kişi görünümü</button></div>
-      ${kap.toplam > 0 ? `<div class="ap-ek ap-ek-c" style="margin-top:8px"><b>Kadro yetmiyor${dp.liste ? '' : `: yaklaşık ${fmt(kap.toplam)} nöbet boş kalacak (${Object.entries(kap.bos).map(([k, n]) => `${NC.YUVA_AD[k]} ${n} gün`).join(', ')})`}.</b> Kimseye mesaisinden / azami nöbetinden fazla nöbet yazılmaz; boş nöbetler listede <b>— BOŞ —</b> olarak kalır. Planlamadan personel isteyin. (Ekip şefi: doktor / AABT · sürücü: işçi ya da sürücülüğü doğrulanmış AABT / ATT.)</div>` : ''}
+      ${kap.toplam > 0 ? `<div class="ap-ek ap-ek-c" style="margin-top:8px"><b>Kadro yetmiyor${dp.liste ? '' : `: yaklaşık ${fmt(kap.toplam)} nöbet boş kalacak (${Object.entries(kap.bos).map(([k, n]) => `${NC.YUVA_AD[k]} ${fmt(n)} gün`).join(', ')})`}.</b> Kimseye mesaisinden / azami nöbetinden fazla nöbet yazılmaz; boş nöbetler listede <b>— BOŞ —</b> olarak kalır. Planlamadan personel isteyin. (Ekip şefi: doktor / AABT · sürücü: işçi ya da sürücülüğü doğrulanmış AABT / ATT.)</div>` : ''}
       <div id="ap-n2-ilerleme" style="margin-top:8px">${dp.liste ? n2DurumYazi(d, L, N) : '<span class="ap-note">Henüz liste yok. Önce istek takvimini doldurun, sonra <b>Otomatik nöbet listesi oluştur</b> düğmesine basın.</span>'}</div></div>
       <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 saat)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz<br><span class="ap-note">09:00–21:00</span></th><th>Sürücü gece<br><span class="ap-note">21:00–09:00</span></th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>`;
     return lNav + (la === 'kisi' ? lKisi : lListe);
@@ -262,7 +296,7 @@
       <p class="ap-note">HUSER ASHİ PLANLAMA iki modülden oluşur: <b>Modül 1 · Planlama</b> (kimin hangi istasyonda kaç nöbet tutacağı, görevlendirmeler) ve <b>Modül 2 · Nöbet listesi</b> (istasyonun gün gün nöbet çizelgesi). Başlıkları açıp kapatabilirsiniz.</p>
       ${b('1. Aylık iş akışı (özet)', `<ol><li><b>Dosyaları yükleyin</b> (her ayın 10-15'inde, bir sonraki ay için): ASOS'tan <b>EKİP Personel Listesi</b>, <b>Personel Listesi Raporu</b> ve <b>Nöbet Listesi Raporu</b>. İzin-Muafiyet Raporu isteğe bağlıdır. Dosyaları birlikte seçebilir veya sayfaya sürükleyebilirsiniz. Önizlemeyi kontrol edip <i>Uygula</i> deyin.</li>
         <li><b>Pano</b> › <i>Tüm planlamayı oluştur</i>: açığı olan istasyonların personeli geri çağrılır, nöbetler hesaplanır, rotasyon önerileri görevlendirme olarak uygulanır. Sonuçları <b>İstasyon</b> ve <b>Görevlendirme</b> sayfalarında kontrol edip elle düzeltin.</li>
-        <li>Plan durumunu <b>Kesinleştir (istasyonlara gönder)</b> yapın. İstasyon sorumluları Modül 2'yi açar; kişi başı nöbet sayısı mesai hedefi ve azami nöbete göre otomatik gelir, istasyon <b>Nöbet hedefleri</b> sayfasında dilediği gibi değiştirebilir (planlamaya onaya gelmez).</li>
+        <li>Üst çubuktaki <b>İstasyonlara gönder (kesinleştir)</b> düğmesine basın. O zamana kadar istasyon sorumluları bu ayın hiçbir sayısını görmez. Kesinleşince Modül 2'yi açarlar; kişi başı nöbet sayısı mesai hedefi ve azami nöbete göre otomatik gelir, istasyon <b>Nöbet hedefleri</b> sayfasında dilediği gibi değiştirebilir (planlamaya onaya gelmez).</li>
         <li>İstasyonlar Modül 2'de <b>istek takvimini</b> doldurur, <b>nöbet listesini</b> oluşturur ve <b>Denetim</b> ile kural ihlallerini giderir.</li>
         <li>Çıktıları alın: istasyon bazında <b>Görüntü (PNG)</b> / <b>Excel</b> veya Pano'dan <b>Tüm istasyonlar Excel (tek dosya)</b>.</li>
         <li>Ay bitince <b>Arşiv</b> sayfasından ayı arşive kaydedin; <b>Arşiv istatistikleri</b> geçmiş aylardan raporlar üretir.</li></ol>`, true)}
@@ -271,7 +305,8 @@
       ${b('3. Pano', `<ul><li>Kartlar: açık istasyon, ekip OF (kapalı), aktif kayıt, ihtiyaç, kapasite, planlanan, personel önerilen, fazla nöbetle dönen, elle karar gereken istasyonlar. Karta tıklayınca istasyonlar süzülür.</li><li><b>Tüm planlamayı oluştur:</b> tek tuşla geri çağırma + nöbet hesabı + rotasyon görevlendirmesi. Kilitli değerler korunur.</li><li><b>Planlananı yeniden hesapla:</b> yalnız nöbet sayılarını yeniden hesaplar.</li><li><b>Bu ayın planını sıfırla:</b> bu ayın planını (kişiler, nöbetler, görevlendirmeler, onaylar, Modül 2 listeleri) tamamen siler; arşiv ve diğer aylar kalır. Kilitli ya da geçmiş ayda yapılamaz. Tüm aylar ve arşiv için Ayarlar › Yedek ve sıfırlama bölümündeki <i>Tüm planları ve arşivi sıfırla</i> (yalnız yönetici, SIFIRLA yazılarak onaylanır).</li><li><b>Tüm istasyonlar Excel (tek dosya):</b> her istasyon ayrı sayfada; sütunlar yüklenen örnek dosyayla aynıdır (Başhekimlik, KKM ve Tanımsız İstasyon sayfaları dahil, sayfalar alfabetik; geçici görevde dışarıdakiler listelenmez, NEDEN ve KALAN AY boş bırakılır) (AD SOYAD, ÜNVAN, SRC YETKİSİ, KADRO TÜRÜ, BRANŞ, İZİN (GÜN), TAHMİNİ NÖBET, G.GÖREV DURUMU, GELDİĞİ/GİTTİĞİ İSTASYON, NEDEN, KALAN AY, YOLLUK DURUMU, AÇIKLAMA). Tahmini nöbet kişinin mesai saatinden hesaplanır (memur/doktor "7 Nöbet + 8 Saat", işçi "16 Nöbet"); planlanan nöbet sayısı yazılmaz.</li><li><b>Mod:</b> <i>Mesai karşılığı</i> (kişi yalnız mesai saatini tamamlayacak kadar nöbet tutar) veya <i>Fazla mesaili</i> (DOKTOR-AABT-ATT için kişi başı en çok N nöbet yazılabilir).</li></ul>`)}
       ${b('4. İstasyon sayfası', `<ul><li>Üstte istasyonun <b>Plan: yazılan / gereken</b> durumu, <b>Nöbet branşı dengesi</b> (ekip şefi, YSP, sürücü; listedeki planlanan nöbetlere göre dolu / açık) ve uyarılar yer alır. Plan ihtiyaca eşit ve üç nöbet branşı doluysa "İstasyon tam" görünür.</li>
         <li>Tablo: <b>Mesai</b> (izinler düşülmüş saat), <b>Hedef</b> (memur/doktorda mesai ÷ 24 tam oran, ör. 160 saat = 6,67 nöbet; işçide mesai ÷ 11 aşağı tam 12 saatlik nöbete yuvarlanır ve altında tam oran görünür; yuvarlamayı siz yaparsınız, Ayarlar'dan eski 0,5 adım yuvarlama açılabilir), <b>Azami</b>, <b>Plan</b> (elle yazılır ya da ▲▼ ile 0,5 artırılır), <b>Fark</b>.</li>
-        <li><b>Elle değiştirdiğiniz değer kilitlenir</b> (🔒) ve diğer kişilerin değerleri değişmez. Kilidi kaldırırsanız otomatik hesap o kişiyi yeniden hesaplar. <i>Planı onayla (kilitle)</i> tüm değerleri kilitler, <i>Kilitleri aç</i> hepsini serbest bırakır.</li>
+        <li><b>Elle değiştirdiğiniz değer kilitlenir</b> (🔒) ve diğer kişilerin değerleri değişmez. Kilidi kaldırırsanız otomatik hesap o kişiyi yeniden hesaplar. İstasyon sayfasındaki <i>Sayıları sabitle 🔒</i> tüm değerleri sabitler, <i>Sabitlemeyi kaldır</i> hepsini otomatik hesaba bırakır.</li>
+        <li><b>Plan durumu:</b> Taslak → <i>İstasyonlara gönder (kesinleştir)</i> → (ay bitince) <i>Ayı kapat (kilitle)</i>. Geri adımlar: <i>Taslağa geri al</i>, <i>Kilidi aç</i> (yalnız yönetici).</li>
         <li><b>Fazlalık nöbet sırası</b> (hedefin üstüne yazılan, açığı kapatan nöbetler): sırayla 1 nöbet ATT sürücülere, 1 nöbet AABT sürücülere (kendi aralarında eşit); ikisinin payı dolduktan sonra kalan diğer branşlara. Ekip şefi yuvasına ATT giremez, yalnızca AABT ve doktor.</li><li><b>Kırmızı satır / "Mesaisi eksik kalan personel" kutusu:</b> planlanan nöbet, Mesai sütunundaki saati karşılamıyor (eksik saat yazılır).</li>
         <li><b>Geçici görev</b> sütunu: istasyon, Başhekimlik ve KKM listeden seçilir; ilçe sağlık müdürlüğü, hastane gibi yerler için <i>Diğer (yaz)…</i> seçilip yazılır.</li>
         <li><b>Açıklama</b> sütunu: her kişinin yanında ona özel not yazılır; PNG ve Excel çıktılarındaki AÇIKLAMA sütununda yer alır.</li><li><b>Ekip OF (kapalı):</b> işaretlenen istasyon kapalı sayılır; ihtiyaç 0'dır ve bu bilgi aylar arasında kalıcıdır. Açana kadar kapalı gelir.</li>
@@ -281,11 +316,12 @@
         <li><b>Görevlendirilemeyenler / önerilmeyenler:</b> 4/B personel 4 yıl dolmadan; <b>EKİP'te atama ile kadro birimi değişen personel 1 yıl dolmadan</b> (geçici görev bu kurala girmez); aile hekimliği; izinli, nöbet muaf, "gitmesin" işaretli kişiler; doktorlar yalnızca doktorlu (A1) istasyonlara ve KKM'ye; bir istasyonda nöbet branşını dolduran kişi (çıkarsa açık artacaksa); <b>işçi kendi istasyonu dışında tek işçi olarak önerilmez</b>.</li>
         <li><b>İstasyon dışı görevliler:</b> geçici görevde olup başka bir istasyona atanmamış personel (Başhekimlik, KKM, hastane vb.). Bu kişilere kendi istasyonunda nöbet yazılmaz.</li>
         <li><b>Excel'e aktar:</b> görevlendirmenin tüm bölümlerini tek dosyada indirir.</li></ul>`)}
-      ${b('6. Nöbet hedefleri (istasyon)', `<p>Plan <b>Kesinleştir</b> yapıldığında istasyon sorumluları Modül 2'yi açar. Kişi başı nöbet sayısı mesai hedefine ve azami nöbete göre <b>otomatik</b> gelir; istasyon <b>Nöbet hedefleri</b> sayfasındaki <i>Hedef nöbet</i> sütunundan dilediği gibi değiştirebilir, <i>Otomatik sayılara dön</i> ile geri alır. Bu değişiklikler planlamaya bildirilmez ve onay gerektirmez; Modül 1'deki planlanan nöbet bağlayıcı değildir.</p>`)}
+      ${b('6. Nöbet hedefleri (istasyon)', `<p>Plan <b>istasyonlara gönderildiğinde (kesinleşince)</b> istasyon sorumluları Modül 2'yi açar; taslakken hiçbir sayı görünmez. Kişi başı nöbet sayısı mesai hedefine ve azami nöbete göre <b>otomatik</b> gelir; istasyon <b>Nöbet hedefleri</b> sayfasındaki <i>Hedef nöbet</i> sütunundan dilediği gibi değiştirebilir, <i>Otomatik sayılara dön</i> ile geri alır. Bu değişiklikler planlamaya bildirilmez ve onay gerektirmez; Modül 1'deki planlanan nöbet bağlayıcı değildir.</p>`)}
       ${b('7. Personel, özel günler, istatistik', `<ul><li><b>Personel:</b> arama, süzme, sayfalama; kişi ekleme/silme (silinen kişiler geri alınabilir). Aile hekimliği ve uzmanlık eğitimindeki personel en altta ve yalnızca planlama yetkililerine görünür.</li><li><b>Özel günler:</b> bayram, resmî tatil, idari izin, yarım gün tanımlanır; mesai saatlerini ve hafta sonu/tatil dengesini etkiler.</li><li><b>İstatistik:</b> personel dağılımı, durumlar, görevlendirmeler, plan özeti.</li></ul>`)}
       ${b('8. Modül 2 · Nöbet listesi', `<ul><li><b>Nöbet hedefleri:</b> istasyonun kişi başı nöbet sayıları (otomatik; istasyon değiştirebilir).</li><li><b>İstek takvimi:</b> kişi × gün matrisinde nöbet istenmeyen günler ve izin aralıkları. İzin başlangıcından önceki günlere (varsayılan 3) nöbet yazılmaz.</li>
-        <li><b>Liste:</b> <i>Otomatik nöbet listesi oluştur</i> kurallara uygun, boş yuvasız bir çizelge üretir; zor istasyonlarda 12-15 saniye sürebilir. Gün veya kişi görünümünde hücreleri elle değiştirebilirsiniz.</li>
-        <li><b>Üretim kuralları:</b> her gün üç nöbet branşı (ekip şefi, YSP, sürücü) dolu; yetenek uyumu (doktor → ekip şefi, işçi → sürücü 12 saat gündüz/gece, AABT → ekip şefi/YSP, ATT → YSP/sürücü); izinli güne ve izin öncesi 3 güne nöbet yok; iki 24 saatlik nöbet arası en az 1, en çok 5 gün; sürücüye gün aşırı üst üste 3 nöbet yok; işçiye art arda 3 gece yok ve gecenin ertesi gündüz yok; <b>işçide gündüz ve gece nöbetleri eşit</b>; <b>hafta sonu ve resmî tatil nöbetleri kişiler arasında dengeli</b>.</li>
+        <li><b>Liste:</b> <i>Otomatik nöbet listesi oluştur</i> kurallara uygun bir çizelge üretir (ilerleme çubuğu görünür, genelde birkaç saniye). Kimseye nöbet hedefinden fazla nöbet yazılmaz: kadro yetmiyorsa nöbet <b>— BOŞ —</b> kalır ve üstte hangi branşta kaç gün boş kaldığı yazar; planlamadan personel isteyin. Gün veya kişi görünümünde hücreleri elle değiştirebilirsiniz.</li>
+        <li><b>Üretim kuralları:</b> her gün üç nöbet branşı (ekip şefi, YSP, sürücü); yetenek uyumu (doktor → ekip şefi; AABT → ekip şefi / YSP; ATT → YSP; sürücü nöbet branşına yalnız işçi ve nöbet listelerinden sürücülüğü doğrulanmış AABT / ATT); <b>işçi yalnız 12 saatlik vardiya tutar</b> (gündüz 09:00–21:00 ya da gece 21:00–09:00, mesaisinin üstüne çıkmaz); tek işçili günde sürücünün diğer 12 saatini sürücülüğü doğrulanmış bir AABT / ATT, aynı gün YSP ya da ekip şefinin 12 saatiyle birlikte tutar (toplam 24 saat; o branşın diğer 12 saati başka kişide); izinli güne ve izin öncesi 3 güne nöbet yok; iki 24 saatlik nöbet arası en az 1, en çok 5 gün; sürücüye gün aşırı üst üste 3 nöbet yok; işçiye art arda 3 gece yok ve gecenin ertesi gündüz yok; <b>işçide gündüz ve gece nöbetleri eşit</b>; <b>hafta sonu ve resmî tatil nöbetleri kişiler arasında dengeli</b>.</li>
+        <li><b>İşçi saat bakiyesi (Ocak 2027'den):</b> işçinin vardiya sayısı aşağı yuvarlanır, eksik kalan saat sonraki aya devreder. Dönemler üç aylıktır (Ocak–Mart, Nisan–Haziran, Temmuz–Eylül, Ekim–Aralık); her dönem sıfırdan başlar. Önceki ayın çalışılan vardiyası ASOS Nöbet Listesi Raporundan, rapor yoksa nöbet listesinden alınır. <i>Nöbet hedefleri</i> sayfasındaki tablo bu ayın durumunu gösterir; dönemin son ayında Pano'da hatırlatma çıkar.</li>
         <li><b>Denetim:</b> ihlalleri listeler; <i>Öneriler</i> sekmesi her ihlal için en iyi değişiklikleri sunar, <i>Uygula</i> ile listeye işler.</li>
         <li><b>Kadro yetersizse</b> boş yuva kalmaması için bazı kişilerin nöbet sayısı Modül 1 hedefinden farklı çıkabilir ("Nöbet sayısı farkı" olarak görünür).</li>
         <li><b>Çıktı:</b> Excel'de gün listesi ve kişi listesi; <b>hafta sonları turuncu, resmî tatiller kırmızı</b> renklidir.</li>
@@ -301,9 +337,16 @@
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && !a.startsWith('takip-') && a !== 'modul' && !a.startsWith('yan')) return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && !a.startsWith('takip-') && a !== 'modul' && a !== 'durum-git' && !a.startsWith('yan')) return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
+      case 'durum-git': {
+        if (!S.plan || !(S.rol === 'yonetici' || S.rol === 'planlayici')) break;
+        if (v === 'kilitli' && S.rol !== 'yonetici') { toast('Ayı yalnızca yönetici kapatır.'); break; }
+        const soru = {kesin: `${ayEtiket()} planı kesinleşsin ve istasyonlara açılsın mı?\n\nİstasyon sorumluları kendi planlarını görür ve nöbet listelerini hazırlar.`, taslak: `${ayEtiket()} planı taslağa alınsın mı?\n\nİstasyonlar planı ve nöbet listesi araçlarını görmez.`, kilitli: `${ayEtiket()} kapatılsın (kilitlensin) mı?\n\nKimse değişiklik yapamaz; kilidi yalnız yönetici açar.`}[v];
+        if (!soru || !(await onay(soru))) break;
+        mut(() => { S.plan.durum = v; }, 'Plan durumu', v); break;
+      }
       case 'modul': S.modul = +v; if (S.modul === 1 && S.rol === 'istasyon') S.modul = 2; break;
       case 'yan1': S.modul = S.rol === 'istasyon' ? 2 : 1; S.sayfa = v; if (v === 'takip') S.takipVeri = null; S.yanAcik = false; break;      // gömülü sol menü: Modül 1 sayfası
       case 'yan2': S.modul = 2; S.n2.sekme = v; S.n2.altSekme = ''; S.yanAcik = false; break;          // gömülü sol menü: Modül 2 sekmesi

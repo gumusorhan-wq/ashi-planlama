@@ -182,8 +182,10 @@ const APCore = (() => {
     const satir = kisiler.map(k => {
       const dt = durumlar[k.durum] || {};
       const mesai = kisiMesai(k, y, m, ozel, durumlar);
-      const h = hedefNobet(mesai, k.sinif, !!dt.nobetYok || !!dt.disarida, ayar);
-      return {k, mesai, hedef: h.birim, hedefAdet: h.adet, nobetYok: !!dt.nobetYok};
+      // işçi: 3 aylık dönemde önceki aylardan devreden saat (eksik çalışılan +, fazla −) bu ayın mesaisine eklenir; vardiya sayısı yine aşağı yuvarlanır
+      const devir = k.sinif === 'isci' && ayar && ayar.isciDevir && ayar.isciDevir[k.id] ? ayar.isciDevir[k.id].devir || 0 : 0;
+      const h = hedefNobet(Math.max(0, mesai + devir), k.sinif, !!dt.nobetYok || !!dt.disarida, ayar);
+      return {k, mesai, devir, hedef: h.birim, hedefAdet: h.adet, nobetYok: !!dt.nobetYok};
     });
     // Azami nöbet: memur/doktor tam ay hedefinin üstüne azamiMemur'a kadar (ör. Kasım: hedef 7, azami 8); izinli kişide hedef + aynı ek; işçi: hedef (mesaisinin üstüne yazılmaz)
     const a = ayar || {}, azamiMemur = a.azamiMemur || 0, tam = hedefNobet(ayMesai(y, m, false, ozel), 'memur', false, a).birim, ek = Math.max(0, azamiMemur - tam);

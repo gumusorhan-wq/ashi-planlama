@@ -1193,7 +1193,7 @@
           const b = S.plan.birimler.find(x => x.ad === S.ist); if (!b || salt()) break; const ac = v === '0', h = hesapla(b); let n = 0;
           S.toplu = true; try { mut(() => { h.satir.forEach(s => { if (s.nobetYok) return; const k = s.k; if (k.birim !== b.ad) return; if (ac) { if (k.kilit) { k.kilit = false; n++; } } else if (k.planlanan != null && !k.kilit) { k.kilit = true; n++; } }); }, ac ? 'İstasyon kilitleri açıldı' : 'İstasyon planı onaylandı (değerler kilitlendi)', `${b.ad}: ${n} kişi`); } finally { S.toplu = false; }
           if (ac) { otoHesapla(); kaydet(); }
-          toast(ac ? `${n} kişinin kilidi açıldı.` : `${n} kişinin nöbeti onaylandı (kilitlendi).`); break;
+          toast(ac ? `${n} kişinin sabitlemesi kaldırıldı; sayılar otomatik hesaplanacak.` : `${n} kişinin nöbet sayısı sabitlendi (🔒).`); break;
         }
         case 'geri-cagir': { const b = S.plan.birimler.find(x => x.ad === v); if (!b) break; const n = geriCagirmaAdaylari(b).length; if (n && (await onay(`${b.ad} ekibine bağlı, başka birimlere görevli ${n} personel geri çağrılsın mı?`))) toast(`${geriCagir(b)} personel geri çağrıldı.`); break; }
         case 'gorev-bitir': {

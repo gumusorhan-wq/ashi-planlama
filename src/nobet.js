@@ -156,7 +156,7 @@ const NobetCore = (() => {
     for (let d = 1; d <= N; d++) { ekle(d, 'es'); ekle(d, 'ysp'); const gt = gunTip[d];
       if (gt === 'cift') { ekle(d, 'surG'); ekle(d, 'surA'); } else if (gt) { ekle(d, gt); ekle(d, 'surM'); isciYari[d] = gt; } else ekle(d, 'sur'); }
     const S = slotD.length, cont = new Int16Array(S).fill(-1), place = P.map(() => []);
-    const sinif = t => (t === 'surG' || t === 'surA') ? 1 : 0;
+    const sinif = t => (t === 'surG' || t === 'surA') ? 1 : 0, grupT = t => t === 'surM' ? 'sur' : t;
     const tipSlot = {}; ['es', 'ysp', 'sur', 'surM', 'surG', 'surA'].forEach(t => { tipSlot[t] = []; }); for (let s = 0; s < S; s++) tipSlot[slotT[s]].push(s);
     // 1) adetleri nöbet branşlarına dağıt (maksimum akış; her kişi için 24 saatlik ve yarım birimleri ayrı düğüm)
     const tipler = ['es', 'ysp', 'sur', 'surM', 'surG', 'surA'], need = tipler.map(t => tipSlot[t].length);
@@ -165,8 +165,9 @@ const NobetCore = (() => {
       cap[SRC][2 + i] = u24[i]; cap[SRC][2 + m + i] = uh[i];
       tipler.forEach((t, k) => { if (!elig(i, t)) return; const dugum = sinif(t) ? 2 + m + i : 2 + i; cap[dugum][2 + 2 * m + k] = 99; });
     });
-    tipler.forEach((t, k) => { cap[2 + 2 * m + k][SNK] = need[k]; });
-    for (;;) { const par = new Array(V).fill(-1); par[SRC] = SRC; const q = [SRC]; while (q.length && par[SNK] < 0) { const u = q.shift(); for (let v = 0; v < V; v++) if (par[v] < 0 && cap[u][v] > 0) { par[v] = u; q.push(v); } } if (par[SNK] < 0) break; let f = 1e9; for (let v = SNK; v !== SRC; v = par[v]) f = Math.min(f, cap[par[v]][v]); for (let v = SNK; v !== SRC; v = par[v]) { cap[par[v]][v] -= f; cap[v][par[v]] += f; } }
+    // kadro yetmezse öncelik: önce sürücü, sonra ekip şefi, en son YSP doldurulur (artırma yolları aşamalı açılır; dolan branş sonradan azalmaz)
+    for (const faz of [['sur', 'surM', 'surG', 'surA'], ['es'], ['ysp']]) { faz.forEach(t => { const k = tipler.indexOf(t); cap[2 + 2 * m + k][SNK] = need[k]; });
+  for (;;) { const par = new Array(V).fill(-1); par[SRC] = SRC; const q = [SRC]; while (q.length && par[SNK] < 0) { const u = q.shift(); for (let v = 0; v < V; v++) if (par[v] < 0 && cap[u][v] > 0) { par[v] = u; q.push(v); } } if (par[SNK] < 0) break; let f = 1e9; for (let v = SNK; v !== SRC; v = par[v]) f = Math.min(f, cap[par[v]][v]); for (let v = SNK; v !== SRC; v = par[v]) { cap[par[v]][v] -= f; cap[v][par[v]] += f; } } }
     const tahsis = P.map((p, i) => tipler.map((t, k) => cap[2 + 2 * m + k][sinif(t) ? 2 + m + i : 2 + i]));
     // 2) her nöbet branşı için kişilerin birimlerini eşit aralıklı hedef zamanlarla sıralayıp slotlara yerleştir
     tipler.forEach((t, k) => {
@@ -215,6 +216,7 @@ const NobetCore = (() => {
         if (b === a) continue;
         const ca = cont[a], cb = cont[b], db = slotD[b]; if (ca === cb) continue;
         if (sinif(slotT[a]) !== sinif(slotT[b])) continue;         // 24 saatlik ve yarım nöbetler birbirine karışmaz (adetler korunur)
+        if ((ca < 0 || cb < 0) && grupT(slotT[a]) !== grupT(slotT[b])) continue;      // boşluk başka branşa taşınmaz (öncelik: sürücü → ekip şefi → YSP korunur)
         if (ca >= 0 && !elig(ca, slotT[b])) continue; if (cb >= 0 && !elig(cb, slotT[a])) continue;
         if (ca >= 0 && db !== da && hasDay[ca][db]) continue; if (cb >= 0 && db !== da && hasDay[cb][da]) continue;
         const eski = (ca >= 0 ? pc[ca] : 0) + (cb >= 0 ? pc[cb] : 0);
@@ -242,13 +244,17 @@ const NobetCore = (() => {
   function kapasiteAnalizi(girdi, kural) {
     const H = hazirla(girdi, kural), P = H.P, N = H.N, M = P.filter(p => !p.isci), m = M.length;
     const dz = isciDuzen(P.map(p => p.isci ? p.hedefYarim : 0), N);
-    // işçi vardiyaları işçilerce tutulur; geri kalan: her gün ekip şefi + YSP, iki işçili gün dışında sürücünün 24 saati (tek işçili günde 12 + başka branşta 12)
-    const need = {es: N, ysp: N, sur: N - dz.D2}, tipler = Object.keys(need), V = 2 + m + tipler.length, cap = Array.from({length: V}, () => new Array(V).fill(0));
-    M.forEach((p, i) => { cap[0][2 + i] = p.hedef24; tipler.forEach((t, k) => { if (p.yet.includes(t)) cap[2 + i][2 + m + k] = 99; }); });
-    tipler.forEach((t, k) => { cap[2 + m + k][1] = need[t]; });
-    for (;;) { const par = new Array(V).fill(-1); par[0] = 0; const q = [0]; while (q.length && par[1] < 0) { const u = q.shift(); for (let w = 0; w < V; w++) if (par[w] < 0 && cap[u][w] > 0) { par[w] = u; q.push(w); } } if (par[1] < 0) break; let f = 1e9; for (let w = 1; w !== 0; w = par[w]) f = Math.min(f, cap[par[w]][w]); for (let w = 1; w !== 0; w = par[w]) { cap[par[w]][w] -= f; cap[w][par[w]] += f; } }
-    const bos = {}; let toplam = 0; tipler.forEach((t, k) => { const b = cap[2 + m + k][1]; if (b > 0) { bos[t] = b; toplam += b; } });
-    return {toplam, bos, isciGun: dz.D1 + dz.D2, isciCift: dz.D2, kombi: dz.D1};
+    // nöbet listesiyle aynı model: işçi vardiyaları işçilerce tutulur; geri kalan her gün ekip şefi + YSP ve iki işçili gün dışında sürücünün 24 saatlik birimi
+    // (tek işçili günde 12 saat sürücü + 12 saat başka branş, birleşik görev). Kadro yeterliyse birleşik görev fazlalığı kesirle geri alınır.
+    const need = {es: N, ysp: N, sur: N - dz.D2 - dz.D1, surM: dz.D1}, tipler = Object.keys(need), V = 2 + m + tipler.length, cap = Array.from({length: V}, () => new Array(V).fill(0));
+    M.forEach((p, i) => { cap[0][2 + i] = p.hedef24; tipler.forEach((t, k) => { if (p.yet.includes(t === 'surM' ? 'sur' : t)) cap[2 + i][2 + m + k] = 999; }); });
+    // nöbet listesiyle aynı öncelik: sürücü → ekip şefi → YSP
+    for (const faz of [['sur', 'surM'], ['es'], ['ysp']]) { faz.forEach(t => { cap[2 + m + tipler.indexOf(t)][1] = need[t]; });
+  for (;;) { const par = new Array(V).fill(-1); par[0] = 0; const q = [0]; while (q.length && par[1] < 0) { const u = q.shift(); for (let w = 0; w < V; w++) if (par[w] < 0 && cap[u][w] > 0) { par[w] = u; q.push(w); } } if (par[1] < 0) break; let f = 1e9; for (let w = 1; w !== 0; w = par[w]) f = Math.min(f, cap[par[w]][w]); for (let w = 1; w !== 0; w = par[w]) { cap[par[w]][w] -= f; cap[w][par[w]] += f; } } }
+    // bos: gün (nöbet) cinsinden; sürücüde işçili günün boş 12 saati yarım gün sayılır (bosYari: boş 12 saatlik vardiya sayısı). gunSay: boş kalan gün-branş sayısı
+    const b = {}; tipler.forEach((t, k) => { b[t] = cap[2 + m + k][1]; });
+    const bos = {}; if (b.es) bos.es = b.es; if (b.ysp) bos.ysp = b.ysp; if (b.sur || b.surM) bos.sur = b.sur + b.surM / 2;
+    return {toplam: b.es + b.ysp + b.sur + b.surM / 2, gunSay: b.es + b.ysp + b.sur + b.surM, bos, surTam: b.sur, surYari: b.surM, isciGun: dz.D1 + dz.D2, isciCift: dz.D2, kombi: dz.D1};
   }
 
   // Kural ihlalleri: boş yuva, yetenek dışı, izinli kişiye nöbet, aynı gün çift görev, dinlenme, izin öncesi boşluk, gün aşırı sürücü, 3 gece, azami aralık. Bunlar kalmamalıdır (istek ve nöbet sayısı farkı tercihtir; hafta sonu dengesi de kural gibi zorlanır).
@@ -268,9 +274,9 @@ const NobetCore = (() => {
   // Böylece kimse adedinin üstüne çıkmaz; tek işçili günde 12 saati boşta kalan sürücü önce başka günün boş sürücü vardiyasına yazılır.
   function bosDoldur(liste, H) {
     const {N, P} = H, saat = saatleri(liste, H), disi = () => { const r = denetle(liste, H).ihlal; return sertSay(r) - r.filter(i => i.tur === 'eksik').length; };
-    let taban = disi(), n = 0;
+    let taban = disi(), n = 0; const t0 = Date.now();
     const dene = (L, t, p, sa) => { L[t] = p.id; const x = disi(); if (x <= taban) { taban = x; saat.set(p.id, saat.get(p.id) + sa); n++; return true; } L[t] = null; return false; };
-    for (let d = 1; d <= N; d++) {
+    for (let d = 1; d <= N && Date.now() - t0 < 2000; d++) {
       const L = liste[d], aday = (f, sa) => P.filter(p => f(p) && !p.izin.has(d) && !gundeMi(L, p.id) && hak(p) - saat.get(p.id) >= sa).sort((a, b) => (hak(b) - saat.get(b.id)) - (hak(a) - saat.get(a.id)));
       ['es', 'ysp'].forEach(t => { if (L[t] != null) return; for (const p of aday(q => !q.isci && q.yet.includes(t), 24)) if (dene(L, t, p, 24)) break; });
       if (L.sur != null) continue;
@@ -325,7 +331,7 @@ const NobetCore = (() => {
   // 8/16, 12/12 gibi (saat 4'ün katı; kısa parça her zaman önce). Bölünen kişi o nöbet branşını tutabilmeli, o gün boş olmalı; sert kural ihlali artarsa bölme yapılmaz.
   function kesirDengele(liste, H) {
     const {N, P} = H, yuvalar = ['es', 'ysp', 'sur'], saat = () => { const m = new Map(P.map(p => [p.id, 0])); for (let d = 1; d <= N; d++) { const L = liste[d]; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { const id = L[t]; if (id == null || !m.has(id)) return; m.set(id, m.get(id) + (t === 'surG' || t === 'surA' ? 12 : L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); if (L.bol) Object.entries(L.bol).forEach(([t, b]) => { if (b && m.has(b.id) && L[t] != null) m.set(b.id, m.get(b.id) + b.saat); }); } return m; };
-    let sert = sertSay(denetle(liste, H).ihlal), bolunen = 0, deneme = 0;      // deneme sınırı: büyük kadroda tarayıcıyı bekletmesin
+    let sert = sertSay(denetle(liste, H).ihlal), bolunen = 0, deneme = 0; const t0 = Date.now();      // deneme ve süre sınırı: büyük / eksik kadroda tarayıcıyı bekletmesin
     for (let tur = 0; tur < 200; tur++) {
       const sa = saat(), fark = p => p.plan == null || p.isci ? 0 : sa.get(p.id) - p.plan * 24;      // saat cinsinden: + fazla, − eksik
       const eksik = P.filter(p => fark(p) <= -4).sort((a, b) => fark(a) - fark(b)), fazla = P.filter(p => fark(p) >= 4).sort((a, b) => fark(b) - fark(a));
@@ -336,7 +342,7 @@ const NobetCore = (() => {
           const L = liste[d]; if (B.izin.has(d)) continue;
           if (['es', 'ysp', 'sur', 'surG', 'surA'].some(t => L[t] === B.id) || Object.values(L.bol || {}).some(b => b && b.id === B.id)) continue;
           for (const y of yuvalar) { if (L[y] !== A.id || (L.bol && L.bol[y]) || !B.yet.includes(y)) continue;
-            if (++deneme > 4000) return bolunen;
+            if (++deneme > 4000 || (deneme % 50 === 0 && Date.now() - t0 > 1500)) return bolunen;
             // kısa parça hep önce: nöbet sahibi (ilk parça, 09:00'dan) kısa süreli olan, ikinci kişi uzun parçayı alır (8 sa → 16 sa)
             const kisaB = sa1 < 12; if (kisaB) L[y] = B.id;
             L.bol = {...(L.bol || {}), [y]: kisaB ? {id: A.id, saat: 24 - sa1} : {id: B.id, saat: sa1}};
@@ -357,7 +363,9 @@ const NobetCore = (() => {
   // Üretim adım adım ilerler (generator): her denemeden sonra {oran, deneme} verir. uret: aynı anda (testler); uretAsync: tarayıcıda ilerleme göstererek, arayüzü kilitlemeden.
   function* uretAdim(girdi, sec) {
     const o = {sureMs: 1200, deneme: 4, seed: 1, zorlaMs: 6000, ...(sec || {})}, H = hazirla(girdi, o.kural), t0 = Date.now(), kap = kapasiteAnalizi(girdi, o.kural);
-    const kalite = son => { const eks = son.ihlal.filter(i => i.tur === 'eksik').length; return Math.max(0, sertSay(son.ihlal) - Math.min(eks, kap.toplam)) * 1e7 + son.toplam; };
+    // kaçınılmaz boşluk: kapasite açığındaki boş gün-branş sayısı (yarısı boş kalan sürücü günü de bir boşluk)
+    const kacinilmaz = kap.gunSay;
+    const kalite = son => { const eks = son.ihlal.filter(i => i.tur === 'eksik').length; return Math.max(0, sertSay(son.ihlal) - Math.min(eks, kacinilmaz)) * 1e7 + son.toplam; };
     let eniyi = null, kal = Infinity, denendi = 0; const pay = Math.max(200, Math.floor(o.sureMs / o.deneme)), topSure = o.sureMs + o.zorlaMs;
     const dene = (seed, ms, basla) => { denendi++; const r = uret2(H, seed, ms, basla), k = kalite(denetle(r.liste, H)); if (k < kal) { kal = k; eniyi = r.liste; } };
     for (let i = 0; i < o.deneme && Date.now() - t0 < o.sureMs; i++) { dene(o.seed + i * 977, Math.min(pay, o.sureMs - (Date.now() - t0))); if (kal === 0) break; yield {oran: Math.min(0.95, (Date.now() - t0) / (kal >= 1e7 ? topSure : o.sureMs)), deneme: denendi}; }
