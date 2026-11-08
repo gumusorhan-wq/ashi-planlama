@@ -894,7 +894,7 @@
     const D = durumlar(), cikti = [], ist = n => (S.plan.birimler.find(x => x.ad === n) || {}).tur === 'istasyon';
     S.plan.birimler.filter(b => b.tur === 'istasyon' && !b.ekipOf).forEach(b => {
       let taban = acikSimule(b); if (taban < 0.5) return;
-      const don = [], aday = S.plan.kayitlar.filter(k => k.birim === b.ad && !aileHek(k) && gorevAktif(k.gorev) && k.gorev.hedef && ist(k.gorev.hedef) && k.gorev.hedef !== b.ad && k.istek !== 'devam' && !/SAĞLIK MAZERETİ|EĞİTİM/.test(k.gorev.gerekce || '') && (D[k.durum] || {}).disarida && C.kisiMesai({...k, durum: ''}, S.y, S.m, ozel(), D) > 0);
+      const don = [], aday = S.plan.kayitlar.filter(k => k.birim === b.ad && !aileHek(k) && gorevAktif(k.gorev) && k.gorev.hedef && ist(k.gorev.hedef) && k.gorev.hedef !== b.ad && k.istek !== 'devam' && (S.ayar.uzunGeriCek || !xlUzunGorev(k.gorev)) && !/SAĞLIK MAZERETİ|EĞİTİM/.test(k.gorev.gerekce || '') && (D[k.durum] || {}).disarida && C.kisiMesai({...k, durum: ''}, S.y, S.m, ozel(), D) > 0);
       aday.forEach(k => { const yeni = acikSimule(b, [], [...don.map(x => x.id), k.id]); if (taban - yeni >= 0.5) { don.push(k); taban = yeni; cikti.push({k, b, hedef: k.gorev.hedef}); } });
     });
     if (uygula && cikti.length) { S.toplu = true; try { cikti.forEach(({k, b, hedef}) => mut(() => { k.gorev = null; if (k.durum === 'GEÇİCİ GÖREVDE') k.durum = ''; k.durumManuel = false; k.istek = ''; }, 'Açık nedeniyle otomatik geri çağrıldı', `${k.ad}: ${hedef} → ${b.ad}`)); } finally { S.toplu = false; } otoHesapla(); }
@@ -938,7 +938,7 @@
     const rNav = `<div class="ap-subnav ap-noprint">${rSek.map(([v, t]) => `<button class="${ra === v ? 'on' : ''}" data-act="rot-sekme" data-v="${v}">${t}</button>`).join('')}</div>`;
     const rKota = `<div class="ap-card"><h2>Aylık rotasyon — ${ayEtiket()}</h2>
       <p class="ap-note">Her istasyondan ayda <b>kota</b> kadar kişi çıkar: varsayılan 1, mesai dolmayan (fazla) istasyonda fazlalık kadar kişi (2-3); kutuyu doldurarak elle değiştirebilirsiniz. Sıra: önce <b>gitmek isteyenler</b>, sonra <b>en uzun süredir çıkmayan</b> (eşitlikte kıdemli en son). Hedef: önce <b>aynı ilçe</b>, sonra <b>yakından uzağa</b>; <b>doktorlar yalnızca doktorlu (A1) ekiplere ve KKM'ye</b> gidebilir. Dışarıdaki kişi "devam etsin" seçilirse kota onunla dolar ve aylar üst üste sürer. 4/B personel 4 yılını doldurmadan, izinli/nöbet muaf/gitmesin işaretli kişiler önerilmez.</p>
-      <div class="ap-row"><button class="ap-btn" data-act="oto-geri-cek" ${duz ? '' : 'disabled'} title="Dönmesi istasyonun açığını azaltacak, başka istasyona görevli personeli geri çağırır (devam etsin işaretliler, sağlık mazereti ve eğitim hariç)">Açığı olan istasyonların personelini geri çağır</button></div><p class="ap-note">Ayrıca: bir istasyonda ihtiyaç varken o nöbet branşını dolduran kişi dışarı önerilmez; personel listeleri yüklenince ve önceki aydan kopyalayınca açığı olan istasyonların dışarıdaki personeli otomatik geri çağrılır (Ayarlar'dan kapatılabilir).</p>
+      <div class="ap-row"><button class="ap-btn" data-act="oto-geri-cek" ${duz ? '' : 'disabled'} title="Dönmesi istasyonun açığını azaltacak, başka ASHİ istasyonuna görevli personeli geri çağırır (devam etsin işaretliler, sağlık mazereti, eğitim, ASHİ dışı görevler ve — Ayarlar'da açılmadıkça — 3 ay ve üzeri görevler hariç)">Açığı olan istasyonların personelini geri çağır</button></div><p class="ap-note">Ayrıca: bir istasyonda ihtiyaç varken o nöbet branşını dolduran kişi dışarı önerilmez; personel listeleri yüklenince ve önceki aydan kopyalayınca açığı olan istasyonların dışarıdaki personeli otomatik geri çağrılır (Ayarlar'dan kapatılabilir).</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>İSTASYON</th><th>KOTA</th><th>ŞU AN DIŞARIDA</th><th>SIRADAKİLER (ilk 4)</th></tr></thead><tbody>${satir || '<tr><td colspan="4" class="ap-empty">Rotasyon gerektiren istasyon yok</td></tr>'}</tbody></table></div></div>`;
     const rOner = `<div class="ap-card">
       <div class="ap-row"><h2 style="margin:0">Önerilen çıkışlar (${oFiltre.length}${rIst ? ' / ' + oner.length : ''})</h2><label class="ap-note" title="Seçilen istasyondan çıkanlar ve o istasyona gidenler listelenir">İstasyon ${istTekHtml('rist', rIst, hedefAdlari, {bos: 'Tümü', kucuk: true})}</label><label class="ap-note">Kaynak <select class="ap-sel" data-act="rot-kaynak"><option value="tum" ${S.rotKaynak !== 'fazla' ? 'selected' : ''}>Tüm istasyonlar (her istasyondan kota kadar)</option><option value="fazla" ${S.rotKaynak === 'fazla' ? 'selected' : ''}>Yalnızca mesaisi dolmayan (fazla) istasyonlar</option></select></label></div>
@@ -1001,10 +1001,20 @@
     const eskiT = k.gorev && (k.gorev.tarih || k.gorev.bas || k.gorev.bit), ayT = eskiT || (ek && (ek.tarih || ek.uzun)) ? {} : ayGorevTarih();      // yeni görev: bu ayın görevlendirme tarihi
     return mut(() => { k.gorev = {...(k.gorev || {}), yer: (k.gorev && k.gorev.yer) || hedef, hedef, kaynak: 'manuel', yolluk: (k.gorev && k.gorev.yolluk) || '', tarih: (k.gorev && k.gorev.tarih) || '', gerekce: (k.gorev && k.gorev.gerekce) || '', ...ayT, ...(ek || {})}; k.durum = 'GEÇİCİ GÖREVDE'; k.durumManuel = true; k.gecmis = [...new Set([...(k.gecmis || []), ayAnahtari()])].sort(); }, 'Görevlendirme', `${k.ad}: ${k.birim} → ${hedef}`);
   }
-  // Bir ekibin başka birimlere görevli personelini geri çağırır (ör. kapalı ekip yeniden açılırken). Kurum dışı yerlerdeki görevler (hastane, aile hekimliği vb.) değiştirilmez.
-  function geriCagirmaAdaylari(b) { return S.plan.kayitlar.filter(k => k.birim === b.ad && !aileHek(k) && gorevAktif(k.gorev) && k.gorev.hedef); }
-  function geriCagir(b) {
-    const liste = geriCagirmaAdaylari(b);
+  // Bir ekibin başka ASHİ istasyonlarına görevli personelini geri çağırır (ör. kapalı ekip yeniden açılırken). ASHİ dışındaki görevler (KKM, Başhekimlik,
+  // hastane, aile hekimliği, kurum dışı) geri çağrılmaz. Uzun süreli (3 ay ve üzeri) görevler ayrıca sorulur (isteğe bağlı).
+  const istasyonaGorev = k => !!(k.gorev && k.gorev.hedef) && (S.plan.birimler.find(x => x.ad === k.gorev.hedef) || {}).tur === 'istasyon';
+  function geriCagirmaAdaylari(b, uzunDahil = true) { return S.plan.kayitlar.filter(k => k.birim === b.ad && !aileHek(k) && gorevAktif(k.gorev) && istasyonaGorev(k) && (uzunDahil || !xlUzunGorev(k.gorev))); }
+  // Önce kısa süreli görevler, sonra (varsa) uzun süreliler ayrı onayla geri çağrılır
+  async function geriCagirSor(b, soru) {
+    const kisa = geriCagirmaAdaylari(b, false), uzun = geriCagirmaAdaylari(b, true).filter(k => !kisa.includes(k)); let n = 0;
+    if (!kisa.length && !uzun.length) { toast('Geri çağrılacak personel yok (ASHİ dışındaki görevler geri çağrılmaz).'); return 0; }
+    if (kisa.length && (await onay(`${soru(kisa.length)}`))) n += geriCagir(b, kisa);
+    if (uzun.length && (await onay(`${uzun.length} personel uzun süreli (3 ay ve üzeri) görevde:\n${uzun.slice(0, 8).map(k => `• ${k.ad} → ${k.gorev.hedef}`).join('\n')}${uzun.length > 8 ? '\n…' : ''}\n\nOnlar da geri çağrılsın mı?`))) n += geriCagir(b, uzun);
+    if (n) toast(`${n} personel geri çağrıldı.`); return n;
+  }
+  function geriCagir(b, liste) {
+    liste = liste || geriCagirmaAdaylari(b, false);
     mut(() => { liste.forEach(k => { k.gorev = null; if (k.durum === 'GEÇİCİ GÖREVDE') k.durum = ''; k.durumManuel = false; k.istek = ''; }); }, 'Personel geri çağrıldı', `${b.ad}: ${liste.length} kişi`);
     return liste.length;
   }
@@ -1195,7 +1205,7 @@
           if (ac) { otoHesapla(); kaydet(); }
           toast(ac ? `${n} kişinin sabitlemesi kaldırıldı; sayılar otomatik hesaplanacak.` : `${n} kişinin nöbet sayısı sabitlendi (🔒).`); break;
         }
-        case 'geri-cagir': { const b = S.plan.birimler.find(x => x.ad === v); if (!b) break; const n = geriCagirmaAdaylari(b).length; if (n && (await onay(`${b.ad} ekibine bağlı, başka birimlere görevli ${n} personel geri çağrılsın mı?`))) toast(`${geriCagir(b)} personel geri çağrıldı.`); break; }
+        case 'geri-cagir': { const b = S.plan.birimler.find(x => x.ad === v); if (!b) break; await geriCagirSor(b, n => `${b.ad} ekibine bağlı, başka istasyonlara görevli ${n} personel geri çağrılsın mı?`); break; }
         case 'gorev-bitir': {
           const k = kayit(t.dataset.id); if (!k || !k.gorev) break;
           if (aileHek(k)) { toast('Aile hekimliğindeki personel kendi isteği olmadan geri çağrılamaz.'); break; }
@@ -1291,12 +1301,13 @@
           const aciliyor = !t.checked && b.ekipOf, dis = aciliyor ? geriCagirmaAdaylari(b) : [];
           S.ayar.ofIst = (Array.isArray(S.ayar.ofIst) ? S.ayar.ofIst : []).filter(x => x !== b.ad); if (t.checked) S.ayar.ofIst.push(b.ad); await ayarKaydet();
           mut(() => { b.ekipOf = t.checked; }, t.checked ? 'Ekip OF işaretlendi' : 'Ekip OF kaldırıldı (ekip açıldı)', b.ad);
-          if (aciliyor && dis.length && (await onay(`${b.ad} yeniden açılıyor. Başka birimlere görevli ${dis.length} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`))) toast(`${geriCagir(b)} personel geri çağrıldı.`);
+          if (aciliyor && dis.length) await geriCagirSor(b, n => `${b.ad} yeniden açılıyor. Başka istasyonlara görevli ${n} personel geri çağrılsın mı?\n\nTamam: görevleri bitirilir, personel ekibe döner.\nİptal: görevler olduğu gibi kalır (sonra tek tek veya "Personeli geri çağır" ile dönebilir).`);
         }
       }
       else if (a === 'hedef-yuv') { if (S.rol !== 'yonetici') return; S.ayar.hedefYuvarla = t.checked; await ayarKaydet(); if (S.plan) { otoHesapla(); kaydet(); } }
       else if (a === 'talep-bekleyen') { S.talepBekleyen = t.checked; if (S.asos) asosHesapla(S.asos.dosyalar.map(d => ({ad: d.ad, tur: d.tur, p: d.p, boyut: d.boyut, hata: d.p ? null : d.hata}))); return; }
       else if (a === 'oto-geri') { if (S.rol !== 'yonetici') return; S.ayar.otoGeriCek = t.checked; await ayarKaydet(); }
+      else if (a === 'uzun-geri') { if (S.rol !== 'yonetici') return; S.ayar.uzunGeriCek = t.checked; await ayarKaydet(); }
       else if (a === 'oto-oner') { if (S.rol !== 'yonetici') return; S.ayar.otoOner = t.checked; await ayarKaydet(); if (t.checked && S.plan) { otoHesapla(); kaydet(); } }
       else return;
       render();

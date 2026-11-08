@@ -96,18 +96,20 @@
     const kp = n2BosTahmin(b), gun = C.gunSayisi(S.y, S.m);
     const yuvaSatir = ['es', 'ysp', 'sur'].map(k => {
       const bos = kp ? (kp.bos[k] || 0) : 0, ad = YUVA_ADLARI[k];
-      return `<div class="ap-yuva"><span>${ad}</span><span class="v">${fmt(gun - bos)}/${gun} gün</span>${bos ? `<span class="ap-tag ap-t-ih" title="${ad}: ${kp && kp.kaynak === 'liste' ? 'oluşturulan nöbet listesinde' : 'bu kadroyla nöbet listesinde (tahmini)'} ${fmt(bos)} gün boş (kimseye adedinden fazla nöbet yazılmaz; 0,5 gün = 12 saat)">${fmt(bos)} gün boş</span>` : '<span class="ap-tag ap-t-ok">tam</span>'}</div>`;
+      return `<div class="ap-yuva"><span>${ad}</span><span class="v">${fmt(gun - bos)}/${gun} gün</span>${bos ? `<span class="ap-tag ap-t-ih" title="${ad}: ${kp && kp.kaynak === 'liste' ? 'oluşturulan nöbet listesinde' : 'bu kadroyla nöbet listesinde (tahmini)'} ${fmt(bos)} gün boş (kimseye adedinden fazla nöbet yazılmaz; 0,5 gün = 12 saat)">${fmt(bos)} gün eksik</span>` : '<span class="ap-tag ap-t-ok">tam</span>'}</div>`;
     }).join('');
     // gelecek personel: hangi branşlardan ve kaç kişi
     let gelen = '';
     if (gelecek) {
       const secenek = E.adaylar.filter(x => !kp || !kp.toplam || x.yuva.some(y => kp.bos[y])).map(x => `${esc(x.ad)}${x.kisi > 1 ? ' ×' + x.kisi : ''}`).join(' · ');
-      gelen = `<div class="ap-ek ap-ek-g" title="Gelen kişi o ay boyunca (tam ay) bu istasyonda mesaisini tamamlayacak şekilde önerilir. Açık nöbet branşlarına girebilen branşlar listelenir."><b>+${gelecek} kişi gelmeli</b> <span>(ay boyu ${fmt(h.tamHedef)} nöbet tutar)</span><div class="ap-note">${kp && kp.kaynak === 'liste' ? 'Nöbet listesinde boş' : 'Nöbet listesinde boş kalacak (tahmini)'}: ${kp && kp.toplam ? Object.entries(kp.bos).map(([k2, n]) => `${YUVA_ADLARI[k2]} ${fmt(n)} gün`).join(', ') : '—'}<br>Uygun personel: ${secenek || 'AABT (sürücü teyitli)'}</div></div>`;
+      gelen = `<div class="ap-ek ap-ek-g" title="Gelen kişi o ay boyunca (tam ay) bu istasyonda mesaisini tamamlayacak şekilde önerilir. Açık nöbet branşlarına girebilen branşlar listelenir."><b>+${gelecek} kişi gelmeli</b> <span>(ay boyu ${fmt(h.tamHedef)} nöbet tutar)</span><div class="ap-note">Uygun personel: ${secenek || 'AABT (sürücü teyitli)'}</div></div>`;
     } else if (h.ihtiyacTur === 'icerde') gelen = `<div class="ap-ek ap-ek-c" title="Herkes yalnız mesaisini tutsa ${fmt(h.hedefAcik)} nöbet açık kalırdı; bu açık bir kişinin tüm ay mesaisini doldurmaya yetmediği ve fazla nöbetle kapandığı için personel önerilmez"><b>Personel gerekmez</b> <span>nöbet branşları fazla nöbetle doluyor</span></div>`;
     else if (h.ihtiyacTur === 'elle') gelen = fazlaMod ? `<div class="ap-ek ap-ek-e"><b>Elle karar</b> <span>fazla nöbetle de ${fmt(-h.farkAzami)} açık; bir kişinin ayı dolmaz</span></div>` : `<div class="ap-ek ap-ek-c"><b>Açık kalıyor</b> <span>${fmt(h.hedefAcik)} nöbet; bir kişinin ayını doldurmaz</span></div>`;
     // dışarı çıkabilecek personel
     let cikan = '';
-    if (h.fazlaEf > 0.001) cikan = `<div class="ap-ek ap-ek-c" title="${fazlaMod ? 'DOKTOR-AABT-ATT en çok ' + fmt(azamiDeger(b)) + ' nöbet tutarsa bile' : 'Mesai karşılığıyla'} nöbet branşlarına sığmayan nöbet fazlası. ${E.fazlaGrup.map(f => f.ad + ': ' + fmt(f.v) + ' nöbet').join('; ')}"><b>${E.cikabilir ? `${E.cikabilir} kişi dışarı çıkabilir` : 'Fazlalık var'}</b> <span>${fmt(h.fazlaEf)} nöbetlik fazlalık${E.fazlaGrup.length ? ' · ' + esc(E.fazlaGrup.map(f => f.ad).join(', ')) : ''} — nöbet branşlarına sığmıyor</span></div>`;
+    // fazla: kişilerin mesaisi (hedef nöbet) toplamı, girebildikleri nöbet branşlarındaki boş yeri aşıyor → bu kadar nöbet bu istasyonda tutulamaz
+    if (h.fazlaEf > 0.001) cikan = `<div class="ap-ek ap-ek-c"><b>Fazla nöbet: ${fmt(h.fazlaEf)}</b> <span>${E.cikabilir ? `→ ${E.cikabilir} kişi başka istasyona gidebilir` : '→ bir kişilik değil, istasyonda kalır'}</span>
+      <div class="ap-note">${E.fazlaGrup.map(f => `${esc(f.ad)}: <b>${fmt(f.v)}</b> nöbet`).join(' · ')}<br>Bu kişilerin mesaisi kadar nöbet bu istasyonda yok: girebildikleri nöbet branşları dolu.</div></div>`;
     const net = gelecek && E.cikabilir ? `<div class="ap-note" style="margin-top:4px">Net: gelen ${gelecek}, çıkabilir ${E.cikabilir} → ${E.cikabilir >= gelecek ? 'kendi fazlalığı yetiyor' : 'dışarıdan ' + (gelecek - E.cikabilir) + ' kişi gerekir'}</div>` : '';
     const durumRozet = !gelecek && !cikan && h.ihtiyacTur === 'yok' ? '<span class="ap-tag ap-t-ok">Dengede</span>' : '';
     return `<div class="ap-st" data-act="ist-ac" data-v="${esc(b.ad)}"><h3>${esc(b.ad)} ${durumRozet}</h3>
@@ -115,8 +117,8 @@
         <div class="r"><span title="Nöbet yazılan toplam / ayda dolması gereken nöbet">Yazılan / gereken nöbet</span><b>${fmt(p)} / ${h.ihtiyac}</b></div>
         <div class="r"><span title="${fazlaMod ? 'DOKTOR-AABT-ATT en çok ' + fmt(azamiDeger(b)) + ' nöbet tutarsa kişilerin toplam kapasitesi' : 'Herkes yalnız mesaisini tamamlayacak kadar nöbet tutarsa kişilerin toplam kapasitesi'}">${fazlaMod ? 'Kapasite (fazla mesaili)' : 'Kapasite (mesai karşılığı)'}</span><b>${fmt(fazlaMod ? h.azamiKap : h.kapasite)}</b></div>
         <div class="r"><span title="Hesaba giren kişi: istasyonda çalışan ve nöbet tutabilen. Dışarıda (geçici görevde) olanların hedefi 0 sayılır, kapasiteye ve ihtiyaca girmez.">Kişi (nöbet tutan)</span><b>${nobetTutan}${disarida ? ` <span class="ap-note">+ ${disarida} dışarıda</span>` : ''}${nobetsiz ? ` <span class="ap-note">+ ${nobetsiz} nöbet tutmaz</span>` : ''}${aile ? ` <span class="ap-note" title="Aile hekimliğine geçen personel listede görünür ama hiçbir hesaba girmez; kendi isteği olmadan geri çağrılmaz">+ ${aile} aile hekimliğinde</span>` : ''}</b></div>
-        <div class="ap-yh">Nöbet branşları (${fazlaMod ? 'fazla mesaili' : 'mesai karşılığı'}: dolu / gereken)</div>${yuvaSatir}
-        ${gelen}${cikan}${net}${Math.abs(plFark) > 0.01 ? `<div class="ap-note" style="margin-top:6px" title="Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}: kilitli değer ya da nöbet branşı kısıtı">Yazılan nöbet beklenenden ${fmt(Math.abs(plFark))} ${plFark < 0 ? 'eksik' : 'fazla'}</div>` : ''}</div>`;
+        <div class="ap-yh" title="${kp && kp.kaynak === 'liste' ? 'Oluşturulan nöbet listesine göre' : 'Kişilerin nöbet sayıları ve branş yeteneklerine göre (tahmini)'}">Nöbet branşları — dolu gün / gereken gün</div>${yuvaSatir}
+        ${gelen}${cikan}${net}${Math.abs(plFark) > 0.01 ? `<div class="ap-note" style="margin-top:6px" title="Elle girilen ya da sabitlenen (🔒) sayılar ya da nöbet branşı kısıtı yüzünden">Planlanan toplam, olması gerekenden ${fmt(Math.abs(plFark))} nöbet ${plFark < 0 ? 'eksik' : 'fazla'}</div>` : ''}</div>`;
   }
 
   // Sürüm 13.28: modül Ana Sayfası (Depo / Teknik ana sayfası gibi) — ön bilgi kartları + hızlı erişim. Pano ve öteki sayfalar değişmedi.
@@ -261,7 +263,7 @@
     const D = durumlar(), duz = !salt();
     const kis = S.plan.kayitlar.filter(k => (k.birim === b.ad || (k.gorev && k.gorev.hedef === b.ad && (D[k.durum] || {}).disarida)) && (planlamaRol() || !gizliKisi(k)));
     const istas = b.tur === 'istasyon', h = istas ? hesapla(b) : null;
-    const disSay = S.plan.kayitlar.filter(k => k.birim === b.ad && gorevAktif(k.gorev) && k.gorev.hedef).length;
+    const disSay = geriCagirmaAdaylari(b, true).length;
     const satirMap = new Map(); if (h) h.satir.forEach(s => satirMap.set(s.k.id, s));
     kis.sort(nobetSirala(satirMap, !istas));
     const p = h ? planlananToplam(h) : 0;
@@ -307,7 +309,7 @@
       ${istas ? `<button class="ap-btn pri" data-act="oner" ${duz ? '' : 'disabled'} title="Plan her değişiklikte otomatik hesaplanır; bu düğme kilitli olmayan değerleri yeniden hesaplar">Yeniden hesapla</button>` : ''}
       ${istas ? `<button class="ap-btn" data-act="ist-onayla" data-v="1" ${duz ? '' : 'disabled'} title="Bu istasyondaki tüm planlanan nöbet sayılarını sabitler (🔒): otomatik hesap bunları değiştirmez">Sayıları sabitle 🔒</button><button class="ap-btn" data-act="ist-onayla" data-v="0" ${duz ? '' : 'disabled'} title="Bu istasyondaki sabitlemeleri kaldırır; sayılar yeniden otomatik hesaplanır">Sabitlemeyi kaldır</button>` : ''}
       <button class="ap-btn" data-act="kisi-ekle" ${duz ? '' : 'disabled'}>+ Kişi ekle</button>
-      ${disSay ? `<button class="ap-btn" data-act="geri-cagir" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'} title="Bu ekibin başka birimlere görevli personelini geri çağırır">Personeli geri çağır (${disSay})</button>` : ''}<button class="ap-btn" data-act="png" data-v="${esc(b.ad)}">Görüntü (PNG)</button><button class="ap-btn" data-act="excel-ist" data-v="${esc(b.ad)}">Excel</button>
+      ${disSay ? `<button class="ap-btn" data-act="geri-cagir" data-v="${esc(b.ad)}" ${duz ? '' : 'disabled'} title="Bu ekibin başka ASHİ istasyonlarına görevli personelini geri çağırır; uzun süreli (3 ay+) görevler ayrıca sorulur. KKM, Başhekimlik ve kurum dışı görevler geri çağrılmaz.">Personeli geri çağır (${disSay})</button>` : ''}<button class="ap-btn" data-act="png" data-v="${esc(b.ad)}">Görüntü (PNG)</button><button class="ap-btn" data-act="excel-ist" data-v="${esc(b.ad)}">Excel</button>
       ${istas ? `<label class="ap-note" title="Kapalı ekip: ihtiyaç 0 sayılır; işareti kaldırınca ekip açılır ve personel geri çağrılabilir"><input type="checkbox" data-act="ekip-of" data-v="${esc(b.ad)}" ${b.ekipOf ? 'checked' : ''} ${duz ? '' : 'disabled'}> <b>Ekip OF (kapalı)</b></label>` : ''}
       </div>
       ${mesEksik.length && !b.ekipOf ? `<div class="ap-ek ap-ek-c" style="margin:8px 0;color:var(--ap-bad)"><b>Mesaisi eksik kalan personel (${mesEksik.length}):</b> ${mesEksik.map(esc).join(' · ')} <span class="ap-note">— planlanan nöbetler "Mesai" sütunundaki saati karşılamıyor; satırları kırmızı gösterilir</span></div>` : ''}${lejant()}
@@ -467,7 +469,8 @@
       <div class="ap-row"><label>DOKTOR-AABT-ATT genel azami nöbet (24 sa.; istasyon sayfasından istasyon bazında değiştirilebilir) <input class="ap-in n" type="number" step="0.5" data-ay="azamiMemur" value="${S.ayar.azamiMemur}" ${yon ? '' : 'disabled'}></label>
       <label>İşçi nöbetinde sistemden düşülen saat <input class="ap-in n" type="number" step="0.5" data-ay="isciDusulen" value="${S.ayar.isciDusulen}" ${yon ? '' : 'disabled'}></label></div>
       <div class="ap-row"><label title="Kapalıyken memur/doktor hedefi tam oranla hesaplanır (160 saat = 6,67 nöbet). Açıkken hedef 0,5 adıma yukarı yuvarlanır (160 saat = 7)."><input type="checkbox" data-act="hedef-yuv" ${S.ayar.hedefYuvarla ? 'checked' : ''} ${yon ? '' : 'disabled'}> Memur/doktor hedefini 0,5 adıma yuvarla (eski yöntem)</label></div>
-      <div class="ap-row"><label><input type="checkbox" data-act="oto-geri" ${S.ayar.otoGeriCek !== false ? 'checked' : ''} ${yon ? '' : 'disabled'}> Açığı olan istasyonların başka istasyona görevli personelini listeler yüklenince / önceki aydan kopyalanınca otomatik geri çağır</label></div>
+      <div class="ap-row"><label><input type="checkbox" data-act="oto-geri" ${S.ayar.otoGeriCek !== false ? 'checked' : ''} ${yon ? '' : 'disabled'}> Açığı olan istasyonların başka istasyona görevli personelini listeler yüklenince / önceki aydan kopyalanınca otomatik geri çağır (ASHİ dışındaki görevler — KKM, Başhekimlik, hastane vb. — geri çağrılmaz)</label></div>
+      <div class="ap-row"><label><input type="checkbox" data-act="uzun-geri" ${S.ayar.uzunGeriCek ? 'checked' : ''} ${yon ? '' : 'disabled'}> Uzun süreli (3 ay ve üzeri) görevlendirmeler de otomatik geri çağrılsın</label></div>
       <div class="ap-row"><label><input type="checkbox" data-act="oto-oner" ${S.ayar.otoOner !== false ? 'checked' : ''} ${yon ? '' : 'disabled'}> Planlanan nöbeti her değişiklikte otomatik hesapla (kilitli değerler korunur)</label></div>
       <p class="ap-note">Yuvarlama: DOKTOR-AABT-ATT hedefi yukarı 0,5 adıma, işçi hedefi aşağı tam 12 saatlik nöbete yuvarlanır.</p></div>
       <div class="ap-card"><h2>Yedek ve sıfırlama</h2><div class="ap-row"><button class="ap-btn dng" data-act="tum-sifirla" ${S.rol === 'yonetici' ? '' : 'disabled'} title="Tüm aylık planlar, arşiv ve gerçekleşen nöbet verisini siler (ayarlar korunur)">Tüm planları ve arşivi sıfırla</button><button class="ap-btn" data-act="yedek-al">JSON yedeği al (bu ay)</button><button class="ap-btn" data-act="yedek-yukle" ${salt() ? 'disabled' : ''}>JSON yedeği yükle</button></div>
