@@ -1762,7 +1762,7 @@ function mount(root, opts = {}) {
         <td>${istas && !(s && s.nobetYok) ? `<div class="ap-stp"><input class="ap-in n" type="text" inputmode="decimal" data-id="${k.id}" data-f="planlanan" value="${k.planlanan != null ? fmt(k.planlanan) : ''}" ${dis}><span class="ap-stb"><button type="button" data-act="plan-art" data-id="${k.id}" data-v="1" ${dis} title="Bir üst 0,5 adıma (ör. 7,67 → 8)">▲</button><button type="button" data-act="plan-art" data-id="${k.id}" data-v="-1" ${dis} title="Bir alt 0,5 adıma (ör. 7,67 → 7,5)">▼</button></span></div>` : ''}</td>
         <td class="num fk ${Math.round(fark * 100) > 0 ? 'ap-pos' : Math.round(fark * 100) < 0 ? 'ap-neg' : ''}">${s && !s.nobetYok && k.planlanan != null ? (Math.round(fark * 100) > 0 ? '+' : '') + fmt(fark) : ''}</td>
         <td>${istas && !(s && s.nobetYok) ? `<input type="checkbox" data-id="${k.id}" data-f="kilit" ${k.kilit ? 'checked' : ''} ${dis} title="Kilitli değer otomatik hesapta değişmez. Elle girilen planlanan değer kendiliğinden kilitlenir; kilidi açınca yeniden hesaplanır.">` : ''}</td>
-        <td>${gelen ? `<span class="ap-hd">${esc(k.birim + ' kadrosundan')}</span>` : gorevHucre(k, birimler, b, dt, dis)}${eng ? `<div class="ap-note" style="color:var(--ap-bad)">${esc(eng)}</div>` : ''}</td>
+        <td>${gelen ? `<span class="ap-hd">${esc(k.birim + ' kadrosundan')}</span>${(() => { const t = gorevTarihleri(k.gorev); return t.bas || t.bit ? `<div class="ap-note">${t.bas ? trTarih(t.bas) : '…'} – ${t.bit ? trTarih(t.bit) : 'bitiş yok'}${k.gorev.kaynak === 'asos' ? ' · ASOS' : ''}</div>` : '<div class="ap-note">tarih yok</div>'; })()}` : gorevHucre(k, birimler, b, dt, dis)}${eng ? `<div class="ap-note" style="color:var(--ap-bad)">${esc(eng)}</div>` : ''}</td>
         <td class="gz"><select class="ap-sel" data-id="${k.id}" data-f="yolluk" ${dis}>${['', 'YOLLUKLU', 'YOLLUKSUZ'].map(a => `<option ${a === ((k.gorev || {}).yolluk || '') ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
         <td class="gz"><input class="ap-in w" data-id="${k.id}" data-f="aciklama" value="${esc(k.aciklama || '')}" ${dis} placeholder="Açıklama" title="Kişiye özel not; PNG ve Excel çıktısındaki AÇIKLAMA sütununda yer alır"></td>
         <td>${gelen ? `<button class="ap-btn sm" data-act="gorev-bitir" data-id="${k.id}" ${duz ? '' : 'disabled'} title="Geri gönder: görevlendirmeyi bitirir, kişi ${esc(k.birim)} istasyonuna geri döner">↩ Geri</button>` : (gorevAktif(k.gorev) ? `<button class="ap-btn sm" data-act="gorev-bitir" data-id="${k.id}" ${duz ? '' : 'disabled'} title="Geri çağır: görevlendirmeyi bitirir, kişi bu istasyona geri döner">↩ Geri</button> ` : '')}${duz && !gelen ? `<button class="ap-btn sm dng" data-act="kisi-sil" data-id="${k.id}" title="Kaydı sil">✕</button>` : ''}</td></tr>`;
@@ -3103,6 +3103,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   // ASOS raporları: (A) "Başhekimlik Komuta İstasyon Personel Listesi Raporu (EKİP)" ve (B) "Personel Listesi Raporu". İkisi de TC ile birleştirilir.
   const gunSon = () => C.iso(S.y, S.m, C.gunSayisi(S.y, S.m));
   // Aylık görevlendirme tarihi kurum düzeninde: ayın 1'i 09:00 – sonraki ayın 1'i 09:00 (ör. 01.12.2026 – 01.01.2027); bitiş dönüş günüdür
+  const oncekiAyIlk = () => S.m === 1 ? C.iso(S.y - 1, 12, 1) : C.iso(S.y, S.m - 1, 1);
   const sonrakiAyIlk = () => S.m === 12 ? C.iso(S.y + 1, 1, 1) : C.iso(S.y, S.m + 1, 1);
   const ayGorevTarih = () => ({bas: ayIlk(), bit: sonrakiAyIlk(), tarih: `${trTarih(ayIlk())} – ${trTarih(sonrakiAyIlk())}`});
   function asosParse(wb) {
@@ -3863,7 +3864,9 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   // Plan ayının ilk günü ya da öncesinde biten geçici görevler kapatılır, kişi kadro istasyonuna döner ("devam" isteği olanlar hariç)
   function bitenGorevleriKapat() {
     if (!S.plan || salt()) return 0;
-    const ilk = ayIlk(), biten = S.plan.kayitlar.filter(k => { if (!k.gorev || k.istek === 'devam' || k.gorev.uzun) return false; const t = gorevTarihleri(k.gorev); return (t.bit && t.bit <= ilk && !(t.bas && t.bas >= ilk)) || kisaGorev(k.gorev); });
+    // Sürüm 13.56: bitişi yazılmamış ama önceki ay başlamış (1 aylık rotasyon) görev de biter — uzun süreli (3 ay+) ve "devam etsin" hariç
+    const ilk = ayIlk(), onc = oncekiAyIlk(), biten = S.plan.kayitlar.filter(k => { if (!k.gorev || k.istek === 'devam' || k.gorev.uzun) return false; const t = gorevTarihleri(k.gorev);
+      return (t.bit && t.bit <= ilk && !(t.bas && t.bas >= ilk)) || kisaGorev(k.gorev) || (!t.bit && t.bas && t.bas >= onc && t.bas < ilk && !xlUzunGorev(k.gorev)); });
     const D0 = durumlar(), artik = S.plan.kayitlar.filter(k => !k.gorev && !(D0[k.durum] || {}).disarida && k.durum !== 'GEÇİCİ GÖREVLİ' && /GECICI GOREV/.test(C.TR(k.durumMetin || '')));
     if (artik.length) { artik.forEach(k => { k.durumMetin = ''; if (k.durumMetinA && /GECICI GOREV/.test(C.TR(k.durumMetinA))) k.durumMetinA = ''; }); logla('Görevi bitmiş personelde kalan "geçici görevli" notu silindi', `${artik.length} kişi`); if (!biten.length) { damgala(); kaydet(); } }
     if (!biten.length) return 0;

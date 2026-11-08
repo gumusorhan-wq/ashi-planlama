@@ -83,6 +83,7 @@
   // ASOS raporları: (A) "Başhekimlik Komuta İstasyon Personel Listesi Raporu (EKİP)" ve (B) "Personel Listesi Raporu". İkisi de TC ile birleştirilir.
   const gunSon = () => C.iso(S.y, S.m, C.gunSayisi(S.y, S.m));
   // Aylık görevlendirme tarihi kurum düzeninde: ayın 1'i 09:00 – sonraki ayın 1'i 09:00 (ör. 01.12.2026 – 01.01.2027); bitiş dönüş günüdür
+  const oncekiAyIlk = () => S.m === 1 ? C.iso(S.y - 1, 12, 1) : C.iso(S.y, S.m - 1, 1);
   const sonrakiAyIlk = () => S.m === 12 ? C.iso(S.y + 1, 1, 1) : C.iso(S.y, S.m + 1, 1);
   const ayGorevTarih = () => ({bas: ayIlk(), bit: sonrakiAyIlk(), tarih: `${trTarih(ayIlk())} – ${trTarih(sonrakiAyIlk())}`});
   function asosParse(wb) {
@@ -843,7 +844,9 @@
   // Plan ayının ilk günü ya da öncesinde biten geçici görevler kapatılır, kişi kadro istasyonuna döner ("devam" isteği olanlar hariç)
   function bitenGorevleriKapat() {
     if (!S.plan || salt()) return 0;
-    const ilk = ayIlk(), biten = S.plan.kayitlar.filter(k => { if (!k.gorev || k.istek === 'devam' || k.gorev.uzun) return false; const t = gorevTarihleri(k.gorev); return (t.bit && t.bit <= ilk && !(t.bas && t.bas >= ilk)) || kisaGorev(k.gorev); });
+    // Sürüm 13.56: bitişi yazılmamış ama önceki ay başlamış (1 aylık rotasyon) görev de biter — uzun süreli (3 ay+) ve "devam etsin" hariç
+    const ilk = ayIlk(), onc = oncekiAyIlk(), biten = S.plan.kayitlar.filter(k => { if (!k.gorev || k.istek === 'devam' || k.gorev.uzun) return false; const t = gorevTarihleri(k.gorev);
+      return (t.bit && t.bit <= ilk && !(t.bas && t.bas >= ilk)) || kisaGorev(k.gorev) || (!t.bit && t.bas && t.bas >= onc && t.bas < ilk && !xlUzunGorev(k.gorev)); });
     const D0 = durumlar(), artik = S.plan.kayitlar.filter(k => !k.gorev && !(D0[k.durum] || {}).disarida && k.durum !== 'GEÇİCİ GÖREVLİ' && /GECICI GOREV/.test(C.TR(k.durumMetin || '')));
     if (artik.length) { artik.forEach(k => { k.durumMetin = ''; if (k.durumMetinA && /GECICI GOREV/.test(C.TR(k.durumMetinA))) k.durumMetinA = ''; }); logla('Görevi bitmiş personelde kalan "geçici görevli" notu silindi', `${artik.length} kişi`); if (!biten.length) { damgala(); kaydet(); } }
     if (!biten.length) return 0;
