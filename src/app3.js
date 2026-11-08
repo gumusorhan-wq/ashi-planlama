@@ -596,7 +596,7 @@
   function personelDegerlendirme(b, h) {
     if (b.ekipOf) return 'Ekip OF (kapalı)';
     if (h.ihtiyacTur === 'oner') return `Personel öner: ${h.ihtiyacKisi} kişi (açık ${fmt(h.hedefAcik)} nöbet)`;
-    if (h.ihtiyacTur === 'icerde') return `Fazla nöbetle kendi içinde döner (hedefin ${fmt(h.hedefAcik)} nöbet üstü)`;
+    if (h.ihtiyacTur === 'icerde') return `Fazla mesaiyle kapanır (mesainin ${fmt(h.hedefAcik)} nöbet üstü, personel gerekmez)`;
     if (h.ihtiyacTur === 'elle') return `Elle karar: azamiyle de ${fmt(-h.farkAzami)} nöbet açık, gelen kişi mesaisini tamamlayamaz`;
     return '';
   }

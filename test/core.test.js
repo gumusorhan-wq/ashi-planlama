@@ -145,3 +145,8 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   const gr3 = {dok: [], isci: [], ke: [kisi('ke', 3, 8)], ka: [], ysp: [kisi('ysp', 7, 8)], sy: [kisi('sy', 10, 10)]};
   const o3 = C.oneri({ihtiyac: 30, gruplar: gr3}, null); assert.ok(Math.abs(o3.get('ke') - 8) < 0.011 && Math.abs(o3.get('sy') - 10) < 0.011, 'ekip şefi fazlalığı yalnız AABT\'ye: ' + o3.get('ke') + ' / ' + o3.get('sy')); }
 console.log('çekirdek testleri geçti');
+// Sürüm 13.56: branş dağıtımı en iyi akışla; fazlalık ATT'de kalır, AABT'de değil; boşluk en az
+{ const r = C.akis({dok: 31, ka: 40, sy: 40}, {es: 31, ysp: 31, sur: 31}, false);
+  assert.deepStrictEqual(r.rem, {es: 0, ysp: 0, sur: 0}); assert.strictEqual(r.fazla.ka, 0); assert.strictEqual(r.fazla.sy, 18);
+  const r2 = C.akis({ka: 20, ysp: 40, sy: 30}, {es: 31, ysp: 31, sur: 31}, true); assert.strictEqual(r2.rem.es + r2.rem.ysp + r2.rem.sur, 3); assert.strictEqual(r2.rem.sur, 0);
+  console.log('akış testleri geçti'); }

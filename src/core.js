@@ -215,9 +215,11 @@ const APCore = (() => {
     // Mod 'fazla' (fazla mesaili): kişilere azami nöbete kadar fazla nöbet yazılacağı kabul edilir; personel yalnızca fazla nöbetle de kapanmayan açık bir kişiyi dolduruyorsa önerilir.
     // Mod verilmezse (ya da 'mesai'): açık, herkes yalnız hedef nöbetini tuttuğunda hesaplanır.
     const hedefAcik = unmetH, fazlaMod = a.mod === 'fazla', acikEf = fazlaMod ? unmetA : unmetH, ihtiyacKisi = tam > 0 ? Math.floor(acikEf / tam + EPS) : 0;
-    const fazlaEf = fazlaMod ? r2(toplam(A.fazla)) : fazlaH;
+    // fazla: herkes yalnız mesaisi kadar (hedef) tutsa bile nöbet branşlarına sığmayan nöbet → bu kişiler mesaisini tamamlayamaz (657: doktor / AABT / ATT eksik mesaide kalamaz).
+    // Azami ile hesaplanan "fazla" (fazla mesaiden artan) mesai eksiği değildir, sayılmaz. İşçi eksik mesaide kalabilir: memur fazlası ayrıca verilir.
+    const fazlaEf = fazlaH, fazlaMemur = r2(fazlaH - (H.fazla.isci || 0));
     const ihtiyacTur = hedefAcik <= EPS ? 'yok' : (fazlaMod && unmetA <= EPS) ? 'icerde' : ihtiyacKisi >= 1 ? 'oner' : unmetA <= EPS ? 'icerde' : 'elle';
-    return {gun, ihtiyac, satir, gruplar, kapasite, azamiKap, fark: r2(fazlaH - unmetH), fazlaH, farkAzami: unmetA > EPS ? -unmetA : r2(azamiKap - ihtiyac), durum, tamHedef: tam, hedefAcik, acikEf: r2(acikEf), fazlaEf, fazlaGrupEf: fazlaMod ? A.fazla : H.fazla, fazlaVar: fazlaMod ? fazlaEf > EPS : durum === 'fazla', acikM: fazlaMod ? A.rem : H.rem, ihtiyacKisi, kalanAcik: r2(acikEf - ihtiyacKisi * tam), ihtiyacTur,
+    return {gun, ihtiyac, satir, gruplar, kapasite, azamiKap, fark: r2(fazlaH - unmetH), fazlaH, farkAzami: unmetA > EPS ? -unmetA : r2(azamiKap - ihtiyac), durum, tamHedef: tam, hedefAcik, acikEf: r2(acikEf), fazlaEf, fazlaMemur, fazlaGrupEf: H.fazla, fazlaVar: fazlaEf > EPS, acikM: fazlaMod ? A.rem : H.rem, ihtiyacKisi, kalanAcik: r2(acikEf - ihtiyacKisi * tam), ihtiyacTur,
       slot: {dem, hedef: H, azami: A, supH, supA}, acik: H.rem, attEs};
   }
   // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
@@ -228,14 +230,31 @@ const APCore = (() => {
   const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (ekip şefi + YSP + sürücü)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
   // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) nöbet branşları doldurur; ATT geri kalan nöbet branşları doldurur.
   // Böylece AABT'nin hedef nöbetleri tam kullanılır, fazlalık ATT'de görünür (bir ATT bir ay dışarı çıkabilir).
+  // Nöbet branşlarına dağıtım en iyi akışla yapılır (boş kalan en az olur; basit sıra bir branşı yanlışlıkla açık, öbürünü fazla gösteriyordu — Sürüm 13.56).
+  // Öncelik nöbet listesiyle aynı: önce sürücü, sonra ekip şefi (doktor / AABT), ATT ekip şefine yalnız doktorsuz ekipte ve onlar yetmezse, en son YSP.
+  // Gruplar sırayla kullanılır (doktor, işçi, AABT, sonra ATT): fazlalık önce ATT'de kalır.
   function akis(sup, dem, attEs) {
-    const rem = {...dem}, fill = {}, fazla = {}, YT = attEs ? YETENEK_ES : YETENEK;
-    GRUPLAR.forEach(g => {
-      let k = sup[g] || 0; fill[g] = {es: 0, ysp: 0, sur: 0};
-      for (const s of YT[g]) { if (k <= 1e-9) break; const u = Math.min(k, Math.max(0, rem[s])); fill[g][s] += u; rem[s] -= u; k -= u; }
-      fazla[g] = Math.max(0, k);
-    });
-    ['es', 'ysp', 'sur'].forEach(s => { rem[s] = Math.round(rem[s] * 100) / 100; });
+    const B = ['es', 'ysp', 'sur'], n = 2 + GRUPLAR.length + 3, gi = g => 2 + GRUPLAR.indexOf(g), bi = s => 2 + GRUPLAR.length + B.indexOf(s), EPS = 1e-9;
+    const C = Array.from({length: n}, () => new Array(n).fill(0)), F = Array.from({length: n}, () => new Array(n).fill(0));
+    GRUPLAR.forEach(g => { C[0][gi(g)] = Math.max(0, sup[g] || 0); YETENEK[g].forEach(s => { C[gi(g)][bi(s)] = 1e9; }); });
+    const yol = bas => {      // bas grubundan başlayan artırma yolu (diğer grupların ataması yeniden yönlenebilir)
+      for (;;) {
+        const par = new Array(n).fill(-1); par[0] = 0; par[gi(bas)] = 0; const q = [gi(bas)];
+        if (C[0][gi(bas)] - F[0][gi(bas)] <= EPS) return;
+        while (q.length && par[1] < 0) { const u = q.shift(); for (let v = 1; v < n; v++) if (par[v] < 0 && C[u][v] - F[u][v] > EPS) { par[v] = u; q.push(v); } }
+        if (par[1] < 0) return;
+        let f = C[0][gi(bas)] - F[0][gi(bas)]; for (let v = 1; v !== gi(bas); v = par[v]) f = Math.min(f, C[par[v]][v] - F[par[v]][v]);
+        for (let v = 1; v !== gi(bas); v = par[v]) { F[par[v]][v] += f; F[v][par[v]] -= f; }
+        F[0][gi(bas)] += f; F[gi(bas)][0] -= f;
+      }
+    };
+    for (const faz of [['sur'], ['es'], ['attEs'], ['ysp']]) {
+      faz.forEach(s => { if (s === 'attEs') { if (attEs) ['ysp', 'sy'].forEach(g => { C[gi(g)][bi('es')] = 1e9; }); } else C[bi(s)][1] = Math.max(0, dem[s] || 0); });
+      GRUPLAR.forEach(yol);
+    }
+    const fill = {}, fazla = {}, rem = {};
+    GRUPLAR.forEach(g => { fill[g] = {es: 0, ysp: 0, sur: 0}; B.forEach(s => { fill[g][s] = Math.max(0, F[gi(g)][bi(s)]); }); fazla[g] = Math.max(0, (sup[g] || 0) - F[0][gi(g)]); });
+    B.forEach(s => { rem[s] = Math.round(((dem[s] || 0) - Math.max(0, F[bi(s)][1])) * 100) / 100; });
     return {fill, rem, fazla};
   }
   // Önerilen planlanan nöbet: önce hedef nöbetlerle yuvalar doldurulur (fazla gruplar orantılı azalır), açık kalırsa azami sınıra kadar ek nöbet yazılır
