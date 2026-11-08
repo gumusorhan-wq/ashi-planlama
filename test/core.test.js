@@ -121,7 +121,7 @@ const attS = (n, id) => mk(n, id, 'memur', 'Sağlık Memuru').map(k => ({...k, r
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri'}, esk), 'ke');
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri', rolSay: {es: 50, ysp: 50, sur: 0}}, esk), 'ke');
   assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'Sağlık Teknikeri', rolSay: {es: 40, ysp: 30, sur: 30}}, esk), 'ka');
-  assert.deepStrictEqual(C.YETENEK.ke, ['es', 'ysp', 'sur']); }
+  assert.deepStrictEqual(C.YETENEK.ke, ['es', 'ysp']); }
 // ASOS izin bitişi dönüş günüdür (dahil değil): 14.10–01.11 Kasım mesaisini etkilemez; elle girilen tarihli izinde bitiş dahildir
 { const D = C.DURUM_VARSAYILAN, k = (iz) => ({sinif: 'memur', durum: '', izin: [iz]});
   const tam = C.kisiMesai({sinif: 'memur', durum: '', izin: []}, 2026, 11, {}, D);

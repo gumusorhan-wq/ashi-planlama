@@ -153,27 +153,47 @@
   }
 
   // ---- nöbet listesi ----
+  // Liste durumu: boş nöbet (kadro yetmiyor) ve kural ihlalleri ayrı ayrı; nöbet sayısı farkı bilgi olarak
+  // Listede boş kalanlar (herkesin aynı şekilde okuyacağı tek sayım): ekip şefi / YSP boş gün, sürücü boş gün (24 saat) ve boş 12 saatlik vardiya
+  function n2Bosluk(L, N) {
+    const o = {es: 0, ysp: 0, sur: 0, surYari: 0}; if (!L) return o;
+    for (let g = 1; g <= N; g++) { const x = L[g]; if (!x) continue; if (x.es == null) o.es++; if (x.ysp == null) o.ysp++;
+      if (x.sur == null) { const y = (x.surG == null) + (x.surA == null); if (y === 2) o.sur++; else if (y === 1) o.surYari++; } }
+    o.toplam = o.es + o.ysp + o.sur + o.surYari; return o;
+  }
+  const n2BoslukYazi = o => [o.es ? `Ekip şefi ${o.es} gün` : '', o.ysp ? `YSP ${o.ysp} gün` : '', o.sur ? `Sürücü ${o.sur} gün (24 saat)` : '', o.surYari ? `Sürücü ${o.surYari} vardiya (12 saat)` : ''].filter(Boolean).join(' · ');
+  function n2DurumYazi(d, L, N) {
+    const bo = n2Bosluk(L, N), bos = bo.toplam, ih = Object.entries(d.say).filter(([t]) => t !== 'adet' && t !== 'eksik');
+    return [bos ? `<span style="color:var(--ap-bad)"><b>Boş: ${n2BoslukYazi(bo)}</b></span>` : '<span style="color:var(--ap-ok)"><b>Boş nöbet yok</b></span>',
+      ih.length ? `Kural ihlali: ${ih.map(([t, n]) => `${IHLAL_AD[t]} <b>${n}</b>`).join(' · ')} <button class="ap-btn sm" data-act="n2-sekme" data-v="denetim">Denetim ve öneriler</button>` : '<span style="color:var(--ap-ok)"><b>Kural ihlali yok</b></span>',
+      d.say.adet ? `<span class="ap-note">Hedefinden farklı nöbet yazılan kişi: ${d.say.adet}</span>` : ''].filter(Boolean).join(' · ');
+  }
   const n2Ad = (G, id) => { const k = G.girdi.kisiler.find(x => x.id === id); return k ? k.ad : ''; };
   function n2ListeHtml(b) {
     const {G, H, L, d} = n2Deneti(b), dp = n2Depo(b.ad), N = H.N, duz = n2Duz(), ks = G.girdi.kisiler, K = G.kural, kap = NC.kapasiteAnalizi(G.girdi, G.kural);
     const hata = new Map(); d.ihlal.forEach(i => { const a = `${i.gun}|${i.kisi == null ? '' : i.kisi}`; hata.set(a, (hata.get(a) || '') + i.mesaj + '\n'); if (i.yuva) hata.set(`${i.gun}||${i.yuva}`, i.mesaj); });
-    const secenek = (yuva, tip, sec) => `<option value=""></option>` + ks.filter(k => (k.grup === 'isci') === (tip === 'surG' || tip === 'surA') && ((H.byId.get(k.id) || {}).yet || NC.YETENEK[k.grup] || []).includes(yuva)).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
-    const hucre = (gun, tip) => { const yuva = tip === 'surG' || tip === 'surA' ? 'sur' : tip, id = L[gun][tip], e = (id != null && hata.get(`${gun}|${id}`)) || (id == null && hata.get(`${gun}||${yuva}`) && (tip === 'sur' || tip === 'es' || tip === 'ysp') ? 'Boş' : '');
-      const bl = L[gun].bol && L[gun].bol[tip];
-      const bolHtml = bl ? `<div class="ap-note n2bol" title="İzin / rapor dönüşü: aynı gün dönen iki kişi bu nöbeti böler (saatine göre kısmi nöbet sayılır)">+ ${esc(n2Ad(G, bl.id))} <select class="ap-sel" data-n2="bol" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'}>${[[12, '12/12'], [8, '16/8 (sonra 8 sa)'], [16, '8/16 (sonra 16 sa)'], ['', 'bölmeyi kaldır']].map(([v, t]) => `<option value="${v}" ${String(v) === String(bl.saat) ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : '';
-      return `<td class="${e ? 'n2e' : ''}" title="${esc(e)}"><select class="ap-sel n2s" data-n2="hucre" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'}>${secenek(yuva, tip, id)}</select>${bolHtml}</td>`; };
+    // seçenekler: 12 saatlik sürücü vardiyasına işçi ve sürücülüğü doğrulanmış AABT / ATT; 24 saatlik branşlara işçi dışındakiler (yeteneğine göre). Yazılı kişi her durumda görünür.
+    const secenek = (yuva, tip, sec, bosYazi) => `<option value="">${bosYazi || ''}</option>` + ks.filter(k => k.id === sec || (((H.byId.get(k.id) || {}).yet || NC.YETENEK[k.grup] || []).includes(yuva) && (tip === 'surG' || tip === 'surA' || k.grup !== 'isci'))).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
+    const saatYaz = h => C.pad((9 + h) % 24) + ':00';
+    const hucre = (gun, tip) => { const yuva = tip === 'surG' || tip === 'surA' ? 'sur' : tip, id = L[gun][tip]; let e = (id != null && hata.get(`${gun}|${id}`)) || (id == null && hata.get(`${gun}||${yuva}`) && (tip === 'sur' || tip === 'es' || tip === 'ysp') ? 'Boş' : '');
+      const bl = L[gun].bol && L[gun].bol[tip], ilk = bl ? 24 - bl.saat : 24;
+      // bölünmüş nöbet: üstteki kişi 09:00'dan, alttaki kişi devamını tutar. Sürücü 12 saatiyle birleşen parça (12 + 12 = 24 saat) ayrıca belirtilir.
+      const kombi = bl && bl.saat === 12 && (tip === 'es' || tip === 'ysp') && ((L[gun].surA != null && L[gun].surA === id) || (L[gun].surG != null && L[gun].surG === bl.id));
+      const bolHtml = bl ? `<div class="ap-note n2bol" title="${kombi ? 'Bu kişi aynı gün sürücünün diğer 12 saatini de tutar (toplam 24 saat).' : 'Nöbet iki kişi arasında bölünür; saatine göre kısmi nöbet sayılır.'}">${saatYaz(ilk)}–09:00 <b>${esc(n2Ad(G, bl.id))}</b>${kombi ? ' (sürücüyle birleşik)' : ''} <select class="ap-sel" data-n2="bol" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'} aria-label="Bölme">${[[12, '12 + 12 saat'], [8, '16 + 8 saat'], [16, '8 + 16 saat'], ['', 'bölmeyi kaldır']].map(([v, t]) => `<option value="${v}" ${String(v) === String(bl.saat) ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : '';
+      const sur24Var = tip === 'sur' && (L[gun].surG != null || L[gun].surA != null), yariBos = (tip === 'surG' || tip === 'surA') && id == null && L[gun].sur == null && L[gun][tip === 'surG' ? 'surA' : 'surG'] != null;
+      const bosYazi = (e === 'Boş' && !sur24Var) || yariBos ? '— BOŞ —' : ''; if (yariBos && !e) e = 'Boş: sürücünün bu 12 saati yazılmadı';
+      return `<td class="${e && !sur24Var ? 'n2e' : ''}" title="${esc(e)}">${bl ? `<span class="ap-note">09:00–${saatYaz(ilk)}</span> ` : ''}<select class="ap-sel n2s" data-n2="hucre" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'} aria-label="${gun}. gün ${tip}">${secenek(yuva, tip, id, bosYazi)}</select>${bolHtml}</td>`; };
     const sat = [...Array(N)].map((_, i) => { const g = i + 1, w = new Date(Date.UTC(S.y, S.m - 1, g)).getUTCDay(); return `<tr class="${w === 0 || w === 6 ? 'hs' : ''} ${(G.girdi.tatil || []).includes(g) ? 'tt' : ''}"><td class="num">${g}</td><td>${GUN_AD[w]}</td>${hucre(g, 'es')}${hucre(g, 'ysp')}${hucre(g, 'sur')}${ks.some(k => k.grup === 'isci') ? hucre(g, 'surG') + hucre(g, 'surA') : ''}</tr>`; }).join('');
-    const sayim = ks.map(k => { let a = 0, y = 0; for (let g = 1; g <= N; g++) { const B = L[g].bol || {}; ['es', 'ysp', 'sur'].forEach(t => { if (L[g][t] === k.id) a += B[t] ? (24 - B[t].saat) / 24 : 1; if (B[t] && B[t].id === k.id) a += B[t].saat / 24; }); } for (let g = 1; g <= N; g++) ['surG', 'surA'].forEach(t => { if (L[g][t] === k.id) y++; }); return {k, birim: Math.round((a + y / 2) * 100) / 100, hedef: (k.adet || 0) + (k.yarim || 0) / 2}; });
-    const ozetIh = Object.entries(d.say).filter(([t]) => t !== 'adet').map(([t, n]) => `${IHLAL_AD[t]}: <b>${n}</b>`).join(' · ');
+    const sayim = ks.map(k => { let a = 0, y = 0; for (let g = 1; g <= N; g++) { const B = L[g].bol || {}; ['es', 'ysp', 'sur'].forEach(t => { if (L[g][t] === k.id) a += B[t] ? (24 - B[t].saat) / 24 : 1; if (B[t] && B[t].id === k.id) a += B[t].saat / 24; }); } for (let g = 1; g <= N; g++) ['surG', 'surA'].forEach(t => { if (L[g][t] === k.id) y++; }); return {k, birim: Math.round((a + y / 2) * 100) / 100, hedef: k.grup === 'isci' ? (k.yarim || 0) / 2 : Math.round((k.planlanan != null ? k.planlanan : k.adet || 0) * 100) / 100}; });      // hedef: işçi yazılabilecek vardiya; diğerleri planlanan (küsurat bölünmüş nöbetle)
     const kisiGoruntu = S.n2.gorunum === 'kisi';
     const kisiTablo = () => {
       const bas = [...Array(N)].map((_, i) => `<th class="n2d">${i + 1}</th>`).join('');
       return `<div class="ap-tw"><table class="ap-t n2"><thead><tr><th style="text-align:left">Personel</th>${bas}<th>Liste</th><th>Hedef</th></tr></thead><tbody>${sayim.map(({k, birim, hedef}) => {
-        const p = H.byId.get(k.id), c = [...Array(N)].map((_, i) => { const g = i + 1; let x = ''; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (L[g][t] === k.id) x = NC.KOD[t] + (L[g].bol && L[g].bol[t] ? '½' : ''); if (L[g].bol && L[g].bol[t] && L[g].bol[t].id === k.id) x = NC.KOD[t] + '½'; }); return `<td class="n2c ${x ? 'nb' : p.izin.has(g) ? 'iz' : p.istek.has(g) ? 'is' : ''}">${x || (p.izin.has(g) ? 'İ' : p.istek.has(g) ? '✕' : '')}</td>`; }).join('');
-        return `<tr><td class="n2n">${esc(k.ad)}</td>${c}<td class="num"><b>${fmt(birim)}</b></td><td class="num ${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(hedef)}</td></tr>`; }).join('')}</tbody></table></div><p class="ap-note">E: ekip şefi · Y: YSP · S: sürücü (24 sa.) · G: sürücü gündüz · A: sürücü gece (12 sa. işçi)</p>`; };
+        const p = H.byId.get(k.id), c = [...Array(N)].map((_, i) => { const g = i + 1; const xs = []; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (L[g][t] === k.id) xs.push(NC.KOD[t] + (L[g].bol && L[g].bol[t] ? '½' : '')); if (L[g].bol && L[g].bol[t] && L[g].bol[t].id === k.id) xs.push(NC.KOD[t] + '½'); }); const x = xs.join('+'); return `<td class="n2c ${x ? 'nb' : p.izin.has(g) ? 'iz' : p.istek.has(g) ? 'is' : ''}">${x || (p.izin.has(g) ? 'İ' : p.istek.has(g) ? '✕' : '')}</td>`; }).join('');
+        return `<tr><td class="n2n">${esc(k.ad)}</td>${c}<td class="num"><b>${fmt(birim)}</b></td><td class="num ${Math.abs(birim - hedef) > 0.05 ? 'n2e' : ''}">${fmt(hedef)}</td></tr>`; }).join('')}</tbody></table></div><p class="ap-note">E: ekip şefi · Y: YSP · S: sürücü (24 saat) · G: sürücü gündüz 09:00–21:00 · A: sürücü gece 21:00–09:00 · ½: bölünmüş nöbet (12 saat ya da saatine göre)</p>`; };
     const lSek = [['liste', 'Nöbet listesi'], ['kisi', 'Kişi başına nöbet']], la = lSek.some(x => x[0] === S.n2.altSekme) ? S.n2.altSekme : 'liste';
     const lNav = `<div class="ap-subnav ap-noprint">${lSek.map(([v, t]) => `<button class="${la === v ? 'on' : ''}" data-act="n2-alt" data-v="${v}">${t}</button>`).join('')}</div>`;
-    const lKisi = `<div class="ap-card"><h2>Kişi başına nöbet</h2>${tabloHtml(['Personel', 'Branş', 'Hedef', 'Listede'], sayim.map(({k, birim, hedef}) => [esc(k.ad), k.brans || '', hedef, `<span class="${Math.abs(birim - hedef) > 0.01 ? 'n2e' : ''}">${fmt(birim)}</span>`]))}</div>`;
+    const lKisi = `<div class="ap-card"><h2>Kişi başına nöbet</h2>${tabloHtml(['Personel', 'Branş', 'Hedef', 'Listede'], sayim.map(({k, birim, hedef}) => [esc(k.ad), k.brans || '', hedef, `<span class="${Math.abs(birim - hedef) > 0.05 ? 'n2e' : ''}">${fmt(birim)}</span>`]))}</div>`;
     const oncSay = Object.keys(G.girdi.onceki || {}).length, oncNot = `<p class="ap-note" style="margin:0 0 6px">${S.onceNobet && Object.values(S.onceNobet.nobet || {}).some(x => x && x.liste) ? `Önceki ayın son 5 günündeki nöbetler dinlenme ve gün aşırı kurallarında dikkate alınır (bu istasyonda ${oncSay} kişi).` : 'Önceki ayın nöbet listesi bu programda yok; ayın ilk günlerinde önceki ay nöbetlerini kontrol edin.'}</p>`;
     const lListe = `<div class="ap-card"><h2>Otomatik nöbet listesi</h2>${oncNot}
       <div class="ap-row"><label class="ap-note">İki nöbet arası en az <input class="ap-in n" type="number" min="0" max="5" data-n2="kural" data-k="minAra" value="${K.minAra}"> gün boş</label>
@@ -185,9 +205,9 @@
       <button class="ap-btn" data-act="n2-liste-temizle" ${duz && dp.liste ? '' : 'disabled'}>Listeyi temizle</button>
       <button class="ap-btn" data-act="n2-excel" ${dp.liste ? '' : 'disabled'}>Excel çıktısı</button>
       <span class="ap-sp"></span><button class="ap-btn ${kisiGoruntu ? '' : 'pri'}" data-act="n2-gorunum" data-v="yuva">Gün görünümü</button><button class="ap-btn ${kisiGoruntu ? 'pri' : ''}" data-act="n2-gorunum" data-v="kisi">Kişi görünümü</button></div>
-      ${kap.toplam > 0 ? `<div class="ap-note" style="margin-top:8px;color:var(--ap-bad)"><b>Bu kadroyla ${fmt(kap.toplam)} nöbet boş kalacak:</b> ${Object.entries(kap.bos).map(([k, n]) => `${NC.YUVA_AD[k]} nöbet branşında ${n}`).join(', ')}. O nöbet branşını tutabilecek yeterli personel yok (ekip şefi: doktor/AABT; sürücü: işçi ya da sürücü teyitli AABT/ATT). Personel isteyin ya da Modül 1'de kişilerin nöbet branşlarını gözden geçirin.</div>` : ''}
-      <div style="margin-top:8px">${dp.liste ? `Ceza puanı <b>${fmt(d.toplam)}</b> · ${ozetIh || '<span style="color:var(--ap-ok)"><b>Hiç kural ihlali yok</b></span>'} ${d.say.adet ? `· Nöbet sayısı farkı olan kişi: <b>${d.say.adet}</b>` : ''}` : '<span class="ap-note">Henüz liste yok. Önce istek takvimini doldurun, sonra butona basın.</span>'}</div></div>
-      <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 sa.)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz (12)</th><th>Sürücü gece (12)</th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>`;
+      ${kap.toplam > 0 ? `<div class="ap-ek ap-ek-c" style="margin-top:8px"><b>Kadro yetmiyor${dp.liste ? '' : `: yaklaşık ${fmt(kap.toplam)} nöbet boş kalacak (${Object.entries(kap.bos).map(([k, n]) => `${NC.YUVA_AD[k]} ${n} gün`).join(', ')})`}.</b> Kimseye mesaisinden / azami nöbetinden fazla nöbet yazılmaz; boş nöbetler listede <b>— BOŞ —</b> olarak kalır. Planlamadan personel isteyin. (Ekip şefi: doktor / AABT · sürücü: işçi ya da sürücülüğü doğrulanmış AABT / ATT.)</div>` : ''}
+      <div id="ap-n2-ilerleme" style="margin-top:8px">${dp.liste ? n2DurumYazi(d, L, N) : '<span class="ap-note">Henüz liste yok. Önce istek takvimini doldurun, sonra <b>Otomatik nöbet listesi oluştur</b> düğmesine basın.</span>'}</div></div>
+      <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 saat)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz<br><span class="ap-note">09:00–21:00</span></th><th>Sürücü gece<br><span class="ap-note">21:00–09:00</span></th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>`;
     return lNav + (la === 'kisi' ? lKisi : lListe);
   }
 
@@ -217,9 +237,11 @@
   }
   function n2Excel(b) {
     const {G, H, L} = n2Deneti(b), N = H.N, wb = XLSX.utils.book_new(), ad = id => (id == null ? '' : n2Ad(G, id));
-    const g = [['Gün', 'Tarih', 'Ekip şefi', 'YSP', 'Sürücü (24 sa.)', 'Sürücü gündüz', 'Sürücü gece']];
-    const hc = (i, t) => { const b = L[i].bol && L[i].bol[t]; return b ? `${ad(L[i][t])} (${24 - b.saat} sa) / ${ad(b.id)} (${b.saat} sa)` : ad(L[i][t]); };
-    for (let i = 1; i <= N; i++) g.push([i, `${C.pad(i)}.${C.pad(S.m)}.${S.y}`, hc(i, 'es'), hc(i, 'ysp'), hc(i, 'sur'), ad(L[i].surG), ad(L[i].surA)]);
+    const g = [['Gün', 'Tarih', 'Ekip şefi', 'YSP', 'Sürücü (24 saat)', 'Sürücü gündüz 09:00–21:00', 'Sürücü gece 21:00–09:00']];
+    const sa = h => C.pad((9 + h) % 24) + ':00';
+    const hc = (i, t) => { const b = L[i].bol && L[i].bol[t]; if (L[i][t] == null) return t === 'sur' && (L[i].surG != null || L[i].surA != null) ? '' : 'BOŞ'; return b ? `${ad(L[i][t])} (09:00–${sa(24 - b.saat)}) / ${ad(b.id)} (${sa(24 - b.saat)}–09:00)` : ad(L[i][t]); };
+    const yari = (i, t) => L[i][t] != null ? ad(L[i][t]) : L[i].sur == null && (L[i].surG != null || L[i].surA != null) ? 'BOŞ' : '';
+    for (let i = 1; i <= N; i++) g.push([i, `${C.pad(i)}.${C.pad(S.m)}.${S.y}`, hc(i, 'es'), hc(i, 'ysp'), hc(i, 'sur'), yari(i, 'surG'), yari(i, 'surA')]);
     // hafta sonu: turuncu, resmî tatil / bayram: kırmızı tonu (hem gün listesinde hem kişi listesinde)
     const tatil = new Set(G.girdi.tatil || []), renk = d => tatil.has(d) ? 'F8B4B4' : (H.ozel[d] ? 'FDD9A0' : null);
     const boya = (ws, r, c1, c2, rgb) => { for (let c = c1; c <= c2; c++) { const a = XLSX.utils.encode_cell({r, c}); if (!ws[a]) ws[a] = {t: 's', v: ''}; ws[a].s = {fill: {patternType: 'solid', fgColor: {rgb}}}; } };
@@ -227,7 +249,7 @@
     XLSX.utils.sheet_add_aoa(wsG, [['Renkler: turuncu = hafta sonu · kırmızı = resmî tatil / bayram']], {origin: {r: N + 2, c: 0}});
     XLSX.utils.book_append_sheet(wb, wsG, 'Gün listesi');
     const k = [['Personel', ...[...Array(N)].map((_, i) => i + 1), 'Toplam']];
-    G.girdi.kisiler.forEach(p => { const r = [p.ad]; let t = 0; for (let i = 1; i <= N; i++) { let x = ''; const B = L[i].bol || {}; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(s => { if (L[i][s] === p.id) { x = NC.KOD[s] + (B[s] ? '½' : ''); t += s === 'surG' || s === 'surA' ? .5 : B[s] ? (24 - B[s].saat) / 24 : 1; } if (B[s] && B[s].id === p.id) { x = NC.KOD[s] + '½'; t += B[s].saat / 24; } }); r.push(x); } r.push(Math.round(t * 100) / 100); k.push(r); });
+    G.girdi.kisiler.forEach(p => { const r = [p.ad]; let t = 0; for (let i = 1; i <= N; i++) { const x = []; const B = L[i].bol || {}; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(s => { if (L[i][s] === p.id) { x.push(NC.KOD[s] + (B[s] ? '½' : '')); t += s === 'surG' || s === 'surA' ? .5 : B[s] ? (24 - B[s].saat) / 24 : 1; } if (B[s] && B[s].id === p.id) { x.push(NC.KOD[s] + '½'); t += B[s].saat / 24; } }); r.push(x.join('+')); } r.push(Math.round(t * 100) / 100); k.push(r); });
     const wsK = XLSX.utils.aoa_to_sheet(k); for (let d = 1; d <= N; d++) { const rg = renk(d); if (rg) boya(wsK, 0, d, d, rg), k.forEach((_, ri) => { if (ri) boya(wsK, ri, d, d, rg); }); }
     XLSX.utils.book_append_sheet(wb, wsK, 'Kişi listesi');
     xlsxIndir(wb, `${b.ad}-Nobet-Listesi-${S.y}-${C.pad(S.m)}.xlsx`);
@@ -314,7 +336,9 @@
         const dp = n2Depo(b.ad); if (dp.liste && !(await onay('Mevcut liste yeni oluşturulan listeyle değiştirilecek. Devam edilsin mi?'))) break;
         if (!n2Duz()) { toast('Düzenleme yetkiniz yok / ay kilitli.'); break; }
         S.n2.calisiyor = true; render(); await new Promise(r => setTimeout(r, 40));
-        try { const G = n2Girdi(b), r = NC.uret(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 12000, seed: (Date.now() % 100000) + 1}); mut2(() => { dp.liste = r.liste; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.zorlandi ? ' (zorlandı)' : ''}`); toast(r.ceza === 0 ? 'Liste oluşturuldu: kural ihlali yok.' : r.sert === 0 ? `Liste oluşturuldu: boş yuva ve sert kural ihlali yok${r.zorlandi ? ' (zorlanarak)' : ''}; ${r.ihlal.length} küçük sapma (nöbet sayısı vb.) kaldı. Denetim sekmesine bakın.` : `Liste oluşturuldu; ${r.sert} sert ihlal kaldı (kadro bu kuralları sağlamaya yetmiyor olabilir). Denetim sekmesine bakın.`); }
+        const ilerle = x => { const el = root.querySelector('#ap-n2-ilerleme'); if (el) el.innerHTML = `<div class="ap-note">Liste oluşturuluyor… %${Math.round(x.oran * 100)} (${x.deneme}. deneme)</div><div style="height:6px;background:var(--ap-line);margin-top:4px"><div style="height:6px;width:${Math.round(x.oran * 100)}%;background:var(--ap-pri, #0055A4);transition:width .2s"></div></div>`; };
+        try { const G = n2Girdi(b), r = await NC.uretAsync(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 8000, seed: (Date.now() % 100000) + 1}, ilerle); mut2(() => { dp.liste = r.liste; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.bos ? ` · ${r.bos} boş` : ''}`);
+          toast([r.bos ? `${r.bos} nöbet boş kaldı (kadro yetmiyor; personel isteyin).` : 'Tüm nöbetler dolu.', r.sert ? `${r.sert} kural ihlali kaldı; Denetim ve öneriler sekmesine bakın.` : 'Kural ihlali yok.'].join(' ')); }
         finally { S.n2.calisiyor = false; }
         break;
       }

@@ -185,13 +185,13 @@ const APCore = (() => {
       const h = hedefNobet(mesai, k.sinif, !!dt.nobetYok || !!dt.disarida, ayar);
       return {k, mesai, hedef: h.birim, hedefAdet: h.adet, nobetYok: !!dt.nobetYok};
     });
-    // Azami nöbet: memur/doktor tam ay hedefinin üstüne azamiMemur'a kadar (ör. Kasım: hedef 7, azami 8); izinli kişide hedef + aynı ek; işçi: hedef + isciEk × 0,5
+    // Azami nöbet: memur/doktor tam ay hedefinin üstüne azamiMemur'a kadar (ör. Kasım: hedef 7, azami 8); izinli kişide hedef + aynı ek; işçi: hedef (mesaisinin üstüne yazılmaz)
     const a = ayar || {}, azamiMemur = a.azamiMemur || 0, tam = hedefNobet(ayMesai(y, m, false, ozel), 'memur', false, a).birim, ek = Math.max(0, azamiMemur - tam);
     satir.forEach(s => {
       const dz = (durumlar || {})[s.k.durum] || {}, fazlaYok = dz.fazlaYok != null ? !!dz.fazlaYok : s.k.durum === 'YARI ZAMANLI';      // yarı zamanlı yalnız kendi mesaisi kadar, fazla nöbet yazılmaz
-      s.azami = s.nobetYok || !(s.hedef > 0) ? 0 : fazlaYok ? s.hedef : (s.k.sinif === 'isci' ? s.hedef + (a.isciEk || 0) * ADIM : Math.min(Math.max(azamiMemur, s.hedef), s.hedef + ek));
+      s.azami = s.nobetYok || !(s.hedef > 0) ? 0 : fazlaYok ? s.hedef : (s.k.sinif === 'isci' ? s.hedef : Math.min(Math.max(azamiMemur, s.hedef), s.hedef + ek));
     });
-    // Yuva yetenekleri: doktor → ekip şefi; işçi → sürücü; AABT (sağlık teknikeri) → ekip şefi + YSP + sürücü; ATT (sağlık memuru / teknisyeni) → YSP + sürücü
+    // Yuva yetenekleri: doktor → ekip şefi; işçi → sürücü (12 saat); AABT (sağlık teknikeri) → ekip şefi + YSP (sürücülüğü nöbet kayıtlarından doğrulanmışsa + sürücü); ATT (sağlık memuru / teknisyeni) → YSP (sürücülüğü doğrulanmışsa + sürücü)
     // (nöbet kayıtlarında ekip şefi olarak görev almışsa ekip şefi + YSP; yalnızca YSP olarak çalışıyorsa YSP).
     const esik = {sur: (a.surEsik == null ? 70 : a.surEsik) / 100, degil: (a.surDegilEsik == null ? 15 : a.surDegilEsik) / 100};
     satir.forEach(s => { s.kadroTip = kadroTip(s.k); s.rol = rolBelirle(s.k, esik); s.grup = grupBelirle(s.k, esik, a); });
@@ -221,9 +221,9 @@ const APCore = (() => {
   // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
   // Ekip şefi nöbetlerini doktor ve AABT tutar; doktorlu olmayan ekipte ATT ekip şefi nöbet branşına en son takviye verebilir (attEs).
   const GRUPLAR = ['dok', 'isci', 'ke', 'ka', 'ysp', 'sy'];
-  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp', 'sur'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
+  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
   const YETENEK_ES = {...YETENEK, ysp: ['ysp', 'es'], sy: ['sur', 'ysp', 'es']};      // doktorsuz ekip: ATT ekip şefine takviye
-  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP + sürücü)', ka: 'AABT (sürücü öncelikli)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
+  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (ekip şefi + YSP + sürücü)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
   // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) nöbet branşları doldurur; ATT geri kalan nöbet branşları doldurur.
   // Böylece AABT'nin hedef nöbetleri tam kullanılır, fazlalık ATT'de görünür (bir ATT bir ay dışarı çıkabilir).
   function akis(sup, dem, attEs) {
