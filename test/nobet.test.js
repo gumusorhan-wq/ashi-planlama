@@ -59,4 +59,11 @@ assert.ok(!N.YETENEK.ke.includes('sur'));
   assert.strictEqual(z.bos, kp.gunSay, 'boş yuva sayısı kapasite açığına eşit: ' + z.bos + ' / ' + kp.gunSay); assert.strictEqual(z.sert, 0, 'boşluk dışında sert ihlal kalmamalı: ' + JSON.stringify(z.say)); }
 // işçi vardiyası memurlar için azaltılmaz: mesaisine en yakın (aşağı) kalır
 { const ks = [...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map(i => ({id: i, grup: 'ka', planlanan: 8, ust: 8})), {id: 11, grup: 'isci', planlanan: 8.5}]; N.adetHazirla(ks, 30); assert.strictEqual(ks.find(k => k.grup === 'isci').yarim, 17); }
+// doktorsuz ekip: AABT ekip şefine yetiyorsa ATT ekip şefine yazılmaz; yetmiyorsa ATT en son girer
+{ const ks = []; for (let i = 1; i <= 4; i++) ks.push(kisi(i, 'ke', 8)); for (let i = 5; i <= 8; i++) ks.push(kisi(i, 'sy', 8)); ks.push(kisi(9, 'ysp', 7));
+  const g = {y: 2026, m: 11, kisiler: ks, attEs: true}, r = N.uret(g, {seed: 4}); let att = 0; for (let d = 1; d <= 30; d++) if (r.liste[d].es >= 5) att++;
+  assert.strictEqual(att, 0, 'AABT yeterken ATT ekip şefine yazıldı: ' + att);
+  const ks2 = []; for (let i = 1; i <= 2; i++) ks2.push(kisi(i, 'ke', 8)); for (let i = 5; i <= 9; i++) ks2.push(kisi(i, 'sy', 8)); ks2.push(kisi(10, 'ysp', 8)); ks2.push(kisi(11, 'ysp', 8));
+  const r2 = N.uret({y: 2026, m: 11, kisiler: ks2, attEs: true}, {seed: 4}); let att2 = 0, aabt = 0; for (let d = 1; d <= 30; d++) { const e = r2.liste[d].es; if (e >= 5) att2++; else if (e != null) aabt++; }
+  assert.ok(aabt === 16 && att2 >= 10, 'AABT önce, ATT eksik kadar: AABT ' + aabt + ', ATT ' + att2); }
 console.log('nöbet çekirdek testleri geçti');
