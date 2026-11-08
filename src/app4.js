@@ -1,3 +1,5 @@
+// HUSER 13.45: hilalli ambulans simgesi (artı yerine ay; 112 ortak simgesiyle aynı çizim)
+const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='15' height='15' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true' style='vertical-align:-0.18em'><path d='M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2'/><path d='M19 18h2a1 1 0 0 0 1-1v-3.28a1 1 0 0 0-.684-.948l-1.923-.641a1 1 0 0 1-.578-.502l-1.539-3.076A1 1 0 0 0 16.382 8H14'/><path d='M9 18h6'/><path d='M9.573 8.057A2.5 2.5 0 1 0 9.573 11.943A2 2 0 1 1 9.573 8.057Z' fill='currentColor' stroke='none'/><circle cx='17' cy='18' r='2'/><circle cx='7' cy='18' r='2'/></svg>";
 
   // ================= MODÜL 1 — ARŞİV VE ARŞİV İSTATİSTİKLERİ =================
   const bransAd = k => k.sinif === 'doktor' ? 'Doktor' : k.sinif === 'isci' ? 'İşçi' : C.kadroTip(k);
@@ -274,18 +276,18 @@
       document.addEventListener('keydown', tus, true); root.appendChild(d); inp.focus(); inp.select();
     });
   }
-  // Tek istasyon seçen ortak panel — HUSER ortak istasyon seçicisi (IstasyonSeciciTek) görünümü: 🚑 düğme, ara, sayılı ilçe düğmeleri, liste.
+  // Tek istasyon seçen ortak panel — HUSER ortak istasyon seçicisi (IstasyonSeciciTek) görünümü: hilalli ambulans düğmesi, ara, sayılı ilçe düğmeleri, liste.
   // anahtar: seçimin nereye yazılacağı (arstat-tek-sec'te çözülür): 'ist', 'n2', 'gist', 'dist', 'rist', 'rh:<id>', 'f:<kayıtId>:<alan>'.
   // ops: {bos: 'Tümü' gibi boş değer satırı, ek: [[değer, yazı]] özel satırlar, kapali: düzenleme yok, kucuk: tablo içi düğme, yazi: düğme yazısı}
   // Panel ekranda sabit konumlanır (tablo kaydırma kutusu kesmesin); bkz. tekKonum().
   function istTekHtml(anahtar, secili, adlar, ops = {}) {
     const acik = S.arstatAc === 'tek-' + anahtar, q = C.TR(S.arstatAra || '').trim(), ilceSec = S.tekIlce || '', ek = ops.ek || [];
     const ekSec = ek.find(([v]) => v === secili), yazi = ops.yazi != null ? ops.yazi : secili ? (ekSec ? ekSec[1] : secili) : (ops.bos || '—');
-    if (!ops.bos && !ek.length && adlar.length <= 1 || ops.kapali) return `<span class="ap-tekad${ops.kucuk ? ' sm' : ''}">${ops.kucuk ? '' : '🚑 '}${esc(yazi)}</span>`;
+    if (!ops.bos && !ek.length && adlar.length <= 1 || ops.kapali) return `<span class="ap-tekad${ops.kucuk ? ' sm' : ''}">${ops.kucuk ? '' : AP_AMB + ' '}${esc(yazi)}</span>`;
     const gruplar = new Map(); adlar.forEach(a => { const k = C.ilceAdi(a), g = gruplar.get(k) || {ad: ilceGoster(a), n: 0}; g.n++; gruplar.set(k, g); });
     const gizle = a => (ilceSec && C.ilceAdi(a) !== ilceSec) || (q && !C.TR(a + ' ' + ilceGoster(a)).includes(q));
     const satir = (v, t, ozel) => `<button class="${v === (secili || '') ? 'sec' : ''}${ozel ? ' ozel' : ''}" data-pop data-act="arstat-tek-sec" data-k="${esc(anahtar)}" data-v="${esc(v)}" ${ozel ? 'data-ozel' : `data-ara="${esc(C.TR(t + ' ' + ilceGoster(t)))}" data-ilce="${esc(C.ilceAdi(t))}"`} ${!ozel && gizle(t) ? 'style="display:none"' : ozel && (q || ilceSec) ? 'style="display:none"' : ''}><i></i>${esc(t)}</button>`;
-    return `<div class="ap-popwrap"><button class="ap-btn ap-tekbtn${ops.kucuk ? ' sm' : ''}${secili ? ' dolu' : ''}" data-pop data-act="arstat-tek-pop" data-v="${esc(anahtar)}" title="${esc(yazi)}">${ops.kucuk ? '' : '🚑 '}<b>${esc(yazi)}</b> ▾</button>${acik ? `<div class="ap-pop ap-pop-ist ap-pop-tek" data-pop>
+    return `<div class="ap-popwrap"><button class="ap-btn ap-tekbtn${ops.kucuk ? ' sm' : ''}${secili ? ' dolu' : ''}" data-pop data-act="arstat-tek-pop" data-v="${esc(anahtar)}" title="${esc(yazi)}">${ops.kucuk ? '' : AP_AMB + ' '}<b>${esc(yazi)}</b> ▾</button>${acik ? `<div class="ap-pop ap-pop-ist ap-pop-tek" data-pop>
       <div class="ap-row" style="justify-content:space-between"><b class="ap-poph">İSTASYON SEÇ</b><span class="ap-note">${adlar.length} birim</span></div>
       <input class="ap-in w" id="ap-tek-ara" data-pop placeholder="İlçe veya istasyon ara…" value="${esc(S.arstatAra || '')}" autocomplete="off">
       ${gruplar.size > 1 ? `<div class="ap-chips">${[...gruplar.entries()].map(([k, g]) => `<button class="ap-chip ${ilceSec === k ? 'sec' : C.ilceAdi(secili || '') === k ? 'kis' : ''}" data-pop data-act="arstat-tek-ilce" data-v="${esc(k)}">${esc(g.ad)} (${g.n})</button>`).join('')}</div>` : ''}
