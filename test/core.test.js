@@ -150,3 +150,6 @@ console.log('çekirdek testleri geçti');
   assert.deepStrictEqual(r.rem, {es: 0, ysp: 0, sur: 0}); assert.strictEqual(r.fazla.ka, 0); assert.strictEqual(r.fazla.sy, 18);
   const r2 = C.akis({ka: 20, ysp: 40, sy: 30}, {es: 31, ysp: 31, sur: 31}, true); assert.strictEqual(r2.rem.es + r2.rem.ysp + r2.rem.sur, 3); assert.strictEqual(r2.rem.sur, 0);
   console.log('akış testleri geçti'); }
+// Sürüm 13.56: tarihsiz izin takvim günü — 5 → 5, 10 → 8, 15 → 11 iş günü (memur, Aralık 2026: 184 saat)
+{ const D = {}; const m = g => C.kisiMesai({sinif: 'memur', izin: [{gun: g, tur: 'YILLIK İZİN'}]}, 2026, 12, {}, D);
+  assert.strictEqual(m(5), 184 - 40); assert.strictEqual(m(10), 184 - 64); assert.strictEqual(m(15), 184 - 88); console.log('tarihsiz izin testleri geçti'); }

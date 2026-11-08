@@ -117,7 +117,11 @@ const APCore = (() => {
           const d = new Date(ms).toISOString().slice(0, 10);
           if (d.slice(0, 7) === `${y}-${pad(m)}`) gunler[d] = 1;
         }
-      } else if (Number(iz.gun) > 0) izinSaat += Number(iz.gun) * (isci ? MESAI.isci : MESAI.memur);
+      } else if (Number(iz.gun) > 0) {
+        // Sürüm 13.56 (09.11.2026): tarihsiz izin takvim günüdür; her 7 günde bir hafta sonu sayılır (5 → 5, 10 → 8, 15 → 11 iş günü). İşçi: yalnız pazar düşülmez (10 → 9)
+        const g = Number(iz.gun), hs = Math.floor(g / 7);
+        izinSaat += Math.max(0, g - (isci ? hs : 2 * hs)) * (isci ? MESAI.isci : MESAI.memur);
+      }
     });
     Object.keys(gunler).forEach(d => { izinSaat += gunSaat(d, isci, ozel); });
     let mesai = Math.max(0, tum - izinSaat);
