@@ -41,7 +41,14 @@ function mount(root, opts = {}) {
   try { S.yanDar = localStorage.getItem('ap_yan_dar') === '1'; } catch (er) { S.yanDar = false; }      // gömülü sol menü daraltılmış mı (bu tarayıcıda)
   const bugun = new Date(), sonraki = new Date(Date.UTC(bugun.getUTCFullYear(), bugun.getUTCMonth() + 1, 1));
   S.y = sonraki.getUTCFullYear(); S.m = sonraki.getUTCMonth() + 1;      // planlama bir sonraki ay içindir
+  // Sürüm 13.56: başka modüle gidip dönünce son açık sayfa / istasyon / ay / sekmeler korunur (oturum boyunca; çıkış ve yeni girişte ana uygulama siler)
+  const OTURUM_ANAHTAR = 'ap_oturum_v1';
+  try { const o = JSON.parse(sessionStorage.getItem(OTURUM_ANAHTAR) || 'null');
+    if (o && typeof o === 'object') { ['modul', 'sayfa', 'ist', 'gorevSekme', 'ozetSekme', 'rotSekme', 'arsivSekme', 'ayarSekme', 'altSekme'].forEach(k => { if (o[k] != null) S[k] = o[k]; });
+      if (o.n2) ['ist', 'sekme', 'gorunum', 'altSekme'].forEach(k => { if (o.n2[k] != null) S.n2[k] = o.n2[k]; }); } } catch (er) { /* yoksay */ }
+  const oturumYaz = () => { try { sessionStorage.setItem(OTURUM_ANAHTAR, JSON.stringify({modul: S.modul, sayfa: S.sayfa, ist: S.ist, gorevSekme: S.gorevSekme, ozetSekme: S.ozetSekme, rotSekme: S.rotSekme, arsivSekme: S.arsivSekme, ayarSekme: S.ayarSekme, altSekme: S.altSekme, y: S.y, m: S.m, n2: {ist: S.n2.ist, sekme: S.n2.sekme, gorunum: S.n2.gorunum, altSekme: S.n2.altSekme}})); } catch (er) { /* yoksay */ } };
   const GUNCEL_Y = S.y, GUNCEL_M = S.m, BUGUN = new Date(), MEVCUT = BUGUN.getFullYear() * 12 + BUGUN.getMonth() + 1, guncelAy = () => S.y * 12 + S.m >= MEVCUT;      // güncel ay dışındaki aylar yalnızca görüntülenir (salt okunur)
+  try { const o = JSON.parse(sessionStorage.getItem(OTURUM_ANAHTAR) || 'null'); if (o && o.y && o.m) { S.y = o.y; S.m = o.m; } } catch (er) { /* yoksay */ }      // son bakılan ay (güncel ay sabiti değişmez)
   const olay = (ad, d) => { try { root.dispatchEvent(new CustomEvent('ashiplan:' + ad, {detail: d, bubbles: true})); } catch (e) {} if (opts.olaylar && opts.olaylar[ad]) opts.olaylar[ad](d); };
 
   const anahtar = (y, m) => `plan:${y}-${C.pad(m)}`;

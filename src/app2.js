@@ -611,6 +611,7 @@
       <div class="ap-popalt"><span>${v.bas ? `<button class="ap-btn sm" data-pop data-act="tp-temizle">Temizle</button>` : ''}</span><button class="ap-btn sm" data-pop data-act="tp-kapat">Kapat ✕</button></div></div>`;
   }
   function render() {
+    oturumYaz();
     const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0, ic0 = root.querySelector('.ap-icerik'), isy = ic0 ? ic0.scrollTop : 0;
     const koyu = !opts.gomulu && S.ayar && (S.ayar.tema === 'koyu' || (S.ayar.tema === 'sistem' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
     root.className = 'ap-root' + (koyu ? ' ap-dark' : '') + (opts.gomulu ? ' ap-gomulu' : ''); document.body.style.background = koyu ? '#0f1720' : opts.gomulu ? '#f8fafc' : '#f4f6f9';      // gömülü modda tema her zaman açık: koyu modu ana uygulama verir
