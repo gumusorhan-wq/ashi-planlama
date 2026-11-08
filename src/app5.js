@@ -25,7 +25,7 @@
     return sat.sort((x, y) => sira(x.k, y.k)).map(s => {
       // Sürüm 13.56: Modül 1'deki planlanan (sabitlenen 🔒 dahil) esas alınır; istasyon Hedef nöbet sütunundan değiştirirse o geçerli. Planlamada elle yazılan sayı azamiyi aşıyorsa üst sınır o sayıdır.
       const k = s.k, m1 = k.planlanan != null && k.planlanan !== '' ? sayi(k.planlanan) : (oto.has(k.id) ? oto.get(k.id) : 0), azami = Math.max(Math.floor(s.azami + 1e-9), k.kilit ? Math.ceil(m1 - 1e-9) : 0);
-      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), otoHedef: m1, planlanan: (dp.hedef || {})[k.id] != null ? dp.hedef[k.id] : m1, elle: (dp.hedef || {})[k.id] != null, sabit: !!k.kilit, ust: k.sinif === 'isci' ? null : azami, azamiF: k.sinif === 'isci' ? null : Math.max(Math.round(s.azami * 100) / 100, k.kilit ? m1 : 0), gelen: !!k._gelen,
+      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), otoHedef: m1, planlanan: (dp.hedef || {})[k.id] != null ? dp.hedef[k.id] : m1, elle: (dp.hedef || {})[k.id] != null, sabit: !!k.kilit, surPay: k.sinif === 'isci' ? 1 : (C.surucuDurumu(k, {degil: (S.ayar.surDegilEsik || 0) / 100}).pay || 0), ust: k.sinif === 'isci' ? null : azami, azamiF: k.sinif === 'isci' ? null : Math.max(Math.round(s.azami * 100) / 100, k.kilit ? m1 : 0), gelen: !!k._gelen,
         izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
     });      // branş sırası: doktor → AABT → ATT → diğer memur → sürücü ATT → işçi
   }

@@ -515,7 +515,7 @@ const APCore = (() => {
     });
     // Yuva yetenekleri: doktor → ekip şefi; işçi → sürücü (12 saat); AABT (sağlık teknikeri) → ekip şefi + YSP (sürücülüğü nöbet kayıtlarından doğrulanmışsa + sürücü); ATT (sağlık memuru / teknisyeni) → YSP (sürücülüğü doğrulanmışsa + sürücü)
     // (nöbet kayıtlarında ekip şefi olarak görev almışsa ekip şefi + YSP; yalnızca YSP olarak çalışıyorsa YSP).
-    const esik = {sur: (a.surEsik == null ? 70 : a.surEsik) / 100, degil: (a.surDegilEsik == null ? 15 : a.surDegilEsik) / 100};
+    const esik = {sur: (a.surEsik == null ? 70 : a.surEsik) / 100, degil: (a.surDegilEsik == null ? 0 : a.surDegilEsik) / 100};
     satir.forEach(s => { s.kadroTip = kadroTip(s.k); s.rol = rolBelirle(s.k, esik); s.grup = grupBelirle(s.k, esik, a); });
     const gruplar = {dok: [], isci: [], ke: [], ka: [], ysp: [], sy: []};
     satir.forEach(s => { if (!s.nobetYok) gruplar[s.grup].push(s); });
@@ -644,8 +644,8 @@ const APCore = (() => {
   }
   // ATT'nin sürücülüğü nöbet listelerinden teyit edilir: sürücü payı eşiğin üstündeyse sürücü, altındaysa sürücü değil, kayıt yoksa doğrulanmadı (sürücü sayılmaz)
   function surucuDurumu(k, esik) {
-    const o = esik || {degil: 0.15};
-    if (k.rolManuel) return {tip: k.rolManuel === 'sur' || k.rolManuel === 'karma' ? 'surucu' : 'degil', kaynak: 'manuel'};
+    const o = esik || {degil: 0};
+    if (k.rolManuel) return {tip: k.rolManuel === 'sur' || k.rolManuel === 'karma' ? 'surucu' : 'degil', kaynak: 'manuel', pay: k.rolManuel === 'sur' || k.rolManuel === 'karma' ? 1 : 0};
     const s = k.rolSay, t = s ? (s.es || 0) + (s.ysp || 0) + (s.sur || 0) : 0;
     if (!t) return {tip: 'dogrulanmadi', kaynak: 'yok'};
     const pay = (s.sur || 0) / t;
@@ -793,7 +793,7 @@ const NobetCore = (() => {
       (k.istek || []).forEach(x => { const d = gunNo(x); if (d) istek.add(d); });
       // İzin / rapor dönüşü: işe başlama günü nöbete girmek zorunludur (o gün başka bir izinle kapanmıyorsa)
       const donus = new Set(donusAday.filter(d => !izin.has(d)));
-      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: yetBul(k.grup), isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, plan: k.grup !== 'isci' && k.planlanan != null ? Math.round(k.planlanan * 100) / 100 : null, onc: (() => { const o = (g.onceki || {})[k.id] || {}; return {t24: (o.t24 || []).filter(d => d <= 0), s24: (o.s24 || []).filter(d => d <= 0), A: (o.A || []).filter(d => d <= 0), G: (o.G || []).filter(d => d <= 0)}; })(), izin, once, istek, baslar, donus};
+      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, surPay: k.surPay == null ? 1 : k.surPay, yet: yetBul(k.grup), isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, plan: k.grup !== 'isci' && k.planlanan != null ? Math.round(k.planlanan * 100) / 100 : null, onc: (() => { const o = (g.onceki || {})[k.id] || {}; return {t24: (o.t24 || []).filter(d => d <= 0), s24: (o.s24 || []).filter(d => d <= 0), A: (o.A || []).filter(d => d <= 0), G: (o.G || []).filter(d => d <= 0)}; })(), izin, once, istek, baslar, donus};
     });
     // hafta sonu (cumartesi/pazar) ve resmî tatil günleri: nöbetlerin bu günlere kişiler arasında dengeli dağılması için
     const ozel = new Uint8Array(N + 2); let ozelSay = 0;
@@ -940,7 +940,8 @@ const NobetCore = (() => {
       for (const s of pl) { const d = slotD[s], t = slotT[s]; all.push(d);
         if (p.izin.has(d)) c += 900; else if (p.istek.has(d)) c += 80;
         if (p.once.has(d) && !p.izin.has(d)) c += 300;
-        if (t === 'surA') A.add(d); else if (t === 'surG') G.add(d); else { g24.push(d); if (t === 'sur') s24.add(d); } }
+        if (t === 'surA') A.add(d); else if (t === 'surG') G.add(d); else { g24.push(d); if (t === 'sur') s24.add(d); }
+        if (!p.isci && (t === 'sur' || t === 'surM' || t === 'surG' || t === 'surA')) c += Math.round(30 * (1 - p.surPay)); }      // sürücü nöbeti önce sürücü payı yüksek olana
       const gv = new Set(); for (const d of all) { if (gv.has(d)) c += 800; gv.add(d); }          // aynı gün birden fazla nöbet
       g24.sort((a, b) => a - b); for (let k = 1; k < g24.length; k++) if (g24[k] >= 1 && g24[k] - g24[k - 1] - 1 < K.minAra) c += 700;
       if (K.surGunAsiri) s24.forEach(d => { if (d + 4 >= 1 && s24.has(d + 2) && s24.has(d + 4)) c += 300; });
@@ -1309,7 +1310,9 @@ function mount(root, opts = {}) {
 
   async function ayarYukle() {
     const a = (await depo.get('ayar')) || {};
-    S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, otoGeriCek: true, panoMod: 'fazla', azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 15, kapsam: [], ...a, ...(opts.ayarlar || {})};
+    S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, otoGeriCek: true, panoMod: 'fazla', azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 0, kapsam: [], ...a, ...(opts.ayarlar || {})};
+    // Sürüm 13.56 (09.11.2026): nöbet kaydında sürücü payı %0'dan büyük olan her AABT / ATT sürücü nöbetine girer (önce payı yüksek olan); eski kayıtlı %15 bir kez 0 yapılır
+    if (!S.ayar.surucuPayV2) { S.ayar.surDegilEsik = 0; S.ayar.surucuPayV2 = true; }
     Object.keys(C.DURUM_VARSAYILAN).forEach(k => { if (!S.ayar.durumlar[k]) S.ayar.durumlar[k] = C.DURUM_VARSAYILAN[k]; });
     // Sürüm 12.47: yarı zamanlı nöbet listesine girer (mesainin yarısı kadar); eski kayıtlı ayarda 'Nöbet yok' işaretliyse bir kez kaldırılır
     if (!S.ayar.yariZamanliV2 && S.ayar.durumlar['YARI ZAMANLI']) { S.ayar.durumlar['YARI ZAMANLI'] = {...S.ayar.durumlar['YARI ZAMANLI'], nobetYok: false, mesaiOran: 0.5}; S.ayar.yariZamanliV2 = true; }
@@ -1437,7 +1440,7 @@ function mount(root, opts = {}) {
   // Branş sırası (tüm kişi listeleri, PNG ve Excel çıktıları): doktor (tabip) → memur [AABT → ATT → diğer memur unvanları → sürücü olarak çalışan ATT
   // (nöbet rolü sürücü)] → işçi. Grup (doktor / memur / işçi) ayrımı korunur; aynı branşta ASOS sırası, sonra ad.
   const ATT_RE = /\bATT\b|ACIL TIP TEKNISYEN|SAGLIK MEMUR|SAGLIK TEKNISYEN/;
-  const surEsikleri = () => ({sur: ((S.ayar && S.ayar.surEsik) ?? 70) / 100, degil: ((S.ayar && S.ayar.surDegilEsik) ?? 15) / 100});
+  const surEsikleri = () => ({sur: ((S.ayar && S.ayar.surEsik) ?? 70) / 100, degil: ((S.ayar && S.ayar.surDegilEsik) ?? 0) / 100});
   function bransSira(k, grup) {
     if (k.sinif === 'doktor') return 0;
     if (k.sinif === 'isci') return 9;
@@ -1701,7 +1704,7 @@ function mount(root, opts = {}) {
       if (pa.rem.sur > 0.05) {      // sürücü açığı: kimin sürücü sayıldığı, kimin sayılmadığı ve nedeni
         const es = {degil: S.ayar.surDegilEsik / 100}, sur = h.satir.filter(x => !x.nobetYok && ['ka', 'sy', 'isci'].includes(x.grup)), deg = h.satir.filter(x => !x.nobetYok && x.k.sinif === 'memur' && (x.grup === 'ke' || x.grup === 'ysp'));
         const pct = x => { const d = C.surucuDurumu(x.k, es); return d.kaynak === 'kayit' ? `sürücü %${Math.round(100 * d.pay)}` : d.kaynak === 'manuel' ? 'elle: sürücü değil' : 'kayıt yok'; };
-        sat.push(`Sürücü sayılan: <b>${sur.length} kişi</b> (planı ${fmt(sur.reduce((t, x) => t + sayi(x.k.planlanan), 0))} nöbet; ${fmt(pa.fill.ka.sur + pa.fill.sy.sur + pa.fill.isci.sur)} nöbeti sürücüye yazılabiliyor). ${deg.length ? `Sürücü <b>sayılmayan</b>: ${deg.map(x => `${esc(x.k.ad)} (${pct(x)})`).join(', ')} — nöbet kayıtlarında sürücü payı %${S.ayar.surDegilEsik == null ? 15 : S.ayar.surDegilEsik}'in altında ya da kayıt yok. Sürücü olarak nöbet tutuyorsa <b>NÖBET ROLÜ</b> sütunundan "Sürücü dahil" seçin.` : ''}`);
+        sat.push(`Sürücü sayılan: <b>${sur.length} kişi</b> (planı ${fmt(sur.reduce((t, x) => t + sayi(x.k.planlanan), 0))} nöbet; ${fmt(pa.fill.ka.sur + pa.fill.sy.sur + pa.fill.isci.sur)} nöbeti sürücüye yazılabiliyor). ${deg.length ? `Sürücü <b>sayılmayan</b>: ${deg.map(x => `${esc(x.k.ad)} (${pct(x)})`).join(', ')} — nöbet kayıtlarında sürücü olarak nöbeti yok ya da kayıt yok. Sürücü olarak nöbet tutuyorsa <b>NÖBET ROLÜ</b> sütunundan "Sürücü dahil" seçin.` : ''}`);
       }
       if (fazla.length) sat.push(`Aynı istasyonda ${fazla.map(g => `${C.GRUP_AD[g]} ${fmt(pa.fazla[g])} nöbet`).join(', ')} yazılı ama açık branşa giremiyor. <b>Çözüm:</b> bu gruptan biri başka istasyona, açık branşı tutabilen biri bu istasyona (değişim) ya da açık branşı tutabilen kişilerin planını artırın.`);
       else sat.push(`<b>Çözüm:</b> açık branşı tutabilen kişilerin planını artırın (azami nöbete kadar) ya da personel isteyin${h.ihtiyacTur === 'oner' ? ` — rotasyon önerisi: <b>${h.ihtiyacKisi} kişi</b> gelmeli` : h.ihtiyacTur === 'elle' ? ' — açık bir kişinin ay boyu mesaisine yetmiyor: kısa görevlendirme' : ''}.`);
@@ -1962,7 +1965,7 @@ function mount(root, opts = {}) {
     const D = durumlar(), yon = S.rol === 'yonetici';
     const tum = `<div class="ap-card"><h2>Durum tablosu</h2><p class="ap-note">Her durumun nöbet ve mesai etkisini ayarlayın. "Nöbet yok": kişi nöbet tutmaz (hedef 0). "Mesai yok": o ay mesai yükümlülüğü yoktur (izinli). Değişiklik yalnızca Yönetici içindir.</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Durum</th><th>Renk</th><th>Nöbet yok</th><th>Mesai yok</th></tr></thead><tbody>${Object.entries(D).map(([k, v]) => `<tr><td>${k}</td><td><input type="color" data-d="${esc(k)}" data-f="renk" value="${v.renk || '#ffffff'}" ${yon ? '' : 'disabled'}></td><td><input type="checkbox" data-d="${esc(k)}" data-f="nobetYok" ${v.nobetYok ? 'checked' : ''} ${yon ? '' : 'disabled'}></td><td><input type="checkbox" data-d="${esc(k)}" data-f="mesaiYok" ${v.mesaiYok ? 'checked' : ''} ${yon ? '' : 'disabled'}></td></tr>`).join('')}</tbody></table></div></div>
-      <div class="ap-card"><h2>Hesap ayarları</h2><div class="ap-row"><label>ATT sürücü sayılması için nöbetlerinin sürücü payı bu değerden büyük olmalı (%): <input class="ap-in n" type="number" min="0" max="100" data-ay="surDegilEsik" value="${S.ayar.surDegilEsik}" ${yon ? '' : 'disabled'}></label> <span class="ap-note">Nöbet kaydı olmayan ATT sürücü sayılmaz.</span></div>
+      <div class="ap-card"><h2>Hesap ayarları</h2><div class="ap-row"><label>AABT / ATT'nin sürücü sayılması için nöbetlerinin sürücü payı bu değerden büyük olmalı (%; 0 = sürücü olarak bir kez nöbet tutan sürücü sayılır): <input class="ap-in n" type="number" min="0" max="100" data-ay="surDegilEsik" value="${S.ayar.surDegilEsik}" ${yon ? '' : 'disabled'}></label> <span class="ap-note">Nöbet kaydı olmayan sürücü sayılmaz. Sürücü nöbeti önce sürücü payı en yüksek olana yazılır; yetmezse payı düşük olanlara geçilir.</span></div>
       <div class="ap-row"><label>DOKTOR-AABT-ATT genel azami nöbet (24 sa.; istasyon sayfasından istasyon bazında değiştirilebilir) <input class="ap-in n" type="number" step="0.5" data-ay="azamiMemur" value="${S.ayar.azamiMemur}" ${yon ? '' : 'disabled'}></label>
       <label>İşçi nöbetinde sistemden düşülen saat <input class="ap-in n" type="number" step="0.5" data-ay="isciDusulen" value="${S.ayar.isciDusulen}" ${yon ? '' : 'disabled'}></label></div>
       <div class="ap-row"><label title="Kapalıyken memur/doktor hedefi tam oranla hesaplanır (160 saat = 6,67 nöbet). Açıkken hedef 0,5 adıma yukarı yuvarlanır (160 saat = 7)."><input type="checkbox" data-act="hedef-yuv" ${S.ayar.hedefYuvarla ? 'checked' : ''} ${yon ? '' : 'disabled'}> Memur/doktor hedefini 0,5 adıma yuvarla (eski yöntem)</label></div>
@@ -2587,7 +2590,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     return sat.sort((x, y) => sira(x.k, y.k)).map(s => {
       // Sürüm 13.56: Modül 1'deki planlanan (sabitlenen 🔒 dahil) esas alınır; istasyon Hedef nöbet sütunundan değiştirirse o geçerli. Planlamada elle yazılan sayı azamiyi aşıyorsa üst sınır o sayıdır.
       const k = s.k, m1 = k.planlanan != null && k.planlanan !== '' ? sayi(k.planlanan) : (oto.has(k.id) ? oto.get(k.id) : 0), azami = Math.max(Math.floor(s.azami + 1e-9), k.kilit ? Math.ceil(m1 - 1e-9) : 0);
-      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), otoHedef: m1, planlanan: (dp.hedef || {})[k.id] != null ? dp.hedef[k.id] : m1, elle: (dp.hedef || {})[k.id] != null, sabit: !!k.kilit, ust: k.sinif === 'isci' ? null : azami, azamiF: k.sinif === 'isci' ? null : Math.max(Math.round(s.azami * 100) / 100, k.kilit ? m1 : 0), gelen: !!k._gelen,
+      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), otoHedef: m1, planlanan: (dp.hedef || {})[k.id] != null ? dp.hedef[k.id] : m1, elle: (dp.hedef || {})[k.id] != null, sabit: !!k.kilit, surPay: k.sinif === 'isci' ? 1 : (C.surucuDurumu(k, {degil: (S.ayar.surDegilEsik || 0) / 100}).pay || 0), ust: k.sinif === 'isci' ? null : azami, azamiF: k.sinif === 'isci' ? null : Math.max(Math.round(s.azami * 100) / 100, k.kilit ? m1 : 0), gelen: !!k._gelen,
         izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
     });      // branş sırası: doktor → AABT → ATT → diğer memur → sürücü ATT → işçi
   }

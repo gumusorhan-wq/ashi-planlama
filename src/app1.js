@@ -119,7 +119,9 @@ function mount(root, opts = {}) {
 
   async function ayarYukle() {
     const a = (await depo.get('ayar')) || {};
-    S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, otoGeriCek: true, panoMod: 'fazla', azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 15, kapsam: [], ...a, ...(opts.ayarlar || {})};
+    S.ayar = {durumlar: JSON.parse(JSON.stringify(C.DURUM_VARSAYILAN)), isciDusulen: 11, tahminiGoster: true, otoOner: true, otoGeriCek: true, panoMod: 'fazla', azamiMemur: 8, isciEk: 0, tema: 'acik', surEsik: 70, surDegilEsik: 0, kapsam: [], ...a, ...(opts.ayarlar || {})};
+    // Sürüm 13.56 (09.11.2026): nöbet kaydında sürücü payı %0'dan büyük olan her AABT / ATT sürücü nöbetine girer (önce payı yüksek olan); eski kayıtlı %15 bir kez 0 yapılır
+    if (!S.ayar.surucuPayV2) { S.ayar.surDegilEsik = 0; S.ayar.surucuPayV2 = true; }
     Object.keys(C.DURUM_VARSAYILAN).forEach(k => { if (!S.ayar.durumlar[k]) S.ayar.durumlar[k] = C.DURUM_VARSAYILAN[k]; });
     // Sürüm 12.47: yarı zamanlı nöbet listesine girer (mesainin yarısı kadar); eski kayıtlı ayarda 'Nöbet yok' işaretliyse bir kez kaldırılır
     if (!S.ayar.yariZamanliV2 && S.ayar.durumlar['YARI ZAMANLI']) { S.ayar.durumlar['YARI ZAMANLI'] = {...S.ayar.durumlar['YARI ZAMANLI'], nobetYok: false, mesaiOran: 0.5}; S.ayar.yariZamanliV2 = true; }
@@ -247,7 +249,7 @@ function mount(root, opts = {}) {
   // Branş sırası (tüm kişi listeleri, PNG ve Excel çıktıları): doktor (tabip) → memur [AABT → ATT → diğer memur unvanları → sürücü olarak çalışan ATT
   // (nöbet rolü sürücü)] → işçi. Grup (doktor / memur / işçi) ayrımı korunur; aynı branşta ASOS sırası, sonra ad.
   const ATT_RE = /\bATT\b|ACIL TIP TEKNISYEN|SAGLIK MEMUR|SAGLIK TEKNISYEN/;
-  const surEsikleri = () => ({sur: ((S.ayar && S.ayar.surEsik) ?? 70) / 100, degil: ((S.ayar && S.ayar.surDegilEsik) ?? 15) / 100});
+  const surEsikleri = () => ({sur: ((S.ayar && S.ayar.surEsik) ?? 70) / 100, degil: ((S.ayar && S.ayar.surDegilEsik) ?? 0) / 100});
   function bransSira(k, grup) {
     if (k.sinif === 'doktor') return 0;
     if (k.sinif === 'isci') return 9;

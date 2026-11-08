@@ -44,7 +44,7 @@ const NobetCore = (() => {
       (k.istek || []).forEach(x => { const d = gunNo(x); if (d) istek.add(d); });
       // İzin / rapor dönüşü: işe başlama günü nöbete girmek zorunludur (o gün başka bir izinle kapanmıyorsa)
       const donus = new Set(donusAday.filter(d => !izin.has(d)));
-      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, yet: yetBul(k.grup), isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, plan: k.grup !== 'isci' && k.planlanan != null ? Math.round(k.planlanan * 100) / 100 : null, onc: (() => { const o = (g.onceki || {})[k.id] || {}; return {t24: (o.t24 || []).filter(d => d <= 0), s24: (o.s24 || []).filter(d => d <= 0), A: (o.A || []).filter(d => d <= 0), G: (o.G || []).filter(d => d <= 0)}; })(), izin, once, istek, baslar, donus};
+      return {id: k.id, ad: k.ad, grup: k.grup, sinif: k.sinif, surPay: k.surPay == null ? 1 : k.surPay, yet: yetBul(k.grup), isci: k.grup === 'isci', hedef24: k.adet || 0, hedefYarim: k.yarim || 0, plan: k.grup !== 'isci' && k.planlanan != null ? Math.round(k.planlanan * 100) / 100 : null, onc: (() => { const o = (g.onceki || {})[k.id] || {}; return {t24: (o.t24 || []).filter(d => d <= 0), s24: (o.s24 || []).filter(d => d <= 0), A: (o.A || []).filter(d => d <= 0), G: (o.G || []).filter(d => d <= 0)}; })(), izin, once, istek, baslar, donus};
     });
     // hafta sonu (cumartesi/pazar) ve resmî tatil günleri: nöbetlerin bu günlere kişiler arasında dengeli dağılması için
     const ozel = new Uint8Array(N + 2); let ozelSay = 0;
@@ -191,7 +191,8 @@ const NobetCore = (() => {
       for (const s of pl) { const d = slotD[s], t = slotT[s]; all.push(d);
         if (p.izin.has(d)) c += 900; else if (p.istek.has(d)) c += 80;
         if (p.once.has(d) && !p.izin.has(d)) c += 300;
-        if (t === 'surA') A.add(d); else if (t === 'surG') G.add(d); else { g24.push(d); if (t === 'sur') s24.add(d); } }
+        if (t === 'surA') A.add(d); else if (t === 'surG') G.add(d); else { g24.push(d); if (t === 'sur') s24.add(d); }
+        if (!p.isci && (t === 'sur' || t === 'surM' || t === 'surG' || t === 'surA')) c += Math.round(30 * (1 - p.surPay)); }      // sürücü nöbeti önce sürücü payı yüksek olana
       const gv = new Set(); for (const d of all) { if (gv.has(d)) c += 800; gv.add(d); }          // aynı gün birden fazla nöbet
       g24.sort((a, b) => a - b); for (let k = 1; k < g24.length; k++) if (g24[k] >= 1 && g24[k] - g24[k - 1] - 1 < K.minAra) c += 700;
       if (K.surGunAsiri) s24.forEach(d => { if (d + 4 >= 1 && s24.has(d + 2) && s24.has(d + 4)) c += 300; });

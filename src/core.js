@@ -195,7 +195,7 @@ const APCore = (() => {
     });
     // Yuva yetenekleri: doktor → ekip şefi; işçi → sürücü (12 saat); AABT (sağlık teknikeri) → ekip şefi + YSP (sürücülüğü nöbet kayıtlarından doğrulanmışsa + sürücü); ATT (sağlık memuru / teknisyeni) → YSP (sürücülüğü doğrulanmışsa + sürücü)
     // (nöbet kayıtlarında ekip şefi olarak görev almışsa ekip şefi + YSP; yalnızca YSP olarak çalışıyorsa YSP).
-    const esik = {sur: (a.surEsik == null ? 70 : a.surEsik) / 100, degil: (a.surDegilEsik == null ? 15 : a.surDegilEsik) / 100};
+    const esik = {sur: (a.surEsik == null ? 70 : a.surEsik) / 100, degil: (a.surDegilEsik == null ? 0 : a.surDegilEsik) / 100};
     satir.forEach(s => { s.kadroTip = kadroTip(s.k); s.rol = rolBelirle(s.k, esik); s.grup = grupBelirle(s.k, esik, a); });
     const gruplar = {dok: [], isci: [], ke: [], ka: [], ysp: [], sy: []};
     satir.forEach(s => { if (!s.nobetYok) gruplar[s.grup].push(s); });
@@ -324,8 +324,8 @@ const APCore = (() => {
   }
   // ATT'nin sürücülüğü nöbet listelerinden teyit edilir: sürücü payı eşiğin üstündeyse sürücü, altındaysa sürücü değil, kayıt yoksa doğrulanmadı (sürücü sayılmaz)
   function surucuDurumu(k, esik) {
-    const o = esik || {degil: 0.15};
-    if (k.rolManuel) return {tip: k.rolManuel === 'sur' || k.rolManuel === 'karma' ? 'surucu' : 'degil', kaynak: 'manuel'};
+    const o = esik || {degil: 0};
+    if (k.rolManuel) return {tip: k.rolManuel === 'sur' || k.rolManuel === 'karma' ? 'surucu' : 'degil', kaynak: 'manuel', pay: k.rolManuel === 'sur' || k.rolManuel === 'karma' ? 1 : 0};
     const s = k.rolSay, t = s ? (s.es || 0) + (s.ysp || 0) + (s.sur || 0) : 0;
     if (!t) return {tip: 'dogrulanmadi', kaynak: 'yok'};
     const pay = (s.sur || 0) / t;
