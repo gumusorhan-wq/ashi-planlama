@@ -406,6 +406,7 @@
       <label class="ap-note" title="Seçilen istasyondan görevli çıkanlar ve o istasyona gelenler listelenir">İstasyon süz ${istTekHtml('gist', S.gIst || '', birimler.map(b => b.ad), {bos: 'Tümü', kucuk: true})}</label>
       <span class="ap-note">Yeni görevlendirme hedefi:</span>${(() => { const h = birimler.some(b => b.ad === S.gYeniHedef) ? S.gYeniHedef : (birimler[0] || {}).ad || ''; return `<input type="hidden" id="ap-g-hedef" value="${esc(h)}">${istTekHtml('gyh', h, birimler.map(b => b.ad), {kucuk: true})}`; })()}
       <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button>
+      <button class="ap-btn" data-act="gorev-tekay-excel" title="Yalnız bu ay çıkan (1 aylık) görevlendirmeler; Yolluklu ve Yolluksuz ayrı sayfa. Uzun süreli (3 ay+) görevler girmez.">📄 Tek ay görevleri (Excel)</button>
       <button class="ap-btn" data-act="g-tarihsiz-bitir" ${duz ? '' : 'disabled'} title="TARİH sütunu boş (önceki aylardan kalan) görevlendirmeleri bitirir; istasyon süzgeci seçiliyse yalnız o istasyonunkileri. Yalnız başka ASHİ istasyonuna görevler; aile hekimliği, KKM, Başhekimlik, hastane ve kurum dışı görevler, uzun süreli (OF) ve devam isteği olanlar hariç.">Tarihi boş görevleri bitir (${gk.filter(k => tarihsizGorev(k)).length})</button></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div>${S.gtAc ? gorevTarihPop() : ''}</div>`;
     return nav + ({deg: degerlendirme, rot: sekme === 'rot' ? rotasyonHtml() : '', ozet, list: liste, dis}[sekme] || degerlendirme);
@@ -622,7 +623,7 @@
     const sayfa = S.modul === 2 ? 'n2:' + S.n2.sekme : S.sayfa + ':' + (S.gorevSekme || '');
     root.querySelectorAll('.ap-main table.ap-t').forEach((t, ti) => {
       if (t.matches('.n2, .n2l, [data-sirasiz]') || !t.tBodies[0]) return;
-      const tb = t.tBodies[0], satir = [...tb.rows]; if (satir.length < 3) return;
+      const tb = t.tBodies[0], satir = [...tb.rows]; if (satir.length < 2) return;
       const ths = [...t.querySelectorAll('thead tr:last-child th')]; if (!ths.length) return;
       const anahtar = `${sayfa}:${ti}:${ths.length}`, d = TD[anahtar] || (TD[anahtar] = {k: -1, y: 1, ara: ''}), grup = satir.some(r => r.querySelector('td[colspan]'));
       if (satir.length >= 8 && !satir.some(r => r.dataset.ara != null)) {      // kendi arama kutusu olan listelerde (data-ara) ikinci kutu açılmaz

@@ -1229,6 +1229,18 @@
         case 'kilavuz': S.modal = kilavuzHtml; break;
         case 'modal-kapat': S.modal = null; S.asos = null; break;
         case 'png': { const b = S.plan.birimler.find(x => x.ad === v); pngCiz(b).toBlob(bl => indir(bl, `${b.ad}-${S.y}-${C.pad(S.m)}.png`)); break; }
+        case 'gorev-tekay-excel': {      // Sürüm 13.57: yalnız bu ayın 1 aylık görevlendirmeleri; Yolluklu / Yolluksuz ayrı sayfa (yolluğu seçilmemişler ayrı sayfada uyarı olarak)
+          const ilk = ayIlk(), son = sonrakiAyIlk(), tekAy = k => { const g = k.gorev; if (!g || !(g.hedef || g.yer) || !gorevAktif(g) || xlUzunGorev(g)) return false; const t = gorevTarihleri(g); return (!t.bas || t.bas >= ilk) && (!t.bit || t.bit <= son); };
+          const L = S.plan.kayitlar.filter(k => !gizliKisi(k) && tekAy(k)).sort((a, b) => trCollator.compare(a.birim || '', b.birim || '') || trCollator.compare(a.ad, b.ad));
+          if (!L.length) { toast('Bu ay için 1 aylık görevlendirme yok.'); break; }
+          const wb = XLSX.utils.book_new(), bas = ['Sıra', 'Ad soyad', 'Ünvan', 'Kadro istasyonu', 'Görev yeri', 'Başlangıç', 'Bitiş', 'Gerekçe'];
+          const sat = l => l.map((k, i) => { const t = gorevTarihleri(k.gorev); return [i + 1, k.ad, k.unvan || '', k.birim || '', k.gorev.hedef || k.gorev.yer || '', trTarih(t.bas || ilk), trTarih(t.bit || son), k.gorev.gerekce || '']; });
+          const sayfa = (ad, l) => { const ws = XLSX.utils.aoa_to_sheet([[`${ayEtiket()} — ${ad} görevlendirmeler (${l.length} kişi)`], [], bas, ...sat(l)]); ws['!cols'] = [6, 28, 22, 20, 24, 12, 12, 30].map(w => ({wch: w})); XLSX.utils.book_append_sheet(wb, ws, ad.slice(0, 31)); };
+          const yl = x => C.TR(x.gorev.yolluk || ''), Y = L.filter(k => yl(k) === 'YOLLUKLU'), N = L.filter(k => yl(k) === 'YOLLUKSUZ'), B = L.filter(k => !['YOLLUKLU', 'YOLLUKSUZ'].includes(yl(k)));
+          sayfa('Yolluklu', Y); sayfa('Yolluksuz', N); if (B.length) sayfa('Yolluk seçilmemiş', B);
+          xlsxIndir(wb, `Tek-ay-gorevlendirme-${S.y}-${C.pad(S.m)}.xlsx`);
+          toast(`${Y.length} yolluklu, ${N.length} yolluksuz${B.length ? `, ${B.length} yolluğu seçilmemiş (ayrı sayfada)` : ''} görevlendirme indirildi.`); break;
+        }
         case 'gorev-excel': {      // Görevlendirme sayfasının tüm bölümleri tek Excel dosyasında
           const wb = XLSX.utils.book_new(), ek = (ad, bas, sat) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([bas, ...sat]), ad), r1 = x => Math.round(x * 100) / 100;
           const ists = S.plan.birimler.filter(b => b.tur === 'istasyon' && !b.ekipOf).map(b => ({b, h: hesapla(b)}));
