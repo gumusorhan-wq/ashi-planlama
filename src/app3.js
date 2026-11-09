@@ -1154,7 +1154,7 @@
           if (!(await onay(`${L.length} tarihi boş görevlendirme bitirilsin mi?${ist ? `\n(${ist} süzgeci)` : ''}\n\nBu kişiler kadro istasyonlarına döner. ASOS dosyası yeniden yüklense de aynı görev geri gelmez; gerekiyorsa yeniden görevlendirebilirsiniz. İşlem günlüğe yazılır.`))) break;
           tarihsizGorevleriBitir(L, 'Tarihi boş görevlendirme bitirildi (önceki ayın görevi)'); otoHesapla(); damgala(); kaydet(); toast(`${L.length} görevlendirme bitirildi.`); break;
         }
-        case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } gorevlendir(k, hedef); S.gAra = ''; break; }
+        case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } if (k.birim === hedef) { toast(`${k.ad} zaten ${hedef} kadrosunda; başka bir hedef istasyon seçin.`); break; } gorevlendir(k, hedef); S.gAra = ''; break; }
         case 'og-tur': S.ogTur = v; break;
         case 'og-ekle': {
           const d = root.querySelector('#ap-og-t').value, tur = S.ogTur || 'bayram'; if (!d) { toast('Tarih seçin.'); break; } delete tarihSec().og;
