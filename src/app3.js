@@ -322,6 +322,28 @@
     });
     return sonuc;
   }
+  // Sürüm 13.57: İzin-Muafiyet / Personel Listesi raporundaki bütün tarihli izinler kişi (TC) bazında; plan ayına bakılmaz.
+  // {aralik: [ilk başlangıç, son bitiş], kisi: {tc: [{tur, bas, bit, gun}]}}
+  function izinArsivHazirla(satirlar) {
+    const kisi = {}; let ilk = '', son = '';
+    (satirlar || []).forEach(r => {
+      const z = r.izin; if (!r.tc || !z || !z.bas || !z.bit) return;
+      const l = (kisi[r.tc] = kisi[r.tc] || []);
+      if (!l.some(x => x.bas === z.bas && x.bit === z.bit && x.tur === z.tip)) l.push({tur: String(z.tip || 'İZİN').toLocaleUpperCase('tr-TR'), bas: z.bas, bit: z.bit, gun: z.gun || 0});
+      if (!ilk || z.bas < ilk) ilk = z.bas; if (!son || z.bit > son) son = z.bit;
+    });
+    return ilk ? {aralik: [ilk, son], kisi} : null;
+  }
+  // Kayıtlı izin arşivine ekler: dosyadaki kişilerin, dosyanın tarih aralığına düşen eski kayıtları silinip dosyadakiler yazılır (iptal edilen izin kalmasın)
+  async function izinArsivBirlestir(yeni) {
+    if (!yeni) return;
+    const ar = (await depo.get('izinArsiv')) || {kisi: {}}, [ilk, son] = yeni.aralik;
+    Object.entries(yeni.kisi).forEach(([tc, l]) => {
+      const eski = (ar.kisi[tc] || []).filter(x => !(x.bas <= son && x.bit >= ilk));
+      ar.kisi[tc] = eski.concat(l).sort((a, b) => (a.bas < b.bas ? -1 : 1));
+    });
+    ar.zaman = Date.now(); await depo.put('izinArsiv', ar); S.takipVeri = null;
+  }
   function geciciGorev(plan, a) {
     const gc = a.gecici; if (!gc || !gc.ad) return {gorev: null, gecmis: []};
     const hedef = birimCoz(plan, gc.ad), baslik = C.TR(gc.neden);
@@ -419,6 +441,7 @@
         if (!k.durumManuel) { k.durum = k.durumB || k.durumA || (k.durum === 'GEÇİCİ GÖREVLİ' ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : '')); k.durumMetin = k.durumMetinB || k.durumMetinA || ''; }
       });
       rp.eslesmeyen = bk.size - rp.eslesen;
+      rp.izinArsiv = izinArsivHazirla(satirlar);      // Sürüm 13.57: dosyadaki bütün tarihli izinler (yalnız bu ay değil) — İzin takibi tablosu için
       return rp;
     }
     const rapor = {tur, yeni: [], degisen: 0, nakil: [], eksik: [], dortB: 0, dortBTarihsiz: 0, toplam: satirlar.length, gorevli: 0, disKurum: 0, gelen: 0, izinli: 0, muafiyet: 0, plan};
@@ -488,6 +511,7 @@
     });
     if (tur === 'A') plan.kayitlar.forEach(k => { if (!goruldu.has(k.id) && k.tc && !(durumlar()[k.durum] || {}).pasif) rapor.eksik.push(k); });
     birimTemizle(plan); birimSirala(plan);
+    rapor.izinArsiv = izinArsivHazirla(satirlar);      // Sürüm 13.57: bütün tarihli izinler (İzin takibi)
     return rapor;
   }
   // Seçilen/sürüklenen dosyaları okur; EKİP (A) listesi önce, Personel Listesi Raporu (B) sonra uygulanarak önizleme üretilir
@@ -1210,6 +1234,7 @@
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | ')); damgala();
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
+          for (const r of A.raporlar) if (r.izinArsiv) { try { await izinArsivBirlestir(r.izinArsiv); } catch (e) { console.warn('izin arşivi', e); } }
           S.arsivVeri = null;
           kaydet(); S.modal = null; S.asos = null; S.sayfa = S.asosDonus || 'ana'; S.asosDonus = null; if (!S.ist || !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || S.plan.birimler[0] || {}).ad || '';
           toast('Personel listeleri uygulandı.'); break;

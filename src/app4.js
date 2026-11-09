@@ -358,6 +358,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     const proje = p => (p.kayitlar || []).map(k => ({a: k.tc || k.ad, ad: k.ad, unvan: k.unvan || '', birim: k.birim || '', izin: (k.izin || []).map(i => ({tur: i.tur, gun: i.gun, bas: i.bas, bit: i.bit})), durum: k.durum || '', durumMetin: k.durumMetin || '', gorev: k.gorev && (k.gorev.hedef || k.gorev.yer) ? {hedef: k.gorev.hedef || '', yer: k.gorev.yer || '', tarih: k.gorev.tarih || ''} : null}));
     for (const key of anahtarlar) { const p = await depo.get(key); if (p && p.kayitlar) veri[String(key).slice(5)] = proje(p); }
     if (S.plan) veri[ayAnahtari()] = proje(S.plan);
+    try { S.izinArsivT = (await depo.get('izinArsiv')) || null; } catch (e) { S.izinArsivT = null; }      // Sürüm 13.57: yüklenen izin dosyalarındaki bütün izinler
     S.takipVeri = veri;
   }
   const takipDurum = () => S.takip = S.takip || {yil: [BUGUN.getFullYear()], ist: [], sekme: 'izin', ara: '', sadece: true};   // açılışta yalnız içinde bulunulan yıl
@@ -385,9 +386,27 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
       e.h[ay] = {izinGun: n, izinTur: [...tur].filter(Boolean), durumIzin, gorev: r.gorev, gorevVar: !!gDurum, gorevYok: !!gDurum && !r.gorev, durumMetin: r.durumMetin};
       kisiler.set(r.a, e);
     }));
+    // Sürüm 13.57: planı olmayan aylarda izinler, yüklenen izin dosyalarının tamamından (izin arşivi) gelir; kişi bilgisi açık plandan
+    const ar = S.izinArsivT, arsivAy = new Set();
+    if (ar && ar.kisi) {
+      const kaynak = new Map(((S.plan && S.plan.kayitlar) || []).filter(k => k.tc).map(k => [k.tc, k]));
+      aylar.filter(ay => !veri[ay]).forEach(ay => Object.entries(ar.kisi).forEach(([tc, l]) => {
+        const k = kaynak.get(tc); if (!k) return;
+        if (T.ist.length && !T.ist.includes(k.birim)) return;
+        if (k.durum === 'AİLE HEKİMLİĞİNDE' || k.durum === 'UZMANLIK EĞİTİMİ') return;
+        if (ara && !C.TR(k.ad).includes(ara)) return;
+        let n = 0; const tur = new Set();
+        l.forEach(i => { let c = 0; for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(C.izinSon({...i, asos: true}) + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) c++; if (c) { n += c; tur.add(i.tur); } });
+        if (!n) return;
+        arsivAy.add(ay);
+        const e = kisiler.get(tc) || {ad: k.ad, unvan: k.unvan || '', ekip: k.birim || '', h: {}};
+        e.h[ay] = {izinGun: n, izinTur: [...tur].filter(Boolean), durumIzin: '', gorev: null, gorevVar: false, gorevYok: false, durumMetin: '', arsiv: true};
+        kisiler.set(tc, e);
+      }));
+    }
     const satir = [...kisiler.values()].sort((a, b) => trCollator.compare(a.ekip, b.ekip) || trCollator.compare(a.ad, b.ad));
     const izinVar = h => h && (h.izinGun > 0 || h.durumIzin), gorevVar = h => h && h.gorevVar;
-    return {aylar, satir, izinVar, gorevVar, T, ayEt, yillar, planli: ay => !!veri[ay]};
+    return {aylar, satir, izinVar, gorevVar, T, ayEt, yillar, planli: ay => !!veri[ay] || arsivAy.has(ay)};
   }
   function takipExcel() {
     const {aylar, satir, izinVar, gorevVar, ayEt, yillar} = takipHazirla(), wb = XLSX.utils.book_new(), temiz = s => String(s == null ? '' : s);
@@ -423,7 +442,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     return `<div class="ap-card"><h2>İzin ve geçici görev takibi</h2><p class="ap-note">Kayıtlı aylık planlardan (${tumAylar.length} ay${tumAylar.length ? ': ' + takipKisa(tumAylar[0]) + ' – ' + takipKisa(tumAylar[tumAylar.length - 1]) : ''}) personelin hangi aylarda izin kullandığı ve hangi aylarda geçici görevlendirildiği. Seçili yılın 12 ayı birlikte görünür; birden çok yıl seçilebilir, boş bırakılırsa kayıtlı tüm yıllar.</p>
       <div class="ap-row" data-ust>${pop('yil', etYil, yilIc)}${pop('ist', etIst, istIc)}<input class="ap-in" data-act="takip-ara" placeholder="Ad ara…" value="${esc(T.ara || '')}"><label class="ap-note"><input type="checkbox" data-act="takip-sadece" ${T.sadece ? 'checked' : ''}> Yalnız kaydı olanlar</label><button class="ap-btn" data-act="takip-yenile" title="Kayıtlı planları yeniden okur">Yenile</button><button class="ap-btn" data-act="takip-excel">Excel'e aktar</button></div></div>
       <div class="ap-subnav ap-noprint" data-ust><button class="${izinSekme ? 'on' : ''}" data-act="takip-sekme" data-v="izin">İzin takibi</button><button class="${izinSekme ? '' : 'on'}" data-act="takip-sekme" data-v="gorev">Geçici görev takibi</button></div>
-      <div class="ap-card"><div class="ap-note" style="margin-bottom:6px">${gorunen.length} kişi · ${sYil.join(', ') || '—'} (${aylar.length} ay sütunu; planı olmayan aylar boş)${izinSekme ? ' · hücre: o ayda kullanılan izin günü ve kısaltma (üzerine gelince tam ad)' : ' · hücre: simgeye tıklayınca görev yeri ve tarih'}</div>${tablo}</div>`;
+      <div class="ap-card"><div class="ap-note" style="margin-bottom:6px">${gorunen.length} kişi · ${sYil.join(', ') || '—'} (${aylar.length} ay sütunu; planı olmayan aylarda izinler yüklenen izin dosyalarından gelir, görevlendirme boş kalır)${izinSekme ? ' · hücre: o ayda kullanılan izin günü ve kısaltma (üzerine gelince tam ad)' : ' · hücre: simgeye tıklayınca görev yeri ve tarih'}</div>${tablo}</div>`;
   }
   function arstatHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }

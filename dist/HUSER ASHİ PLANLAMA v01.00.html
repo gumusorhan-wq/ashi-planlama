@@ -2612,6 +2612,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     const proje = p => (p.kayitlar || []).map(k => ({a: k.tc || k.ad, ad: k.ad, unvan: k.unvan || '', birim: k.birim || '', izin: (k.izin || []).map(i => ({tur: i.tur, gun: i.gun, bas: i.bas, bit: i.bit})), durum: k.durum || '', durumMetin: k.durumMetin || '', gorev: k.gorev && (k.gorev.hedef || k.gorev.yer) ? {hedef: k.gorev.hedef || '', yer: k.gorev.yer || '', tarih: k.gorev.tarih || ''} : null}));
     for (const key of anahtarlar) { const p = await depo.get(key); if (p && p.kayitlar) veri[String(key).slice(5)] = proje(p); }
     if (S.plan) veri[ayAnahtari()] = proje(S.plan);
+    try { S.izinArsivT = (await depo.get('izinArsiv')) || null; } catch (e) { S.izinArsivT = null; }      // Sürüm 13.57: yüklenen izin dosyalarındaki bütün izinler
     S.takipVeri = veri;
   }
   const takipDurum = () => S.takip = S.takip || {yil: [BUGUN.getFullYear()], ist: [], sekme: 'izin', ara: '', sadece: true};   // açılışta yalnız içinde bulunulan yıl
@@ -2639,9 +2640,27 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
       e.h[ay] = {izinGun: n, izinTur: [...tur].filter(Boolean), durumIzin, gorev: r.gorev, gorevVar: !!gDurum, gorevYok: !!gDurum && !r.gorev, durumMetin: r.durumMetin};
       kisiler.set(r.a, e);
     }));
+    // Sürüm 13.57: planı olmayan aylarda izinler, yüklenen izin dosyalarının tamamından (izin arşivi) gelir; kişi bilgisi açık plandan
+    const ar = S.izinArsivT, arsivAy = new Set();
+    if (ar && ar.kisi) {
+      const kaynak = new Map(((S.plan && S.plan.kayitlar) || []).filter(k => k.tc).map(k => [k.tc, k]));
+      aylar.filter(ay => !veri[ay]).forEach(ay => Object.entries(ar.kisi).forEach(([tc, l]) => {
+        const k = kaynak.get(tc); if (!k) return;
+        if (T.ist.length && !T.ist.includes(k.birim)) return;
+        if (k.durum === 'AİLE HEKİMLİĞİNDE' || k.durum === 'UZMANLIK EĞİTİMİ') return;
+        if (ara && !C.TR(k.ad).includes(ara)) return;
+        let n = 0; const tur = new Set();
+        l.forEach(i => { let c = 0; for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(C.izinSon({...i, asos: true}) + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) c++; if (c) { n += c; tur.add(i.tur); } });
+        if (!n) return;
+        arsivAy.add(ay);
+        const e = kisiler.get(tc) || {ad: k.ad, unvan: k.unvan || '', ekip: k.birim || '', h: {}};
+        e.h[ay] = {izinGun: n, izinTur: [...tur].filter(Boolean), durumIzin: '', gorev: null, gorevVar: false, gorevYok: false, durumMetin: '', arsiv: true};
+        kisiler.set(tc, e);
+      }));
+    }
     const satir = [...kisiler.values()].sort((a, b) => trCollator.compare(a.ekip, b.ekip) || trCollator.compare(a.ad, b.ad));
     const izinVar = h => h && (h.izinGun > 0 || h.durumIzin), gorevVar = h => h && h.gorevVar;
-    return {aylar, satir, izinVar, gorevVar, T, ayEt, yillar, planli: ay => !!veri[ay]};
+    return {aylar, satir, izinVar, gorevVar, T, ayEt, yillar, planli: ay => !!veri[ay] || arsivAy.has(ay)};
   }
   function takipExcel() {
     const {aylar, satir, izinVar, gorevVar, ayEt, yillar} = takipHazirla(), wb = XLSX.utils.book_new(), temiz = s => String(s == null ? '' : s);
@@ -2677,7 +2696,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     return `<div class="ap-card"><h2>İzin ve geçici görev takibi</h2><p class="ap-note">Kayıtlı aylık planlardan (${tumAylar.length} ay${tumAylar.length ? ': ' + takipKisa(tumAylar[0]) + ' – ' + takipKisa(tumAylar[tumAylar.length - 1]) : ''}) personelin hangi aylarda izin kullandığı ve hangi aylarda geçici görevlendirildiği. Seçili yılın 12 ayı birlikte görünür; birden çok yıl seçilebilir, boş bırakılırsa kayıtlı tüm yıllar.</p>
       <div class="ap-row" data-ust>${pop('yil', etYil, yilIc)}${pop('ist', etIst, istIc)}<input class="ap-in" data-act="takip-ara" placeholder="Ad ara…" value="${esc(T.ara || '')}"><label class="ap-note"><input type="checkbox" data-act="takip-sadece" ${T.sadece ? 'checked' : ''}> Yalnız kaydı olanlar</label><button class="ap-btn" data-act="takip-yenile" title="Kayıtlı planları yeniden okur">Yenile</button><button class="ap-btn" data-act="takip-excel">Excel'e aktar</button></div></div>
       <div class="ap-subnav ap-noprint" data-ust><button class="${izinSekme ? 'on' : ''}" data-act="takip-sekme" data-v="izin">İzin takibi</button><button class="${izinSekme ? '' : 'on'}" data-act="takip-sekme" data-v="gorev">Geçici görev takibi</button></div>
-      <div class="ap-card"><div class="ap-note" style="margin-bottom:6px">${gorunen.length} kişi · ${sYil.join(', ') || '—'} (${aylar.length} ay sütunu; planı olmayan aylar boş)${izinSekme ? ' · hücre: o ayda kullanılan izin günü ve kısaltma (üzerine gelince tam ad)' : ' · hücre: simgeye tıklayınca görev yeri ve tarih'}</div>${tablo}</div>`;
+      <div class="ap-card"><div class="ap-note" style="margin-bottom:6px">${gorunen.length} kişi · ${sYil.join(', ') || '—'} (${aylar.length} ay sütunu; planı olmayan aylarda izinler yüklenen izin dosyalarından gelir, görevlendirme boş kalır)${izinSekme ? ' · hücre: o ayda kullanılan izin günü ve kısaltma (üzerine gelince tam ad)' : ' · hücre: simgeye tıklayınca görev yeri ve tarih'}</div>${tablo}</div>`;
   }
   function arstatHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
@@ -3520,6 +3539,28 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     });
     return sonuc;
   }
+  // Sürüm 13.57: İzin-Muafiyet / Personel Listesi raporundaki bütün tarihli izinler kişi (TC) bazında; plan ayına bakılmaz.
+  // {aralik: [ilk başlangıç, son bitiş], kisi: {tc: [{tur, bas, bit, gun}]}}
+  function izinArsivHazirla(satirlar) {
+    const kisi = {}; let ilk = '', son = '';
+    (satirlar || []).forEach(r => {
+      const z = r.izin; if (!r.tc || !z || !z.bas || !z.bit) return;
+      const l = (kisi[r.tc] = kisi[r.tc] || []);
+      if (!l.some(x => x.bas === z.bas && x.bit === z.bit && x.tur === z.tip)) l.push({tur: String(z.tip || 'İZİN').toLocaleUpperCase('tr-TR'), bas: z.bas, bit: z.bit, gun: z.gun || 0});
+      if (!ilk || z.bas < ilk) ilk = z.bas; if (!son || z.bit > son) son = z.bit;
+    });
+    return ilk ? {aralik: [ilk, son], kisi} : null;
+  }
+  // Kayıtlı izin arşivine ekler: dosyadaki kişilerin, dosyanın tarih aralığına düşen eski kayıtları silinip dosyadakiler yazılır (iptal edilen izin kalmasın)
+  async function izinArsivBirlestir(yeni) {
+    if (!yeni) return;
+    const ar = (await depo.get('izinArsiv')) || {kisi: {}}, [ilk, son] = yeni.aralik;
+    Object.entries(yeni.kisi).forEach(([tc, l]) => {
+      const eski = (ar.kisi[tc] || []).filter(x => !(x.bas <= son && x.bit >= ilk));
+      ar.kisi[tc] = eski.concat(l).sort((a, b) => (a.bas < b.bas ? -1 : 1));
+    });
+    ar.zaman = Date.now(); await depo.put('izinArsiv', ar); S.takipVeri = null;
+  }
   function geciciGorev(plan, a) {
     const gc = a.gecici; if (!gc || !gc.ad) return {gorev: null, gecmis: []};
     const hedef = birimCoz(plan, gc.ad), baslik = C.TR(gc.neden);
@@ -3617,6 +3658,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         if (!k.durumManuel) { k.durum = k.durumB || k.durumA || (k.durum === 'GEÇİCİ GÖREVLİ' ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : '')); k.durumMetin = k.durumMetinB || k.durumMetinA || ''; }
       });
       rp.eslesmeyen = bk.size - rp.eslesen;
+      rp.izinArsiv = izinArsivHazirla(satirlar);      // Sürüm 13.57: dosyadaki bütün tarihli izinler (yalnız bu ay değil) — İzin takibi tablosu için
       return rp;
     }
     const rapor = {tur, yeni: [], degisen: 0, nakil: [], eksik: [], dortB: 0, dortBTarihsiz: 0, toplam: satirlar.length, gorevli: 0, disKurum: 0, gelen: 0, izinli: 0, muafiyet: 0, plan};
@@ -3686,6 +3728,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     });
     if (tur === 'A') plan.kayitlar.forEach(k => { if (!goruldu.has(k.id) && k.tc && !(durumlar()[k.durum] || {}).pasif) rapor.eksik.push(k); });
     birimTemizle(plan); birimSirala(plan);
+    rapor.izinArsiv = izinArsivHazirla(satirlar);      // Sürüm 13.57: bütün tarihli izinler (İzin takibi)
     return rapor;
   }
   // Seçilen/sürüklenen dosyaları okur; EKİP (A) listesi önce, Personel Listesi Raporu (B) sonra uygulanarak önizleme üretilir
@@ -4408,6 +4451,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
           logla('ASOS personel listeleri uygulandı', A.raporlar.map(r => `${r.tur === 'A' ? 'EKİP' : 'Personel Listesi'}: ${r.toplam} satır, ${r.yeni.length} yeni, ${r.degisen} güncel, ${r.nakil.length} birim değişikliği`).join(' | ')); damgala();
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
+          for (const r of A.raporlar) if (r.izinArsiv) { try { await izinArsivBirlestir(r.izinArsiv); } catch (e) { console.warn('izin arşivi', e); } }
           S.arsivVeri = null;
           kaydet(); S.modal = null; S.asos = null; S.sayfa = S.asosDonus || 'ana'; S.asosDonus = null; if (!S.ist || !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || S.plan.birimler[0] || {}).ad || '';
           toast('Personel listeleri uygulandı.'); break;
