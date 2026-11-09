@@ -261,6 +261,7 @@
     S.modal = null;
     if (!l.length) { toast(`İK'da ${turler.length > 1 ? 'nöbet / izin' : turler[0] === 'N' ? 'nöbet' : 'bu aya denk gelen izin'} kaydı yok — dosya yükleyin.${hatali.length ? ' (Okunamayan: ' + kisa(hatali) + ')' : ''}`); render(); return; }
     if (hatali.length) toast('İK\'dan okunamayan aylar: ' + kisa(hatali));
+    S.asosDonus = S.sayfa;      // Sürüm 13.57: İK'dan alınca aynı sayfada kalınır (nöbet ardından izin almak için yeniden girmek gerekmez)
     await asosDosyalariIsle(l);
   }
   function asosParseB(rows, hi) {
@@ -1071,7 +1072,7 @@
           if (typeof opts.veriKaynagi !== 'function') { toast('ASHİ bağlantısı tanımlı değil.'); break; }
           if (salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
           const l = await opts.veriKaynagi({ay: ayAnahtari(), turler: ['N', 'I']}); if (!l || !l.length) { toast('ASHİ\'den veri gelmedi.'); break; }
-          await asosDosyalariIsle(l); return;
+          S.asosDonus = S.sayfa; await asosDosyalariIsle(l); return;
         }
         case 'ik-al': await ikdenAl(v ? v.split(',') : ['N', 'I']); return;      // İK (ASHİ Nöbet Sayım) arşivinden nöbet / izin verisi
         case 'ist-kmp': S.istKmp = !S.istKmp; break;
@@ -1199,7 +1200,7 @@
           });
           otoHesapla(); bitenGorevleriKapat(); try { await kisaGelenKontrol(); } catch (e) {} if (S.ayar.otoGeriCek !== false) { const gc = acikGeriCek(true); if (gc.length) toast(`${gc.length} personel, istasyonlarında açık olduğu için otomatik geri çağrıldı.`); } logla('Önceki aydan kopyalandı', pk); kaydet(); S.sayfa = 'pano'; break;
         }
-        case 'plan-asos': { if (salt()) { toast(!guncelAy() ? 'Geçmiş aya dosya yüklenemez (salt okunur).' : 'Düzenleme yetkiniz yok / ay kilitli.'); break; } const f = await dosyaSec('.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', true); if (f.length) await asosDosyalariIsle(f); return; }
+        case 'plan-asos': { if (salt()) { toast(!guncelAy() ? 'Geçmiş aya dosya yüklenemez (salt okunur).' : 'Düzenleme yetkiniz yok / ay kilitli.'); break; } S.asosDonus = null; const f = await dosyaSec('.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', true); if (f.length) await asosDosyalariIsle(f); return; }
         case 'asos-uygula': {
           const A = S.asos; if (!A || !A.plan) break;
           if (S.plan && salt()) { toast('Bu ay düzenlemeye kapalı.'); break; }
@@ -1210,7 +1211,7 @@
           await yuklemeKaydet(A.dosyalar.filter(d => d.rapor));
           for (const r of A.raporlar) if (r.gercek) for (const g of Object.values(r.gercek)) await depo.put('gercek:' + g.ay, g);
           S.arsivVeri = null;
-          kaydet(); S.modal = null; S.asos = null; S.sayfa = 'ana'; if (!S.ist || !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || S.plan.birimler[0] || {}).ad || '';
+          kaydet(); S.modal = null; S.asos = null; S.sayfa = S.asosDonus || 'ana'; S.asosDonus = null; if (!S.ist || !S.plan.birimler.some(b => b.ad === S.ist)) S.ist = (S.plan.birimler.find(b => b.tur === 'istasyon') || S.plan.birimler[0] || {}).ad || '';
           toast('Personel listeleri uygulandı.'); break;
         }
         case 'pano-mod': { S.ayar.panoMod = v === 'mesai' ? 'mesai' : 'fazla'; await ayarKaydet(); if (S.plan && !salt()) { otoHesapla(); damgala(); kaydet(); } break; }
@@ -1343,7 +1344,7 @@
   });
 
   root.addEventListener('dragover', e => { if (e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files')) e.preventDefault(); });
-  root.addEventListener('drop', e => { if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); if (salt()) { toast('Düzenleme yetkiniz yok / ay kilitli / geçmiş ay salt okunur.'); return; } asosDosyalariIsle([...e.dataTransfer.files]); });
+  root.addEventListener('drop', e => { if (!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault(); if (salt()) { toast('Düzenleme yetkiniz yok / ay kilitli / geçmiş ay salt okunur.'); return; } S.asosDonus = null; asosDosyalariIsle([...e.dataTransfer.files]); });
 
   // Gömülü mod: güncel ay açıkken sunucudaki plan periyodik olarak (30 sn, sekme görünürken) yeniden okunur; başkalarının değiştirebildiği kısımlar güncellenir.
   // İstasyon parçaları (plan.nobet / plan.onay) her zaman; bu sekmenin düzenlediği istasyonun parçasına (kilit bende) dokunulmaz.
