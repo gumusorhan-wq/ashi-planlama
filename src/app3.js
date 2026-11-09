@@ -454,7 +454,8 @@
         if (k.durumA === 'GEÇİCİ GÖREVDE' && !k.gorev) k.gorev = {yer: '', hedef: null, kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
       } else {
         k.atamaBas = a.atamaBas || ''; if (a.atamaBas && k.memBasKaynak !== 'memuriyet') k.memBas = a.atamaBas;      // memuriyete başlama tarihi yoksa atama başlangıcı (4/B)
-        if (a.atamaBas) k.kadroTarih = a.atamaBas;      // Sürüm 13.57: kadro yeri değişikliği 1 yıl kuralı EKİP listesindeki atama başlangıç tarihinden k.atamaNeden = a.atamaNeden;
+        // Sürüm 13.57: kadro yeri değişikliği 1 yıl kuralı yalnız ATAMA ile gelenlerde, EKİP listesindeki atama başlangıç tarihinden; geçici görevle gelenler (başka kurumdan / IASB) ve başlayış nedeni geçici görev olanlar sayılmaz
+        if (a.atamaBas && !gelenKaynak && !/GECICI/.test(C.TR(a.atamaNeden || ''))) k.kadroTarih = a.atamaBas; k.atamaNeden = a.atamaNeden;
         // Bir kişinin birden çok izin/muafiyet satırı olabilir: aynı dosyada ilk satırda ASOS verisi sıfırlanır, sonrakiler eklenir
         const h = asosAyHesabi(a), ilkSatir = !izinGoruldu.has(k.id); izinGoruldu.add(k.id);
         if (ilkSatir) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; k.sut = h.sut; k.izin = (k.izin || []).filter(i => !i.asos); }
