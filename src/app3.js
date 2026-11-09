@@ -453,7 +453,8 @@
         else if (!a.gecici.ad && k.gorev && k.gorev.kaynak === 'asos' && !k.gorev.bas) k.gorev = null;
         if (k.durumA === 'GEÇİCİ GÖREVDE' && !k.gorev) k.gorev = {yer: '', hedef: null, kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
       } else {
-        k.atamaBas = a.atamaBas || ''; if (a.atamaBas && k.memBasKaynak !== 'memuriyet') k.memBas = a.atamaBas;      // memuriyete başlama tarihi yoksa atama başlangıcı k.atamaNeden = a.atamaNeden;
+        k.atamaBas = a.atamaBas || ''; if (a.atamaBas && k.memBasKaynak !== 'memuriyet') k.memBas = a.atamaBas;      // memuriyete başlama tarihi yoksa atama başlangıcı (4/B)
+        if (a.atamaBas) k.kadroTarih = a.atamaBas;      // Sürüm 13.57: kadro yeri değişikliği 1 yıl kuralı EKİP listesindeki atama başlangıç tarihinden k.atamaNeden = a.atamaNeden;
         // Bir kişinin birden çok izin/muafiyet satırı olabilir: aynı dosyada ilk satırda ASOS verisi sıfırlanır, sonrakiler eklenir
         const h = asosAyHesabi(a), ilkSatir = !izinGoruldu.has(k.id); izinGoruldu.add(k.id);
         if (ilkSatir) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; k.sut = h.sut; k.izin = (k.izin || []).filter(i => !i.asos); }
