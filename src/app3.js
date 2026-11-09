@@ -729,7 +729,7 @@
       dogumOnce: K.filter(k => k.durum === 'DOĞUM ÖNCESİ'), dogumSonra: K.filter(k => k.durum === 'DOĞUM SONRASI'),
       yarim: K.filter(k => k.durum === 'YARI ZAMANLI'), ucretsiz: K.filter(k => k.durum === 'ÜCRETSİZ İZİN'), askerlik: K.filter(k => k.durum === 'ASKERLİK İZNİ'),
       saglik: K.filter(k => k.durum === 'SAĞLIK MAZERETİ MESAİ' || (k.gorev && /SAĞLIK MAZERETİ/.test(k.gorev.gerekce || ''))),
-      muaf: K.filter(k => k.durum === 'NÖBET MUAFİYETİ'), rapor: K.filter(k => /RAPORLU/.test(k.durum || '')),
+      muaf: K.filter(k => k.durum === 'NÖBET MUAFİYETİ' || k.durum === 'NÖBET MUAFİYETİ MESAİ'), rapor: K.filter(k => /RAPORLU/.test(k.durum || '')),
       disGiden: K.filter(k => !gizliKisi(k) && dis(k)), disGelen: K.filter(k => k.kurumDisiGelen || k.durumB === 'GEÇİCİ GÖREVLİ' || (k.durum === 'GEÇİCİ GÖREVLİ' && !k.gorev) || (k.gorev && k.gorev.hedef && !['istasyon', 'kkm', 'bashekimlik'].includes(birimTur(k.birim)))),
       aile: K.filter(k => k.durum === 'AİLE HEKİMLİĞİNDE')};
   }

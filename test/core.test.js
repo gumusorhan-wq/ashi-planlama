@@ -156,3 +156,6 @@ console.log('çekirdek testleri geçti');
 // Sürüm 13.57: 657 memur şoför 'ms' grubunda (yalnız sürücü), sağlık ünvanlı sürücü değil
 { assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'ŞOFÖR'}), 'ms'); assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'SÜRÜCÜ'}), 'ms');
   assert.notStrictEqual(C.grupBelirle({sinif: 'memur', unvan: 'ACİL TIP TEKNİSYENİ'}), 'ms'); assert.deepStrictEqual(C.YETENEK.ms, ['sur']); console.log('657 sürücü testleri geçti'); }
+// Sürüm 13.57: NÖBET MUAFİYETİ eski hesap (nöbet yok), NÖBET MUAFİYETİ MESAİ gündüz 8 saat (hedef = mesai / 24)
+{ assert.strictEqual(C.DURUM_VARSAYILAN['NÖBET MUAFİYETİ'].gunduz8, undefined); assert.strictEqual(C.DURUM_VARSAYILAN['NÖBET MUAFİYETİ MESAİ'].gunduz8, true);
+  assert.strictEqual(C.durumAnahtar ? C.durumAnahtar('Nöbet muafiyeti mesai') : 'NÖBET MUAFİYETİ MESAİ', 'NÖBET MUAFİYETİ MESAİ'); console.log('muafiyet mesai testleri geçti'); }

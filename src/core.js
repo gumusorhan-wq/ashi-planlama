@@ -73,6 +73,8 @@ const APCore = (() => {
     'AİLE HEKİMLİĞİNDE':   {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true,  disarida: true, disKurum: true},
     'SÖZLEŞMELİ ÇALIŞIYOR': {renk: '#D9D9D9', nobetYok: true, mesaiYok: true, disarida: true, disKurum: true},      // 663 sayılı KHK vb. sözleşmeyle başka kurumda: nöbet tutmaz
     'NÖBET MUAFİYETİ':     {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
+    // Sürüm 13.57: gündüz 8 saat (09:00–17:00) çalışan muafiyetli; saatleri nöbetin 8 saatlik parçası sayılır (hedef = mesai / 24). Elle seçilir.
+    'NÖBET MUAFİYETİ MESAİ': {renk: '#FCD5B4', nobetYok: true, mesaiYok: false, gunduz8: true},
     'UZMANLIK EĞİTİMİ':    {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
     'PASİF':               {renk: '#EEEEEE', nobetYok: true,  mesaiYok: true,  pasif: true}
   };
@@ -88,7 +90,7 @@ const APCore = (() => {
       [/AILE HEK/, 'AİLE HEKİMLİĞİNDE'], [/UZMANLIK/, 'UZMANLIK EĞİTİMİ'], [/SOZLESMELI CALIS|663 SAYILI/, 'SÖZLEŞMELİ ÇALIŞIYOR'],
       [/UCRETSIZ/, 'ÜCRETSİZ İZİN'], [/ASKER/, 'ASKERLİK İZNİ'], [/YARI|YART/, 'YARI ZAMANLI'],
       [/SAGLIK MAZ.*MESAI|MAZERET.*MESAI|SAGLIK MAZ/, 'SAĞLIK MAZERETİ MESAİ'],
-      [/NOBET MUAF/, 'NÖBET MUAFİYETİ'], [/MESAI USULU/, 'MESAİ USULÜ'], [/NOBET USULU/, 'NÖBET USULÜ']
+      [/NOBET MUAF.*MESAI/, 'NÖBET MUAFİYETİ MESAİ'], [/NOBET MUAF/, 'NÖBET MUAFİYETİ'], [/MESAI USULU/, 'MESAİ USULÜ'], [/NOBET USULU/, 'NÖBET USULÜ']
     ];
     for (const [re, k] of kural) if (re.test(t)) return k;
     return '';
@@ -189,7 +191,7 @@ const APCore = (() => {
       // işçi: 3 aylık dönemde önceki aylardan devreden saat (eksik çalışılan +, fazla −) bu ayın mesaisine eklenir; vardiya sayısı yine aşağı yuvarlanır
       const devir = k.sinif === 'isci' && ayar && ayar.isciDevir && ayar.isciDevir[k.id] ? ayar.isciDevir[k.id].devir || 0 : 0;
       // Sürüm 13.57: nöbet muafiyetli personel gündüz 8 saat çalışır; bu saatler nöbetin 8 saatlik parçası sayılır (hedef = mesai / 24, azami = hedef)
-      const gunduz = !dt.disarida && (k.durum === 'NÖBET MUAFİYETİ' || !!dt.gunduz8) && k.sinif !== 'isci';
+      const gunduz = !dt.disarida && (k.durum === 'NÖBET MUAFİYETİ MESAİ' || !!dt.gunduz8) && k.sinif !== 'isci';
       const h = hedefNobet(Math.max(0, mesai + devir), gunduz ? 'memur' : k.sinif, (!!dt.nobetYok && !gunduz) || !!dt.disarida, ayar);
       return {k, mesai, devir, hedef: h.birim, hedefAdet: h.adet, nobetYok: !!dt.nobetYok && !gunduz, gunduz};
     });
