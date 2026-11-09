@@ -25,7 +25,7 @@
     return sat.sort((x, y) => sira(x.k, y.k)).map(s => {
       // Sürüm 13.56: Modül 1'deki planlanan (sabitlenen 🔒 dahil) esas alınır; istasyon Hedef nöbet sütunundan değiştirirse o geçerli. Planlamada elle yazılan sayı azamiyi aşıyorsa üst sınır o sayıdır.
       const k = s.k, m1 = k.planlanan != null && k.planlanan !== '' ? sayi(k.planlanan) : (oto.has(k.id) ? oto.get(k.id) : 0), azami = Math.max(Math.floor(s.azami + 1e-9), k.kilit ? Math.ceil(m1 - 1e-9) : 0);
-      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), otoHedef: m1, planlanan: (dp.hedef || {})[k.id] != null ? dp.hedef[k.id] : m1, elle: (dp.hedef || {})[k.id] != null, sabit: !!k.kilit, surPay: k.sinif === 'isci' ? 1 : (C.surucuDurumu(k, {degil: (S.ayar.surDegilEsik || 0) / 100}).pay || 0), ust: k.sinif === 'isci' ? null : azami, azamiF: k.sinif === 'isci' ? null : Math.max(Math.round(s.azami * 100) / 100, k.kilit ? m1 : 0), gelen: !!k._gelen,
+      return {id: k.id, ad: k.ad, grup: s.grup, sinif: k.sinif, brans: bransAd(k), otoHedef: m1, planlanan: (dp.hedef || {})[k.id] != null ? dp.hedef[k.id] : m1, elle: (dp.hedef || {})[k.id] != null, sabit: !!k.kilit, gunduz: !!s.gunduz, surPay: k.sinif === 'isci' ? 1 : (C.surucuDurumu(k, {degil: (S.ayar.surDegilEsik || 0) / 100}).pay || 0), ust: k.sinif === 'isci' ? null : azami, azamiF: k.sinif === 'isci' ? null : Math.max(Math.round(s.azami * 100) / 100, k.kilit ? m1 : 0), gelen: !!k._gelen,
         izin: (k.izin || []).filter(i => i.bas && i.bit).map(i => ({bas: i.bas, bit: C.izinSon(i), tur: i.tur})), izinGun: izinGun(k)};
     });      // branş sırası: doktor → AABT → ATT → diğer memur → sürücü ATT → işçi
   }
@@ -68,7 +68,7 @@
     return n2UstHtml(b) + ({plan: n2PlanHtml, istek: n2IstekHtml, liste: n2ListeHtml, denetim: n2DenetimHtml, paket: n2PaketHtml}[s] || n2PlanHtml)(b);
   }
   // ---- Planlama: Modül 1'de hazırlanan, bu istasyonun kendi planlaması (istasyon sorumlusu için yalnız onaydan sonra; sağlık nedenleri görünmez) ----
-  const NB_AD = {dok: 'Ekip şefi', isci: 'Sürücü', ke: 'Ekip şefi · YSP', ka: 'Ekip şefi · YSP · Sürücü', ysp: 'YSP', sy: 'YSP · Sürücü'};
+  const NB_AD = {dok: 'Ekip şefi', isci: 'Sürücü', ms: 'Sürücü', ke: 'Ekip şefi · YSP', ka: 'Ekip şefi · YSP · Sürücü', ysp: 'YSP', sy: 'YSP · Sürücü'};
   // İstasyon onay akışı: plan "Kesinleştir" ile istasyonlara gönderilir → istasyon sorumlusu nöbetleri düzenleyip planlamaya geri gönderir → planlama onaylarsa kesin plana işlenir
   const ONAY_AD = {acik: 'Düzenleniyor', gonderildi: 'Planlama onayı bekleniyor', onaylandi: 'Onaylandı', reddedildi: 'Planlama düzeltme istedi'};
   const n2OnayOku = ad => ((S.plan && S.plan.onay) || {})[ad] || {durum: 'acik', teklif: {}};
@@ -338,9 +338,13 @@
 
   // ---- olaylar ----
   async function ekClick(a, v, t, e) {
-    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && !a.startsWith('takip-') && a !== 'modul' && a !== 'durum-git' && !a.startsWith('yan')) return false;
+    if (!a.startsWith('n2-') && !a.startsWith('arsiv-') && !a.startsWith('arstat-') && !a.startsWith('yukleme-') && !a.startsWith('talep-') && !a.startsWith('ayar-') && !a.startsWith('takip-') && a !== 'modul' && a !== 'durum-git' && a !== 'plan-kaydet' && !a.startsWith('yan')) return false;
     const b = S.plan ? n2Birim() : null;
     switch (a) {
+      case 'plan-kaydet': {      // görünür Kaydet: bekleyen otomatik kaydı beklemeden hemen yazar
+        if (!S.plan || salt()) break;
+        kaydetIptal(); try { await planYaz(); toast(`Kaydedildi (${S.sonKayit}).`); } catch (e) { toast('Kaydedilemedi: ' + (e && e.message ? e.message : e)); } render(); break;
+      }
       case 'durum-git': {
         if (!S.plan || !(S.rol === 'yonetici' || S.rol === 'planlayici')) break;
         if (v === 'kilitli' && S.rol !== 'yonetici') { toast('Ayı yalnızca yönetici kapatır.'); break; }

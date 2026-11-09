@@ -66,4 +66,9 @@ assert.ok(!N.YETENEK.ke.includes('sur'));
   const ks2 = []; for (let i = 1; i <= 2; i++) ks2.push(kisi(i, 'ke', 8)); for (let i = 5; i <= 9; i++) ks2.push(kisi(i, 'sy', 8)); ks2.push(kisi(10, 'ysp', 8)); ks2.push(kisi(11, 'ysp', 8));
   const r2 = N.uret({y: 2026, m: 11, kisiler: ks2, attEs: true}, {seed: 4}); let att2 = 0, aabt = 0; for (let d = 1; d <= 30; d++) { const e = r2.liste[d].es; if (e >= 5) att2++; else if (e != null) aabt++; }
   assert.ok(aabt === 16 && att2 >= 10, 'AABT önce, ATT eksik kadar: AABT ' + aabt + ', ATT ' + att2); }
+// Sürüm 13.57: nöbet muafiyetli personel iş günlerinde 09:00–17:00 (8 saatlik parça) yazılır; hafta sonu yazılmaz
+{ const ks = []; for (let i = 1; i <= 6; i++) ks.push({...kisi(i, 'ka', 9), planlanan: 8}); for (let i = 7; i <= 9; i++) ks.push({...kisi(i, 'ysp', 9), planlanan: 8}); ks.push({...kisi(12, 'ke', 0), gunduz: true, planlanan: 7.67});
+  const g = {y: 2026, m: 12, kisiler: ks}, r = N.uret(g, {seed: 3}), H = N.hazirla(g); let parca = 0;
+  for (let d = 1; d <= 31; d++) { const L = r.liste[d]; Object.entries(L.bol || {}).forEach(([y, b]) => { if (L[y] === 12) { parca++; assert.strictEqual(b.saat, 16); assert.ok(!H.ozel[d], d + '. gün hafta sonu'); } }); }
+  assert.ok(parca >= 20, 'muaf parça sayısı ' + parca); }
 console.log('nöbet çekirdek testleri geçti');

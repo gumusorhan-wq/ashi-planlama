@@ -41,7 +41,7 @@
       <div class="ap-yanbas"><img class="ap-ylogo" src="${AP_LOGO}" alt=""><div class="ap-ybaslik"><b>ASHİ Planlama</b><span>${S.modul === 2 ? 'Modül 2' : 'Modül 1'} · ${esc(aktif)}</span></div><button type="button" class="ap-yanac" data-act="yan-ac" aria-label="Menüyü aç / kapat">${S.yanAcik ? '✕' : '☰'}</button></div>
       <div class="ap-ykisa" title="${esc(ayEtiket())}"><button class="ap-ykok" data-act="ay-" title="Önceki ay">‹</button><button class="ap-ayac" data-pop data-act="tp-ay-ac" title="Ay seç">${kisaAy}</button><button class="ap-ykok" data-act="ay+" title="Sonraki ay">›</button></div>
       <div class="ap-yanust"><div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><button class="ap-ayac" data-pop data-act="tp-ay-ac" title="Ay seç">${ayEtiket()} ▾</button><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
-        ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}" title="${DURUM_IPUCU[d] || ''}">${DURUM_AD[d] || d}</span>${guncelAy() && planlamaRol() ? durumSecHtml(d) : ''}</div>` : ''}
+        ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}" title="${DURUM_IPUCU[d] || ''}">${DURUM_AD[d] || d}</span>${guncelAy() && planlamaRol() ? durumSecHtml(d) : ''}${d !== 'kilitli' && !salt() ? `<button class="ap-btn sm" data-act="plan-kaydet" title="Değişiklikler zaten otomatik kaydedilir; bu düğme bekleyen değişikliği hemen sunucuya yazar">💾 Kaydet</button>${S.sonKayit ? `<span class="ap-note" title="Son kayıt">✓ ${S.sonKayit}</span>` : ''}` : ''}</div>` : ''}
         ${opts.kullanici ? '' : `<select class="ap-sel" data-act="rol" title="Rol (demo)">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select>`}</div>
       <div class="ap-yanic">${m1 ? `<div class="ap-ysec">MODÜL 1 · PLANLAMA</div>${m1Sec.map(s1).join('')}` : ''}
         <div class="ap-ysec">MODÜL 2 · NÖBET LİSTESİ</div>${s2}
@@ -230,7 +230,7 @@
       const yapar = {es: 'doktor / AABT', ysp: 'AABT / ATT', sur: 'işçi ya da sürücülüğü doğrulanmış AABT / ATT'};
       sat.push(`<b>${acik.map(y => `${AD[y]} ${fmt(pa.rem[y])} nöbet açık`).join(', ')}</b> — bu nöbeti tutabilecek kişinin planı dolu. Gereken: ${acik.map(y => yapar[y]).join('; ')}.`);
       if (pa.rem.sur > 0.05) {      // sürücü açığı: kimin sürücü sayıldığı, kimin sayılmadığı ve nedeni
-        const es = {degil: S.ayar.surDegilEsik / 100}, sur = h.satir.filter(x => !x.nobetYok && ['ka', 'sy', 'isci'].includes(x.grup)), deg = h.satir.filter(x => !x.nobetYok && x.k.sinif === 'memur' && (x.grup === 'ke' || x.grup === 'ysp'));
+        const es = {degil: S.ayar.surDegilEsik / 100}, sur = h.satir.filter(x => !x.nobetYok && ['ka', 'sy', 'isci', 'ms'].includes(x.grup)), deg = h.satir.filter(x => !x.nobetYok && x.k.sinif === 'memur' && (x.grup === 'ke' || x.grup === 'ysp'));
         const pct = x => { const d = C.surucuDurumu(x.k, es); return d.kaynak === 'kayit' ? `sürücü %${Math.round(100 * d.pay)}` : d.kaynak === 'manuel' ? 'elle: sürücü değil' : 'kayıt yok'; };
         sat.push(`Sürücü sayılan: <b>${sur.length} kişi</b> (planı ${fmt(sur.reduce((t, x) => t + sayi(x.k.planlanan), 0))} nöbet; ${fmt(pa.fill.ka.sur + pa.fill.sy.sur + pa.fill.isci.sur)} nöbeti sürücüye yazılabiliyor). ${deg.length ? `Sürücü <b>sayılmayan</b>: ${deg.map(x => `${esc(x.k.ad)} (${pct(x)})`).join(', ')} — nöbet kayıtlarında sürücü olarak nöbeti yok ya da kayıt yok. Sürücü olarak nöbet tutuyorsa <b>NÖBET ROLÜ</b> sütunundan "Sürücü dahil" seçin.` : ''}`);
       }
@@ -311,7 +311,7 @@
         <td><input class="ap-in w" data-id="${k.id}" data-f="ad" value="${esc(k.ad)}" ${dis}>${idariEtiket(k, duz)}</td>
         <td><input class="ap-in w" data-id="${k.id}" data-f="unvan" value="${esc(k.unvan)}" ${dis} title="${esc(k.dortB ? '4/B' : '')}">${k.dortB ? '<span class="ap-tag ap-t-fz" title="4/B personel">4/B</span>' : ''}${(() => { const y = C.kadroYilDurum(k.kadroTarih, ayIlk()); return y.yok || y.uygun ? '' : `<span class="ap-tag ap-t-fz" title="Kadro değişikliği (${esc(k.kadroTarih.split('-').reverse().join('.'))}): ${esc(y.dolum.split('-').reverse().join('.'))} tarihine kadar görevlendirilemez">kadro 1 yıl</span>`; })()}</td>
         <td class="gz"><select class="ap-sel" data-id="${k.id}" data-f="sinif" ${dis}>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === k.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
-        <td>${k.sinif === 'memur' ? `${(() => { const sd = C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}); return `<select class="ap-sel" data-id="${k.id}" data-f="rolManuel" ${dis} title="Boş: nöbet listelerinden otomatik. AABT ve ATT sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa girer; ATT ekip şefi nöbet branşına girmez."><option value="">Oto: ${esc(s ? ({dok: 'Doktor', isci: 'İşçi', ke: 'AABT: ekip şefi+YSP', ka: 'AABT: sürücü dahil', ysp: 'Yalnız YSP', sy: 'Sürücü+YSP'})[s.grup] : '')}</option>${(s && s.kadroTip === 'AABT' ? [['ysp', 'Ekip şefi+YSP (sürücü değil)'], ['sur', 'Sürücü dahil']] : [['ysp', 'Yalnız YSP'], ['sur', 'Sürücü+YSP']]).map(([r, t]) => `<option value="${r}" ${(k.rolManuel === r || (r === 'sur' && k.rolManuel === 'karma')) ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="ap-note">${sd.kaynak === 'manuel' ? 'elle seçildi' : sd.kaynak === 'kayit' ? `sürücü %${Math.round(100 * sd.pay)}` : '<span style="color:var(--ap-warn)">doğrulanmadı</span>'}</div>`; })()}` : `<span class="ap-note ap-hd">${k.sinif === 'doktor' ? 'Ekip şefi' : 'Sürücü'}</span>`}</td>
+        <td>${k.sinif === 'memur' ? `${(() => { const sd = C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}); return `<select class="ap-sel" data-id="${k.id}" data-f="rolManuel" ${dis} title="Boş: nöbet listelerinden otomatik. AABT ve ATT sürücü nöbet branşına yalnız nöbet listesinde sürücü görünüyorsa girer; ATT ekip şefi nöbet branşına girmez."><option value="">Oto: ${esc(s ? ({dok: 'Doktor', isci: 'İşçi', ms: 'Sürücü (657)', ke: 'AABT: ekip şefi+YSP', ka: 'AABT: sürücü dahil', ysp: 'Yalnız YSP', sy: 'Sürücü+YSP'})[s.grup] : '')}</option>${(s && s.kadroTip === 'AABT' ? [['ysp', 'Ekip şefi+YSP (sürücü değil)'], ['sur', 'Sürücü dahil']] : [['ysp', 'Yalnız YSP'], ['sur', 'Sürücü+YSP']]).map(([r, t]) => `<option value="${r}" ${(k.rolManuel === r || (r === 'sur' && k.rolManuel === 'karma')) ? 'selected' : ''}>${t}</option>`).join('')}</select><div class="ap-note">${sd.kaynak === 'manuel' ? 'elle seçildi' : sd.kaynak === 'kayit' ? `sürücü %${Math.round(100 * sd.pay)}` : '<span style="color:var(--ap-warn)">doğrulanmadı</span>'}</div>`; })()}` : `<span class="ap-note ap-hd">${k.sinif === 'doktor' ? 'Ekip şefi' : 'Sürücü'}</span>`}</td>
         <td>${gelen ? '<b class="ap-hd">GEÇİCİ GÖREVLİ</b>' : `<select class="ap-sel" data-id="${k.id}" data-f="durum" ${dis}><option value="">—</option>${Object.keys(D).map(a => `<option ${a === k.durum ? 'selected' : ''}>${a}</option>`).join('')}</select>`}${k.durumMetin && k.durumMetin !== k.durum ? `<div class="ap-note">${esc(k.durumMetin)}</div>` : ''}</td>
         <td class="iz-g"><input class="ap-in n" type="number" min="0" step="0.5" data-id="${k.id}" data-f="izinGun" value="${izinGun(k) || ''}" ${dis}>${izinTarihli(k) && izinAyGun(k) !== izinGun(k) ? `<div class="ap-note iz-not" title="İznin başlangıç-bitiş tarihleri ASOS'tan geldi; mesaiyi yalnız plan ayına düşen günler etkiler">${ayEtiket()}'da ${izinAyGun(k)} gün · mesaiden ${fmt(C.kisiMesai({...k, izin: [], sut: 0, durum: ''}, S.y, S.m, ozel(), durumlar()) - C.kisiMesai({...k, sut: 0, durum: ''}, S.y, S.m, ozel(), durumlar()))} saat düşer</div>` : ''}</td>
         <td class="gz iz-t"><select class="ap-sel" data-id="${k.id}" data-f="izinTur" ${dis}><option value="">—</option>${IZIN_TURLERI.map(a => `<option ${a === ((k.izin || [])[0] || {}).tur ? 'selected' : ''}>${a}</option>`).join('')}</select></td>
@@ -610,6 +610,36 @@
       <div class="ap-gungrid">${['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(x => `<span class="ap-note">${x}</span>`).join('')}${gunler.join('')}</div>
       <div class="ap-popalt"><span>${v.bas ? `<button class="ap-btn sm" data-pop data-act="tp-temizle">Temizle</button>` : ''}</span><button class="ap-btn sm" data-pop data-act="tp-kapat">Kapat ✕</button></div></div>`;
   }
+  // Sürüm 13.57: bütün tablolarda başlığa tıklayınca sıralama (▲ / ▼, üçüncü tıklama kaldırır) ve 8+ satırlı tabloda "Tabloda ara" süzgeci.
+  // Ara başlık satırı (colspan) olan gruplu tablolarda sıralanınca ara başlıklar gizlenir. Takvim tabloları (istek / nöbet listesi) hariç. Durum sayfa + tablo sırasına göre saklanır.
+  const TD = {};
+  const hucreDeger = (r, i) => { const c = r.cells[i]; if (!c) return ''; const e = c.querySelector('input:not([type=checkbox]),select');
+    if (e) return e.tagName === 'SELECT' ? ((e.options[e.selectedIndex] || {}).text || '') : e.value; const cb = c.querySelector('input[type=checkbox]'); if (cb) return cb.checked ? '1' : '0'; return (c.textContent || '').trim(); };
+  const hucreSayi = v => { const t = String(v).replace(/[−–]/g, '-').replace(/\s/g, ''); if (!/^[-+]?[\d.]*\d(,\d+)?/.test(t)) return null; const m = t.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.').match(/^[-+]?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
+  function tabloSuz(t, d) { const q = C.TR(d.ara || ''); [...t.tBodies[0].rows].forEach(r => { if (!q) { if (r.dataset.taraGizli) { r.style.display = ''; delete r.dataset.taraGizli; } return; }
+    const v = C.TR([...r.cells].map((c, i) => hucreDeger(r, i)).join(' ')); if (v.includes(q)) { if (r.dataset.taraGizli) { r.style.display = ''; delete r.dataset.taraGizli; } } else if (r.style.display !== 'none') { r.style.display = 'none'; r.dataset.taraGizli = '1'; } }); }
+  function tabloSiralaFiltrele() {
+    const sayfa = S.modul === 2 ? 'n2:' + S.n2.sekme : S.sayfa + ':' + (S.gorevSekme || '');
+    root.querySelectorAll('.ap-main table.ap-t').forEach((t, ti) => {
+      if (t.matches('.n2, .n2l, [data-sirasiz]') || !t.tBodies[0]) return;
+      const tb = t.tBodies[0], satir = [...tb.rows]; if (satir.length < 3) return;
+      const ths = [...t.querySelectorAll('thead tr:last-child th')]; if (!ths.length) return;
+      const anahtar = `${sayfa}:${ti}:${ths.length}`, d = TD[anahtar] || (TD[anahtar] = {k: -1, y: 1, ara: ''}), grup = satir.some(r => r.querySelector('td[colspan]'));
+      if (satir.length >= 8 && !satir.some(r => r.dataset.ara != null)) {      // kendi arama kutusu olan listelerde (data-ara) ikinci kutu açılmaz
+        const kap = t.closest('.ap-tw') || t, inp = document.createElement('input');
+        inp.className = 'ap-in ap-tara ap-noprint'; inp.placeholder = 'Tabloda ara…'; inp.value = d.ara; inp.dataset.tk = anahtar; inp.setAttribute('aria-label', 'Tabloda ara');
+        kap.parentNode.insertBefore(inp, kap); inp._tablo = t;
+      }
+      ths.forEach((th, i) => { if (th.colSpan > 1 || !(th.textContent || '').trim()) return; th.classList.add('ap-sirala'); th.dataset.tk = anahtar; th.dataset.ti = i; if (d.k === i) th.dataset.yon = d.y > 0 ? '▲' : '▼'; else delete th.dataset.yon; });
+      if (d.k >= 0 && grup) satir.forEach(r => { if (r.querySelector('td[colspan]')) r.style.display = 'none'; });      // gruplu tabloda sıralanınca ara başlıklar gizlenir (sıralama kaldırılınca geri gelir)
+      if (d.k >= 0) satir.filter(r => !r.querySelector('td[colspan]')).sort((a, b) => { const va = hucreDeger(a, d.k), vb = hucreDeger(b, d.k), na = hucreSayi(va), nb = hucreSayi(vb);
+        if (!va && vb) return 1; if (va && !vb) return -1; return (na != null && nb != null ? na - nb : va.localeCompare(vb, 'tr', {numeric: true})) * d.y; }).forEach(r => tb.appendChild(r));
+      if (d.ara) tabloSuz(t, d);
+    });
+  }
+  root.addEventListener('click', e => { const th = e.target.closest && e.target.closest('th.ap-sirala'); if (!th || e.target.closest('input,select,button,a')) return;
+    const d = TD[th.dataset.tk]; if (!d) return; const i = +th.dataset.ti; if (d.k !== i) { d.k = i; d.y = 1; } else if (d.y > 0) d.y = -1; else d.k = -1; render(); });
+  root.addEventListener('input', e => { const t = e.target; if (!t.classList || !t.classList.contains('ap-tara')) return; const d = TD[t.dataset.tk]; if (!d) return; d.ara = t.value; if (t._tablo) tabloSuz(t._tablo, d); });
   function render() {
     oturumYaz();
     const sy = window.scrollY, tw = root.querySelector('.ap-tw'), sl = tw ? tw.scrollLeft : 0, st = tw ? tw.scrollTop : 0, ic0 = root.querySelector('.ap-icerik'), isy = ic0 ? ic0.scrollTop : 0;
@@ -630,6 +660,7 @@
         if (sayisal || hucre.every(c => c.classList.contains('num') || (!(c.textContent || '').trim() && !c.querySelector('input,select')))) { th.classList.add('num'); hucre.forEach(c => c.classList.add('num')); }
       });
     });
+    tabloSiralaFiltrele();
     seciciDonustur();
     toastCiz();
     ustYerlestir();

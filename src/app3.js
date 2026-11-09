@@ -283,7 +283,12 @@
   }
   const trTarih = iso => iso ? iso.split('-').reverse().join('.') : '';
   function asosSinif(a) {
-    if (/ISCI|SOFOR/.test(C.TR(a.kadroTur + ' ' + a.unvan)) || /SURUCU/.test(C.TR(a.kadroBrans))) return 'isci';
+    // Sürüm 13.57: istihdam şekli belirleyicidir — 657 / memur / 4-A / 4-B olan şoför / sürücü memurdur (işçi değil); işçi yalnız istihdam şekli işçi / 4-D ise
+    // ya da istihdam şekli boşken ünvan / branş işçi, şoför, sürücü ise
+    const tur = C.TR(a.kadroTur || '');
+    if (/ISCI|4\s*\/?\s*D\b/.test(tur)) return 'isci';
+    if (/657|MEMUR|4\s*\/?\s*A\b|4\s*\/?\s*B\b|SOZLESMELI|KADROLU/.test(tur)) return /DOKTOR|TABIP|HEKIM/.test(C.TR(a.unvan)) ? 'doktor' : 'memur';
+    if (/ISCI|SOFOR/.test(C.TR(a.unvan)) || /SURUCU/.test(C.TR(a.kadroBrans))) return 'isci';
     return C.sinifTespit(a.unvan) || 'memur';
   }
   function asosDurumA(a) {
@@ -439,7 +444,7 @@
       }
       k.gecmis = k.gecmis || []; k.gecmisAsos = k.gecmisAsos || [];
       if (tur === 'A') {
-        k.calisma = a.calisma; if (a.yillikKalan != null) k.yillikKalan = a.yillikKalan; if (a.memBas && !k.atamaBas) k.memBas = a.memBas;
+        k.calisma = a.calisma; if (a.yillikKalan != null) k.yillikKalan = a.yillikKalan; if (a.memBas) { k.memBas = a.memBas; k.memBasKaynak = 'memuriyet'; }      // Sürüm 13.57: 4/B 4 yıl kuralı memuriyete başlama tarihinden (Personel Listesi Raporu)
         k.durumA = asosDurumA(a);
         const bitti = k.gorevSonaErdi || (a.gecici.ad && gorevYoksay(k, birimCoz(plan, a.gecici.ad)));      // görevi biten ya da 1–2 nöbet için gidildiği nöbet listesinden anlaşılan görev
         if (bitti && k.durumA === 'GEÇİCİ GÖREVDE') k.durumA = '';      // Personel Listesi Raporu'na göre görevi plan ayından önce bitiyor (ör. 01.10–01.11): kadrosuna döner
@@ -448,7 +453,7 @@
         else if (!a.gecici.ad && k.gorev && k.gorev.kaynak === 'asos' && !k.gorev.bas) k.gorev = null;
         if (k.durumA === 'GEÇİCİ GÖREVDE' && !k.gorev) k.gorev = {yer: '', hedef: null, kaynak: 'asos', yolluk: '', bas: '', bit: '', tarih: '', gerekce: ''};
       } else {
-        k.atamaBas = a.atamaBas || ''; if (a.atamaBas) k.memBas = a.atamaBas; k.atamaNeden = a.atamaNeden;
+        k.atamaBas = a.atamaBas || ''; if (a.atamaBas && k.memBasKaynak !== 'memuriyet') k.memBas = a.atamaBas;      // memuriyete başlama tarihi yoksa atama başlangıcı k.atamaNeden = a.atamaNeden;
         // Bir kişinin birden çok izin/muafiyet satırı olabilir: aynı dosyada ilk satırda ASOS verisi sıfırlanır, sonrakiler eklenir
         const h = asosAyHesabi(a), ilkSatir = !izinGoruldu.has(k.id); izinGoruldu.add(k.id);
         if (ilkSatir) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; k.sut = h.sut; k.izin = (k.izin || []).filter(i => !i.asos); }

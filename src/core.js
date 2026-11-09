@@ -188,20 +188,22 @@ const APCore = (() => {
       const mesai = kisiMesai(k, y, m, ozel, durumlar);
       // işçi: 3 aylık dönemde önceki aylardan devreden saat (eksik çalışılan +, fazla −) bu ayın mesaisine eklenir; vardiya sayısı yine aşağı yuvarlanır
       const devir = k.sinif === 'isci' && ayar && ayar.isciDevir && ayar.isciDevir[k.id] ? ayar.isciDevir[k.id].devir || 0 : 0;
-      const h = hedefNobet(Math.max(0, mesai + devir), k.sinif, !!dt.nobetYok || !!dt.disarida, ayar);
-      return {k, mesai, devir, hedef: h.birim, hedefAdet: h.adet, nobetYok: !!dt.nobetYok};
+      // Sürüm 13.57: nöbet muafiyetli personel gündüz 8 saat çalışır; bu saatler nöbetin 8 saatlik parçası sayılır (hedef = mesai / 24, azami = hedef)
+      const gunduz = !dt.disarida && (k.durum === 'NÖBET MUAFİYETİ' || !!dt.gunduz8) && k.sinif !== 'isci';
+      const h = hedefNobet(Math.max(0, mesai + devir), gunduz ? 'memur' : k.sinif, (!!dt.nobetYok && !gunduz) || !!dt.disarida, ayar);
+      return {k, mesai, devir, hedef: h.birim, hedefAdet: h.adet, nobetYok: !!dt.nobetYok && !gunduz, gunduz};
     });
     // Azami nöbet: memur/doktor tam ay hedefinin üstüne azamiMemur'a kadar (ör. Kasım: hedef 7, azami 8); izinli kişide hedef + aynı ek; işçi: hedef (mesaisinin üstüne yazılmaz)
     const a = ayar || {}, azamiMemur = a.azamiMemur || 0, tam = hedefNobet(ayMesai(y, m, false, ozel), 'memur', false, a).birim, ek = Math.max(0, azamiMemur - tam);
     satir.forEach(s => {
       const dz = (durumlar || {})[s.k.durum] || {}, fazlaYok = dz.fazlaYok != null ? !!dz.fazlaYok : s.k.durum === 'YARI ZAMANLI';      // yarı zamanlı yalnız kendi mesaisi kadar, fazla nöbet yazılmaz
-      s.azami = s.nobetYok || !(s.hedef > 0) ? 0 : fazlaYok ? s.hedef : (s.k.sinif === 'isci' ? s.hedef : Math.min(Math.max(azamiMemur, s.hedef), s.hedef + ek));
+      s.azami = s.nobetYok || !(s.hedef > 0) ? 0 : fazlaYok ? s.hedef : (s.k.sinif === 'isci' || s.gunduz ? s.hedef : Math.min(Math.max(azamiMemur, s.hedef), s.hedef + ek));
     });
     // Yuva yetenekleri: doktor → ekip şefi; işçi → sürücü (12 saat); AABT (sağlık teknikeri) → ekip şefi + YSP (sürücülüğü nöbet kayıtlarından doğrulanmışsa + sürücü); ATT (sağlık memuru / teknisyeni) → YSP (sürücülüğü doğrulanmışsa + sürücü)
     // (nöbet kayıtlarında ekip şefi olarak görev almışsa ekip şefi + YSP; yalnızca YSP olarak çalışıyorsa YSP).
     const esik = {sur: (a.surEsik == null ? 70 : a.surEsik) / 100, degil: (a.surDegilEsik == null ? 0 : a.surDegilEsik) / 100};
     satir.forEach(s => { s.kadroTip = kadroTip(s.k); s.rol = rolBelirle(s.k, esik); s.grup = grupBelirle(s.k, esik, a); });
-    const gruplar = {dok: [], isci: [], ke: [], ka: [], ysp: [], sy: []};
+    const gruplar = {dok: [], isci: [], ms: [], ke: [], ka: [], ysp: [], sy: []};
     satir.forEach(s => { if (!s.nobetYok) gruplar[s.grup].push(s); });
     const D3 = ihtiyac / 3, dem = {es: D3, ysp: D3, sur: D3}, r2 = v => Math.round(v * 100) / 100, EPS = 1e-9;
     const topla = (f) => { const o = {}; GRUPLAR.forEach(g => { o[g] = gruplar[g].reduce((x, s) => x + s[f], 0); }); return o; };
@@ -228,10 +230,10 @@ const APCore = (() => {
   }
   // Grup yetenekleri ve yuva akışı. Nöbet branşları: es (ekip şefi), ysp (yardımcı sağlık personeli), sur (sürücü).
   // Ekip şefi nöbetlerini doktor ve AABT tutar; doktorlu olmayan ekipte ATT ekip şefi nöbet branşına en son takviye verebilir (attEs).
-  const GRUPLAR = ['dok', 'isci', 'ke', 'ka', 'ysp', 'sy'];
-  const YETENEK = {dok: ['es'], isci: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
+  const GRUPLAR = ['dok', 'isci', 'ms', 'ke', 'ka', 'ysp', 'sy'];      // ms: 657'ye tabi memur sürücü (şoför) — yalnız sürücü, 24 saat
+  const YETENEK = {dok: ['es'], isci: ['sur'], ms: ['sur'], ke: ['es', 'ysp'], ka: ['es', 'sur', 'ysp'], ysp: ['ysp'], sy: ['sur', 'ysp']};   // sıra = doldurma önceliği
   const YETENEK_ES = {...YETENEK, ysp: ['ysp', 'es'], sy: ['sur', 'ysp', 'es']};      // doktorsuz ekip: ATT ekip şefine takviye
-  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (ekip şefi + YSP + sürücü)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
+  const GRUP_AD = {dok: 'Doktor', isci: 'İşçi', ms: 'Sürücü (657 memur)', ke: 'AABT (ekip şefi + YSP)', ka: 'AABT (ekip şefi + YSP + sürücü)', ysp: 'ATT (yalnız YSP)', sy: 'ATT (sürücü + YSP)'};
   // Önce doktor ve işçi, sonra AABT (önce ekip şefi, sonra ATT'nin giremediği yuvalar, en son YSP) nöbet branşları doldurur; ATT geri kalan nöbet branşları doldurur.
   // Böylece AABT'nin hedef nöbetleri tam kullanılır, fazlalık ATT'de görünür (bir ATT bir ay dışarı çıkabilir).
   // Nöbet branşlarına dağıtım en iyi akışla yapılır (boş kalan en az olur; basit sıra bir branşı yanlışlıkla açık, öbürünü fazla gösteriyordu — Sürüm 13.56).
@@ -276,15 +278,16 @@ const APCore = (() => {
   }
   function oneri(hesap, kilitli) {
     const {ihtiyac, gruplar: gr} = hesap, sonuc = new Map(), D3 = ihtiyac / 3;
-    const ser = g => gr[g].filter(s => !kilitli || !kilitli.has(s.k.id));
-    const kil = g => gr[g].filter(s => kilitli && kilitli.has(s.k.id)).reduce((x, s) => x + kilitli.get(s.k.id), 0);
+    const ser = g => (gr[g] || []).filter(s => !kilitli || !kilitli.has(s.k.id));
+    const kil = g => (gr[g] || []).filter(s => kilitli && kilitli.has(s.k.id)).reduce((x, s) => x + kilitli.get(s.k.id), 0);
     const top = (L, f) => L.reduce((x, s) => x + s[f], 0), kilitSup = {}, sup1 = {}, ek = {};
     GRUPLAR.forEach(g => { const L = ser(g); kilitSup[g] = kil(g); sup1[g] = top(L, 'hedef'); ek[g] = top(L, 'azami') - top(L, 'hedef'); });
     const ae = !!hesap.attEs, f0 = akis(kilitSup, {es: D3, ysp: D3, sur: D3}, ae), f1 = akis(sup1, f0.rem, ae), f2 = akisEk(ek, f1.rem, ae);
     GRUPLAR.forEach(g => {
       const L = ser(g), t = x => x.es + x.ysp + x.sur, total = t(f1.fill[g]) + t(f2.fill[g]);
       // Hedefin üstüne fazla nöbet yazılan memur/doktorda nöbet tam sayıya yuvarlanır: önce aşağı, eksik kalan toplam küsuratı en büyük olanlardan başlayarak azamiyi aşmadan yukarı tamamlanır (ör. 8,67 / 8,67 / 8,66 → 9 / 9 / 8)
-      const V = dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), g === 'isci' ? ADIM : 0.01);
+      // Sürüm 13.57: işçi her durumda mesaisine göre hedef vardiyasını tutar (kilitli memur sürücüler sürücüyü doldursa da düşürülmez)
+      const V = g === 'isci' ? L.map(s => s.hedef) : dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), 0.01);
       if (g !== 'isci') {
         const fz = V.map((v, i) => v > L[i].hedef + 0.01 ? i : -1).filter(i => i >= 0), hedefT = fz.reduce((x, i) => x + V[i], 0);
         const R = V.slice(); fz.forEach(i => { R[i] = Math.max(L[i].hedef, Math.floor(V[i] + 0.01)); });
@@ -306,6 +309,12 @@ const APCore = (() => {
     return sonuc;
   }
   // Kadro tipi: AABT (sağlık teknikeri) ve ATT (sağlık memuru / teknisyeni). Unvanda açıkça yazıyorsa o esas alınır.
+  // Sürüm 13.57: 657'ye tabi memur şoför / sürücü (sağlık ünvanı yok) — işçi değil, 24 saatlik sürücü nöbeti tutar
+  function memurSurucu(k) {
+    if (k.sinif !== 'memur') return false;
+    const u = TR((k.unvan || '') + ' ' + (k.kadroBrans || ''));
+    return /SOFOR|SURUCU/.test(u) && !/AABT|\bATT\b|ACIL|TEKNIKER|TEKNISYEN|SAGLIK|HEMSIRE|EBE\b|PARAMEDIK/.test(u);
+  }
   function kadroTip(k) {
     const u = TR((k.unvan || '') + ' ' + (k.kadroBrans || ''));
     if (/\bAABT\b|AMBULANS VE ACIL BAKIM/.test(u)) return 'AABT';
@@ -315,6 +324,7 @@ const APCore = (() => {
   function grupBelirle(k, esik, ayar) {
     if (k.sinif === 'doktor') return 'dok';
     if (k.sinif === 'isci') return 'isci';
+    if (memurSurucu(k)) return 'ms';
     if (kadroTip(k) === 'AABT') return surucuDurumu(k, esik).tip === 'surucu' ? 'ka' : 'ke';    // AABT de her nöbet branşına girmez: sürücü nöbet branşı yalnızca nöbet listelerinde sürücü olarak nöbet tuttuğu doğrulananlara açılır
     return surucuDurumu(k, esik).tip === 'surucu' ? 'sy' : 'ysp';    // ATT: yalnızca nöbet listelerinde sürücü olarak nöbet tuttuğu doğrulanırsa sürücü + YSP; aksi halde yalnız YSP (ekip şefi olamaz)
   }
@@ -425,7 +435,7 @@ const APCore = (() => {
     return Math.round(2 * 6371 * Math.asin(Math.sqrt(h)));
   }
 
-  const api = {izinSon, surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, kadroYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
+  const api = {izinSon, surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, memurSurucu, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, kadroYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
     durumAnahtar, sinifTespit, DURUM_VARSAYILAN, OZEL_TUR, RESMI, MESAI, YUVA_VARSAYILAN, ADIM};
   return api;
 })();

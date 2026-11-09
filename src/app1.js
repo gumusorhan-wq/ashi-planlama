@@ -81,7 +81,7 @@ function mount(root, opts = {}) {
   // Kayıt sürerken (bekleme + sunucuya yazma) S.kaydetBekliyor açık kalır; S.yazNo her kayıt isteğinde artar (gömülü moddaki periyodik yenileme bunlara bakar)
   S.yazNo = 0;
   let yaziliyor = 0;
-  const planYaz = async () => { S.yazNo++; S.kaydetBekliyor = true; yaziliyor++; try { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } } finally { yaziliyor--; if (!kaydetZamani && !yaziliyor) S.kaydetBekliyor = false; } };
+  const planYaz = async () => { S.yazNo++; S.kaydetBekliyor = true; yaziliyor++; try { if (S.plan) { await depo.put(anahtar(S.y, S.m), S.plan); S.sonKayit = new Date().toLocaleTimeString('tr-TR', {hour: '2-digit', minute: '2-digit'}); olay('plan:degisti', {ay: `${S.y}-${S.m}`}); } } finally { yaziliyor--; if (!kaydetZamani && !yaziliyor) S.kaydetBekliyor = false; } };
   const kaydetIptal = () => { clearTimeout(kaydetZamani); kaydetZamani = null; if (!yaziliyor) S.kaydetBekliyor = false; };
   const kaydet = () => { S.yazNo++; S.kaydetBekliyor = true; clearTimeout(kaydetZamani); kaydetZamani = setTimeout(() => { kaydetZamani = null; planYaz().catch(e => console.error(e)); }, 300); };
   // Ay kilidini açma (yalnız yönetici): kilitli ay mut() ile değiştirilemediğinden bu işlem salt() engelini bilinçli olarak aşar; plan 'kesin' durumuna döner.
@@ -142,6 +142,8 @@ function mount(root, opts = {}) {
   async function planYukle() {
     S.plan = (await depo.get(anahtar(S.y, S.m))) || null;
     if (S.plan && guncelAy()) ofUygula(S.plan);
+    // Sürüm 13.57: istihdam şekli 657 / memur / 4-A / 4-B olup eski kurala göre işçi sayılmış şoför / sürücüler memur olur (657 memur sürücü)
+    if (S.plan) S.plan.kayitlar.forEach(k => { if (k.sinif === 'isci' && /657|MEMUR|4\s*\/?\s*A\b|4\s*\/?\s*B\b|SOZLESMELI|KADROLU/.test(C.TR(k.kadroTur || '')) && !/ISCI|4\s*\/?\s*D\b/.test(C.TR(k.kadroTur || ''))) k.sinif = 'memur'; });
     try { const py = S.m === 1 ? S.y - 1 : S.y, pm = S.m === 1 ? 12 : S.m - 1, op = await depo.get(anahtar(py, pm)); S.oncePlanBirim = new Map(); ((op && op.kayitlar) || []).forEach(k => { if (k.tc) S.oncePlanBirim.set(k.tc, {birim: k.birim, kadroTarih: k.kadroTarih || ''}); });
       // Modül 2: önceki ayın nöbet listeleri (son günlerdeki nöbetler dinlenme / gün aşırı kurallarında hesaba katılır)
       S.onceNobet = {y: py, m: pm, nobet: (op && op.nobet) || {}, ad: new Map(((op && op.kayitlar) || []).map(k => [k.id, {ad: C.TR(k.ad || ''), tc: k.tc || ''}]))}; } catch (e) { S.oncePlanBirim = new Map(); S.onceNobet = null; }
@@ -263,6 +265,7 @@ function mount(root, opts = {}) {
     const g = grup || C.grupBelirle(k, surEsikleri(), S.ayar);
     if (g === 'ke' || g === 'ka') return 1;      // AABT (sürücü teyitli AABT de AABT sırasında kalır)
     if (g === 'sy') return 4;                     // nöbet rolü sürücü olan ATT: memurların en altı
+    if (g === 'ms') return 5;                     // 657 memur sürücü: memurlardan sonra, işçiden önce
     return ATT_RE.test(C.TR((k.unvan || '') + ' ' + (k.kadroBrans || ''))) ? 2 : 3;
   }
   // satirMap: istasyon hesabındaki satırlar (id → {grup}); verilmezse grup kişiden hesaplanır

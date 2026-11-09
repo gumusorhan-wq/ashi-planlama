@@ -153,3 +153,6 @@ console.log('çekirdek testleri geçti');
 // Sürüm 13.56: tarihsiz izin takvim günü — 5 → 5, 10 → 8, 15 → 11 iş günü (memur, Aralık 2026: 184 saat)
 { const D = {}; const m = g => C.kisiMesai({sinif: 'memur', izin: [{gun: g, tur: 'YILLIK İZİN'}]}, 2026, 12, {}, D);
   assert.strictEqual(m(5), 184 - 40); assert.strictEqual(m(10), 184 - 64); assert.strictEqual(m(15), 184 - 88); console.log('tarihsiz izin testleri geçti'); }
+// Sürüm 13.57: 657 memur şoför 'ms' grubunda (yalnız sürücü), sağlık ünvanlı sürücü değil
+{ assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'ŞOFÖR'}), 'ms'); assert.strictEqual(C.grupBelirle({sinif: 'memur', unvan: 'SÜRÜCÜ'}), 'ms');
+  assert.notStrictEqual(C.grupBelirle({sinif: 'memur', unvan: 'ACİL TIP TEKNİSYENİ'}), 'ms'); assert.deepStrictEqual(C.YETENEK.ms, ['sur']); console.log('657 sürücü testleri geçti'); }

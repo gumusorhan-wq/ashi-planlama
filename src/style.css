@@ -304,3 +304,9 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 .ap-tw.ap-tw-kutu table.n2 td.n2n,.ap-tw.ap-tw-kutu table.n2 thead th:first-child{position:sticky;left:0;z-index:2;background:var(--ap-card,#fff)}
 .ap-tw.ap-tw-kutu table.n2 thead th:first-child{z-index:4;background:var(--ap-pri2,#e8f0fb)}
 @media (max-width:760px){.ap-tw.ap-tw-kutu{max-height:none}}
+
+/* Sürüm 13.57: tablo sıralama ve süzgeç */
+.ap-t th.ap-sirala{cursor:pointer;user-select:none}
+.ap-t th.ap-sirala:hover{text-decoration:underline}
+.ap-t th.ap-sirala[data-yon]::after{content:' ' attr(data-yon);color:var(--ap-pri,#0055A4)}
+.ap-tara{display:block;max-width:280px;margin:6px 0}
