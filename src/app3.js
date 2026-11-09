@@ -282,6 +282,11 @@
     return out;
   }
   const trTarih = iso => iso ? iso.split('-').reverse().join('.') : '';
+  // Sürüm 13.57: bu ayın 1 aylık görevlendirmeleri (uzun süreli / 3 ay+ hariç) — "Tek ay görevleri" sekmesi ve Excel'i aynı listeyi kullanır
+  function tekAyGorevler() { const ilk = ayIlk(), son = sonrakiAyIlk();
+    return S.plan.kayitlar.filter(k => { if (gizliKisi(k)) return false; const g = k.gorev; if (!g || !(g.hedef || g.yer) || !gorevAktif(g) || xlUzunGorev(g)) return false; const t = gorevTarihleri(g); return (!t.bas || t.bas >= ilk) && (!t.bit || t.bit <= son); })
+      .sort((a, b) => trCollator.compare(a.birim || '', b.birim || '') || trCollator.compare(a.ad, b.ad)); }
+  const yollukTur = k => { const y = C.TR((k.gorev && k.gorev.yolluk) || ''); return y === 'YOLLUKLU' ? 'Y' : y === 'YOLLUKSUZ' ? 'N' : ''; };
   function asosSinif(a) {
     // Sürüm 13.57: istihdam şekli belirleyicidir — 657 / memur / 4-A / 4-B olan şoför / sürücü memurdur (işçi değil); işçi yalnız istihdam şekli işçi / 4-D ise
     // ya da istihdam şekli boşken ünvan / branş işçi, şoför, sürücü ise
@@ -1156,7 +1161,7 @@
           if (!(await onay(`${L.length} tarihi boş görevlendirme bitirilsin mi?${ist ? `\n(${ist} süzgeci)` : ''}\n\nBu kişiler kadro istasyonlarına döner. ASOS dosyası yeniden yüklense de aynı görev geri gelmez; gerekiyorsa yeniden görevlendirebilirsiniz. İşlem günlüğe yazılır.`))) break;
           tarihsizGorevleriBitir(L, 'Tarihi boş görevlendirme bitirildi (önceki ayın görevi)'); otoHesapla(); damgala(); kaydet(); toast(`${L.length} görevlendirme bitirildi.`); break;
         }
-        case 'g-ekle': { const ad = root.querySelector('#ap-g-kisi').value.trim().toLocaleUpperCase('tr-TR'), hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.ad === ad); if (!k) { toast('Kişi bulunamadı. Listeden seçin.'); break; } if (k.birim === hedef) { toast(`${k.ad} zaten ${hedef} kadrosunda; başka bir hedef istasyon seçin.`); break; } gorevlendir(k, hedef); S.gAra = ''; break; }
+        case 'g-ekle': { const id = (root.querySelector('#ap-g-sec') || {}).value || '', hedef = root.querySelector('#ap-g-hedef').value; const k = S.plan.kayitlar.find(x => x.id === id); if (!k) { toast('Önce "Yeni görevlendirme" kutusundan kişi seçin.'); break; } S.gSecId = ''; if (k.birim === hedef) { toast(`${k.ad} zaten ${hedef} kadrosunda; başka bir hedef istasyon seçin.`); break; } gorevlendir(k, hedef); break; }
         case 'og-tur': S.ogTur = v; break;
         case 'og-ekle': {
           const d = root.querySelector('#ap-og-t').value, tur = S.ogTur || 'bayram'; if (!d) { toast('Tarih seçin.'); break; } delete tarihSec().og;
@@ -1232,13 +1237,12 @@
         case 'modal-kapat': S.modal = null; S.asos = null; break;
         case 'png': { const b = S.plan.birimler.find(x => x.ad === v); pngCiz(b).toBlob(bl => indir(bl, `${b.ad}-${S.y}-${C.pad(S.m)}.png`)); break; }
         case 'gorev-tekay-excel': {      // Sürüm 13.57: yalnız bu ayın 1 aylık görevlendirmeleri; Yolluklu / Yolluksuz ayrı sayfa (yolluğu seçilmemişler ayrı sayfada uyarı olarak)
-          const ilk = ayIlk(), son = sonrakiAyIlk(), tekAy = k => { const g = k.gorev; if (!g || !(g.hedef || g.yer) || !gorevAktif(g) || xlUzunGorev(g)) return false; const t = gorevTarihleri(g); return (!t.bas || t.bas >= ilk) && (!t.bit || t.bit <= son); };
-          const L = S.plan.kayitlar.filter(k => !gizliKisi(k) && tekAy(k)).sort((a, b) => trCollator.compare(a.birim || '', b.birim || '') || trCollator.compare(a.ad, b.ad));
+          const ilk = ayIlk(), son = sonrakiAyIlk(), L = tekAyGorevler();
           if (!L.length) { toast('Bu ay için 1 aylık görevlendirme yok.'); break; }
           const wb = XLSX.utils.book_new(), bas = ['Sıra', 'Ad soyad', 'Ünvan', 'Kadro istasyonu', 'Görev yeri', 'Başlangıç', 'Bitiş', 'Gerekçe'];
           const sat = l => l.map((k, i) => { const t = gorevTarihleri(k.gorev); return [i + 1, k.ad, k.unvan || '', k.birim || '', k.gorev.hedef || k.gorev.yer || '', trTarih(t.bas || ilk), trTarih(t.bit || son), k.gorev.gerekce || '']; });
           const sayfa = (ad, l) => { const ws = XLSX.utils.aoa_to_sheet([[`${ayEtiket()} — ${ad} görevlendirmeler (${l.length} kişi)`], [], bas, ...sat(l)]); ws['!cols'] = [6, 28, 22, 20, 24, 12, 12, 30].map(w => ({wch: w})); XLSX.utils.book_append_sheet(wb, ws, ad.slice(0, 31)); };
-          const yl = x => C.TR(x.gorev.yolluk || ''), Y = L.filter(k => yl(k) === 'YOLLUKLU'), N = L.filter(k => yl(k) === 'YOLLUKSUZ'), B = L.filter(k => !['YOLLUKLU', 'YOLLUKSUZ'].includes(yl(k)));
+          const Y = L.filter(k => yollukTur(k) === 'Y'), N = L.filter(k => yollukTur(k) === 'N'), B = L.filter(k => !yollukTur(k));
           sayfa('Yolluklu', Y); sayfa('Yolluksuz', N); if (B.length) sayfa('Yolluk seçilmemiş', B);
           xlsxIndir(wb, `Tek-ay-gorevlendirme-${S.y}-${C.pad(S.m)}.xlsx`);
           toast(`${Y.length} yolluklu, ${N.length} yolluksuz${B.length ? `, ${B.length} yolluğu seçilmemiş (ayrı sayfada)` : ''} görevlendirme indirildi.`); break;
@@ -1299,6 +1303,7 @@
   root.addEventListener('change', async e => {
     const t = e.target;
     try {
+      if (t.id === 'ap-g-sec') { S.gSecId = t.value; const bt = t.nextElementSibling; if (bt && bt.dataset.ssFor === 'ap-g-sec') { const o = t.options[t.selectedIndex]; bt.firstElementChild.textContent = o ? o.text : ''; bt.title = o ? o.text : ''; } return; }      // yeni görevlendirilecek kişi (seçim render'da korunur)
       if (await ekChange(t)) { render(); return; }
       if (t.dataset.id && t.dataset.f) { const v = t.type === 'checkbox' ? t.checked : t.value; setField(t.dataset.id, t.dataset.f, v); render(); return; }
       if (t.dataset.d) { if (S.rol !== 'yonetici') return; const d = S.ayar.durumlar[t.dataset.d]; d[t.dataset.f] = t.type === 'checkbox' ? t.checked : t.value; await ayarKaydet(); otoHesapla(); kaydet(); render(); return; }

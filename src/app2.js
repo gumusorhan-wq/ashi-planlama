@@ -41,7 +41,7 @@
       <div class="ap-yanbas"><img class="ap-ylogo" src="${AP_LOGO}" alt=""><div class="ap-ybaslik"><b>ASHİ Planlama</b><span>${S.modul === 2 ? 'Modül 2' : 'Modül 1'} · ${esc(aktif)}</span></div><button type="button" class="ap-yanac" data-act="yan-ac" aria-label="Menüyü aç / kapat">${S.yanAcik ? '✕' : '☰'}</button></div>
       <div class="ap-ykisa" title="${esc(ayEtiket())}"><button class="ap-ykok" data-act="ay-" title="Önceki ay">‹</button><button class="ap-ayac" data-pop data-act="tp-ay-ac" title="Ay seç">${kisaAy}</button><button class="ap-ykok" data-act="ay+" title="Sonraki ay">›</button></div>
       <div class="ap-yanust"><div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><button class="ap-ayac" data-pop data-act="tp-ay-ac" title="Ay seç">${ayEtiket()} ▾</button><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
-        ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}" title="${DURUM_IPUCU[d] || ''}">${DURUM_AD[d] || d}</span>${guncelAy() && planlamaRol() ? durumSecHtml(d) : ''}${d !== 'kilitli' && !salt() ? `<button class="ap-btn sm" data-act="plan-kaydet" title="Değişiklikler zaten otomatik kaydedilir; bu düğme bekleyen değişikliği hemen sunucuya yazar">💾 Kaydet</button>${S.sonKayit ? `<span class="ap-note" title="Son kayıt">✓ ${S.sonKayit}</span>` : ''}` : ''}</div>` : ''}
+        ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}" title="${DURUM_IPUCU[d] || ''}">${DURUM_AD[d] || d}</span>${guncelAy() && planlamaRol() ? durumSecHtml(d) : ''}</div>` : ''}
         ${opts.kullanici ? '' : `<select class="ap-sel" data-act="rol" title="Rol (demo)">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select>`}</div>
       <div class="ap-yanic">${m1 ? `<div class="ap-ysec">MODÜL 1 · PLANLAMA</div>${m1Sec.map(s1).join('')}` : ''}
         <div class="ap-ysec">MODÜL 2 · NÖBET LİSTESİ</div>${s2}
@@ -394,7 +394,7 @@
       <input class="ap-in" id="ap-d-kisi" placeholder="Kişi / yer ara (listeyi süzer)…" value="${esc(S.disAra || '')}" autocomplete="off">
       <label class="ap-note" title="Yalnız seçilen kadro istasyonunun personeli listelenir">Kadro istasyonu süz ${istTekHtml('dist', dist, [...new Set(disK.map(k => k.birim))].sort(trCollator.compare), {bos: 'Tümü', kucuk: true})}</label></div><p class="ap-note">Geçici görevde olup başka bir <b>istasyona</b> atanmamış personel (Başhekimlik, KKM, ilçe sağlık müdürlüğü, hastane vb. ya da yeri henüz seçilmemiş). Bu kişilere kendi istasyonlarında nöbet yazılmaz. Yeri "Görev yeri" sütunundan seçebilir ya da yazabilirsiniz.</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Ünvan</th><th>Kadro istasyonu</th><th>Durum</th><th style="min-width:230px">Görev yeri / tarih</th></tr></thead><tbody>${disSat || '<tr><td colspan="5" class="ap-empty">İstasyon dışında görevli personel yok</td></tr>'}</tbody></table></div></div>`;
-    const sekmeler = [['deg', 'Personel ihtiyacı değerlendirmesi'], ['rot', 'Aylık rotasyon'], ['list', `Görevlendirmeler (${gk.length})`], ['dis', `İstasyon dışı görevliler (${disK.length})`], ['ozet', 'Açık / fazla istasyonlar']];
+    const sekmeler = [['deg', 'Personel ihtiyacı değerlendirmesi'], ['rot', 'Aylık rotasyon'], ['list', `Görevlendirmeler (${gk.length})`], ['dis', `İstasyon dışı görevliler (${disK.length})`], ['tekay', `Tek ay görevleri (${tekAyGorevler().length})`], ['ozet', 'Açık / fazla istasyonlar']];
     const nav = `<div class="ap-subnav ap-noprint" data-ust>${sekmeler.map(([v, t]) => `<button class="${sekme === v ? 'on' : ''}" data-act="gorev-sekme" data-v="${v}">${t}</button>`).join('')}<button class="ap-btn" style="margin-left:auto" data-act="gorev-excel" title="Personel ihtiyacı, rotasyon, görevlendirmeler ve açık/fazla istasyonlar tek Excel dosyasında">Excel'e aktar</button></div>`;
     const oSek = [['oner', `Personel önerilen istasyonlar (${acik.length})`], ['fazla', `Mesai tamamlayamayan istasyonlar (${fazla.length})`], ...(oner.length ? [['esles', 'Eşleştirme önerisi']] : [])], oa = oSek.some(x => x[0] === S.ozetSekme) ? S.ozetSekme : 'oner';
     const oKart = {oner: `<div class="ap-card"><h2>Personel önerilen istasyonlar (${acik.length})</h2>${acik.map(x => `<div class="ap-row"><b>${esc(x.b.ad)}</b><span class="ap-tag ap-t-ih">${x.h.ihtiyacKisi} kişi · ${fmt(x.h.hedefAcik)} nöbet açık</span></div>`).join('') || '<span class="ap-note">Yok</span>'}</div>`,
@@ -402,14 +402,19 @@
       esles: `<div class="ap-card"><h2>Eşleştirme önerisi</h2>${oner.map(t => `<div>${esc(t)}</div>`).join('')}<div class="ap-note">Öneri yalnız tam kişi önerir: gelen kişi hedef istasyonda bütün mesaisini doldurabilmeli (bir kişilik açık yoksa personel önerilmez). Yakınlık ilçe merkezleri arası yaklaşık km; branş uyumu kişi seçerken denetlenir. Kişi seçerken 4/B kuralı (4 yıl dolmadan başka istasyona görevlendirme yasak) otomatik denetlenir.</div></div>`};
     const ozet = `<div class="ap-subnav ap-noprint" data-ust>${oSek.map(([v, t]) => `<button class="${oa === v ? 'on' : ''}" data-act="ozet-sekme" data-v="${v}">${t}</button>`).join('')}</div>${oKart[oa]}`;
     const liste = `<div class="ap-card"><div class="ap-row" data-ust><h2 style="margin:0">Görevlendirmeler (${gk.length})</h2>
-      <input class="ap-in" list="ap-kisi-list" id="ap-g-kisi" value="${esc(S.gAra || '')}" placeholder="Kişi ara (listeyi süzer) / seç…" title="Yazdıkça aşağıdaki görevlendirme listesi ad, kaynak ve hedefe göre süzülür; listeden bir kişi seçip yanındaki istasyonla Görevlendir diyerek yeni görevlendirme yapabilirsiniz"><datalist id="ap-kisi-list">${S.plan.kayitlar.filter(k => !k.gorev || !k.gorev.hedef).slice(0, 2000).map(k => `<option value="${esc(k.ad)}">`).join('')}</datalist>
+      <input class="ap-in" type="search" id="ap-g-kisi" value="${esc(S.gAra || '')}" placeholder="Listede ara (ad, kaynak, hedef)…" title="Yazdıkça aşağıdaki görevlendirme listesi süzülür">
       <label class="ap-note" title="Seçilen istasyondan görevli çıkanlar ve o istasyona gelenler listelenir">İstasyon süz ${istTekHtml('gist', S.gIst || '', birimler.map(b => b.ad), {bos: 'Tümü', kucuk: true})}</label>
-      <span class="ap-note">Yeni görevlendirme hedefi:</span>${(() => { const h = birimler.some(b => b.ad === S.gYeniHedef) ? S.gYeniHedef : (birimler[0] || {}).ad || ''; return `<input type="hidden" id="ap-g-hedef" value="${esc(h)}">${istTekHtml('gyh', h, birimler.map(b => b.ad), {kucuk: true})}`; })()}
+      <span class="ap-note">Yeni görevlendirme:</span><select class="ap-sel" id="ap-g-sec" title="Görevlendirilecek kişi (arayarak seçin)"><option value="">— kişi seçin —</option>${S.plan.kayitlar.filter(k => !gizliKisi(k) && (!k.gorev || !(k.gorev.hedef || k.gorev.yer))).sort((a, b) => trCollator.compare(a.ad, b.ad)).map(k => `<option value="${esc(k.id)}" ${S.gSecId === k.id ? 'selected' : ''}>${esc(k.ad)} · ${esc(k.birim || '')}</option>`).join('')}</select><span class="ap-note">→</span>${(() => { const h = birimler.some(b => b.ad === S.gYeniHedef) ? S.gYeniHedef : (birimler[0] || {}).ad || ''; return `<input type="hidden" id="ap-g-hedef" value="${esc(h)}">${istTekHtml('gyh', h, birimler.map(b => b.ad), {kucuk: true})}`; })()}
       <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button>
       <button class="ap-btn" data-act="gorev-tekay-excel" title="Yalnız bu ay çıkan (1 aylık) görevlendirmeler; Yolluklu ve Yolluksuz ayrı sayfa. Uzun süreli (3 ay+) görevler girmez.">📄 Tek ay görevleri (Excel)</button>
       <button class="ap-btn" data-act="g-tarihsiz-bitir" ${duz ? '' : 'disabled'} title="TARİH sütunu boş (önceki aylardan kalan) görevlendirmeleri bitirir; istasyon süzgeci seçiliyse yalnız o istasyonunkileri. Yalnız başka ASHİ istasyonuna görevler; aile hekimliği, KKM, Başhekimlik, hastane ve kurum dışı görevler, uzun süreli (OF) ve devam isteği olanlar hariç.">Tarihi boş görevleri bitir (${gk.filter(k => tarihsizGorev(k)).length})</button></div>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div>${S.gtAc ? gorevTarihPop() : ''}</div>`;
-    return nav + ({deg: degerlendirme, rot: sekme === 'rot' ? rotasyonHtml() : '', ozet, list: liste, dis}[sekme] || degerlendirme);
+    const tekay = sekme === 'tekay' ? (() => { const L = tekAyGorevler(), ilk = ayIlk(), son = sonrakiAyIlk(), n = t => L.filter(k => yollukTur(k) === t).length;
+      const sat = L.map((k, i) => { const t = gorevTarihleri(k.gorev), y = yollukTur(k); return `<tr><td class="num">${i + 1}</td><td>${esc(k.ad)}</td><td>${esc(k.unvan || '')}</td><td>${esc(k.birim || '')}</td><td>${esc(k.gorev.hedef || k.gorev.yer || '')}</td><td>${trTarih(t.bas || ilk)}</td><td>${trTarih(t.bit || son)}</td><td>${y === 'Y' ? 'Yolluklu' : y === 'N' ? 'Yolluksuz' : '<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Seçilmemiş</span>'}</td><td>${esc(k.gorev.gerekce || '')}</td></tr>`; }).join('');
+      return `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">Tek ay görevleri — ${esc(ayEtiket())} (${L.length})</h2><span class="ap-tag">Yolluklu ${n('Y')}</span><span class="ap-tag">Yolluksuz ${n('N')}</span>${n('') ? `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Yolluğu seçilmemiş ${n('')}</span>` : ''}<button class="ap-btn" style="margin-left:auto" data-act="gorev-tekay-excel" title="Yolluklu ve Yolluksuz ayrı sayfa">📄 Excel'e aktar</button></div>
+        <p class="ap-note">Yalnız bu ay başlayıp bu ay biten (1 aylık) görevlendirmeler; uzun süreli (3 ay+) görevler girmez. Sütun başlığına tıklayarak sıralayabilir ve süzebilirsiniz (ör. YOLLUK › yalnız Yolluklu). Yolluk ve gerekçe "Görevlendirmeler" sekmesinden değiştirilir.</p>
+        <div class="ap-tw"><table class="ap-t"><thead><tr><th>Sıra</th><th>Ad soyad</th><th>Ünvan</th><th>Kadro istasyonu</th><th>Görev yeri</th><th>Başlangıç</th><th>Bitiş</th><th>Yolluk</th><th>Gerekçe</th></tr></thead><tbody>${sat || '<tr><td colspan="9" class="ap-empty">Bu ay için 1 aylık görevlendirme yok</td></tr>'}</tbody></table></div></div>`; })() : '';
+    return nav + ({deg: degerlendirme, rot: sekme === 'rot' ? rotasyonHtml() : '', ozet, list: liste, dis, tekay}[sekme] || degerlendirme);
   }
   // İstatistik sayfasındaki satırların listesi (istatistikle aynı kapsam: pasif ve aile hekimliğindekiler hariç)
   function ozelUyar(k, o) {
@@ -518,7 +523,9 @@
     const baslik = k === 'ist' ? esc(S.ist || 'İstasyon') : esc((SAYFALAR.find(x => x[0] === k) || [, ''])[1]);
     // Pano: "Bu ayın planını sıfırla" sağ üstte (profil kartının altı), sık kullanılan düğmelerden ayrı
     const sag = k === 'pano' ? `<button class="ap-btn dng sm ap-sbas-sag ap-noprint" data-act="plan-sifirla" ${salt() || !planlamaRol() ? 'disabled' : ''} title="Bu ayın planını tamamen siler (arşiv etkilenmez)">Bu ayın planını sıfırla</button>` : '';
-    return opts.gomulu ? `<div class="ap-sbas"><div><h2>${baslik}</h2>${damgaHtml(d)}</div>${sag}</div>` : (d || sag ? `<div class="ap-sbas"><div>${damgaHtml(d)}</div>${sag}</div>` : '');
+    const kay = (S.plan.durum || 'taslak') !== 'kilitli' && !salt() ? `<button class="ap-btn pri sm ap-noprint" data-act="plan-kaydet" title="Değişiklikler zaten otomatik kaydedilir; bu düğme bekleyen değişikliği hemen sunucuya yazar">💾 Kaydet</button>${S.sonKayit ? `<span class="ap-note" title="Son kayıt">✓ ${S.sonKayit}</span>` : ''}` : '';
+    const sagG = kay || sag ? `<div class="ap-sbas-sag ap-sbas-dg">${kay}${sag.replace(' ap-sbas-sag', '')}</div>` : '';
+    return opts.gomulu ? `<div class="ap-sbas"><div><h2>${baslik}</h2>${damgaHtml(d)}</div>${sagG}</div>` : (d || sagG ? `<div class="ap-sbas"><div>${damgaHtml(d)}</div>${sagG}</div>` : '');
   }
   function sayfaHtml() {
     if (S.modul === 2) return n2Html();
@@ -617,8 +624,49 @@
   const hucreDeger = (r, i) => { const c = r.cells[i]; if (!c) return ''; const e = c.querySelector('input:not([type=checkbox]),select');
     if (e) return e.tagName === 'SELECT' ? ((e.options[e.selectedIndex] || {}).text || '') : e.value; const cb = c.querySelector('input[type=checkbox]'); if (cb) return cb.checked ? '1' : '0'; return (c.textContent || '').trim(); };
   const hucreSayi = v => { const t = String(v).replace(/[−–]/g, '-').replace(/\s/g, ''); if (!/^[-+]?[\d.]*\d(,\d+)?/.test(t)) return null; const m = t.replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.').match(/^[-+]?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
-  function tabloSuz(t, d) { const q = C.TR(d.ara || ''); [...t.tBodies[0].rows].forEach(r => { if (!q) { if (r.dataset.taraGizli) { r.style.display = ''; delete r.dataset.taraGizli; } return; }
-    const v = C.TR([...r.cells].map((c, i) => hucreDeger(r, i)).join(' ')); if (v.includes(q)) { if (r.dataset.taraGizli) { r.style.display = ''; delete r.dataset.taraGizli; } } else if (r.style.display !== 'none') { r.style.display = 'none'; r.dataset.taraGizli = '1'; } }); }
+  // Sütun süzgeci (Excel gibi): d.f = {sütunNo: [gizlenen değerler]}. Yalnız bu kodun gizlediği satırlar (data-tara-gizli) geri açılır.
+  const suzDeger = v => String(v || '').replace(/\s+/g, ' ').trim();
+  function tabloSuz(t, d) { const q = C.TR(d.ara || ''), f = d.f || {}, fk = Object.keys(f).filter(i => f[i] && f[i].length);
+    [...t.tBodies[0].rows].forEach(r => { if (r.querySelector('td[colspan]')) return;
+      const gizle = (q && !C.TR([...r.cells].map((c, i) => hucreDeger(r, i)).join(' ')).includes(q)) || fk.some(i => f[i].includes(suzDeger(hucreDeger(r, +i))));
+      if (gizle) { if (r.style.display !== 'none') { r.style.display = 'none'; r.dataset.taraGizli = '1'; } }
+      else if (r.dataset.taraGizli) { r.style.display = ''; delete r.dataset.taraGizli; } }); }
+  const suzAktif = d => !!(d && (d.ara || Object.keys(d.f || {}).some(i => d.f[i] && d.f[i].length)));
+  function sutunSuzYenile() { root.querySelectorAll('.ap-main table.ap-t').forEach(t => { const th = t.querySelector('th.ap-sirala'), d = th && TD[th.dataset.tk]; if (suzAktif(d)) tabloSuz(t, d); }); }
+  function sutunPopAc(th) {
+    const d = TD[th.dataset.tk], i = +th.dataset.ti, t = th.closest('table'); if (!d || !t) return;
+    ssKapat(); d.f = d.f || {};
+    const gizli = new Set(d.f[i] || []), say = new Map();
+    [...t.tBodies[0].rows].forEach(r => { if (r.querySelector('td[colspan]')) return; const v = suzDeger(hucreDeger(r, i)); say.set(v, (say.get(v) || 0) + 1); });
+    const degerler = [...say.keys()].sort((a, b) => { if (!a) return 1; if (!b) return -1; const na = hucreSayi(a), nb = hucreSayi(b); return na != null && nb != null ? na - nb : a.localeCompare(b, 'tr', {numeric: true}); });
+    const host = document.createElement('div'); host.className = root.className + ' ap-sshost';
+    const ad = esc((th.textContent || '').replace(/[▲▼]/g, '').trim());
+    host.innerHTML = `<div class="ap-pop ap-sspop ap-supop" data-pop><b class="ap-supop-bas">${ad}</b>
+      <div class="ap-supop-sira"><button type="button" class="ap-btn sm ${d.k === i && d.y > 0 ? 'pri' : ''}" data-su="a">▲ Küçükten büyüğe</button><button type="button" class="ap-btn sm ${d.k === i && d.y < 0 ? 'pri' : ''}" data-su="z">▼ Büyükten küçüğe</button>${d.k === i ? '<button type="button" class="ap-btn sm" data-su="k">Sıralamayı kaldır</button>' : ''}</div>
+      ${degerler.length > 8 ? '<input class="ap-in ap-ssara" placeholder="Değer ara…" autocomplete="off">' : ''}
+      <label class="ap-supop-tum"><input type="checkbox" data-su-tum> <span>Tümünü seç</span></label>
+      <div class="ap-supop-liste">${degerler.map((v, j) => `<label data-ara="${esc(C.TR(v))}"><input type="checkbox" data-j="${j}" ${gizli.has(v) ? '' : 'checked'}> <span>${v ? esc(v) : '<i>(Boş)</i>'}</span><em>${say.get(v)}</em></label>`).join('')}</div>
+      <div class="ap-popalt"><button type="button" class="ap-btn sm" data-su="temizle">Süzgeci temizle</button><button type="button" class="ap-btn pri sm" data-su="uygula">Uygula</button></div></div>`;
+    document.body.appendChild(host); ssPop = host; ssKonum(th);
+    const kutu = [...host.querySelectorAll('[data-j]')], tum = host.querySelector('[data-su-tum]'), ara = host.querySelector('.ap-ssara');
+    const gor = () => kutu.filter(c => c.closest('label').style.display !== 'none');
+    const tumGuncelle = () => { const g = gor(), n = g.filter(c => c.checked).length; tum.checked = g.length > 0 && n === g.length; tum.indeterminate = n > 0 && n < g.length; };
+    tumGuncelle();
+    const kapat = () => { ssKapat(); };
+    host.addEventListener('mousedown', e => e.stopPropagation());
+    host.addEventListener('change', e => { if (e.target === tum) gor().forEach(c => { c.checked = tum.checked; }); tumGuncelle(); });
+    if (ara) { ara.addEventListener('input', () => { const q = C.TR(ara.value).trim(); kutu.forEach(c => { const l = c.closest('label'); l.style.display = !q || l.dataset.ara.includes(q) ? '' : 'none'; }); tumGuncelle(); }); ara.focus(); }
+    host.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); kapat(); } else if (e.key === 'Enter') { e.preventDefault(); host.querySelector('[data-su=uygula]').click(); } });
+    host.addEventListener('click', e => { const x = e.target.closest('[data-su]'); if (!x) return; e.stopPropagation(); const k = x.dataset.su;
+      if (k === 'a' || k === 'z') { d.k = i; d.y = k === 'a' ? 1 : -1; }
+      else if (k === 'k') d.k = -1;
+      else if (k === 'temizle') delete d.f[i];
+      else if (k === 'uygula') {      // arama açıkken yalnız görünen değerler seçilmiş sayılır (Excel davranışı)
+        const q = ara && C.TR(ara.value).trim(), h = kutu.filter(c => !c.checked || (q && c.closest('label').style.display === 'none')).map(c => degerler[+c.dataset.j]);
+        if (h.length && h.length === degerler.length) { toast('En az bir değer seçin.'); return; }
+        if (h.length) d.f[i] = h; else delete d.f[i]; }
+      kapat(); render(); });
+  }
   function tabloSiralaFiltrele() {
     const sayfa = S.modul === 2 ? 'n2:' + S.n2.sekme : S.sayfa + ':' + (S.gorevSekme || '');
     root.querySelectorAll('.ap-main table.ap-t').forEach((t, ti) => {
@@ -631,15 +679,17 @@
         inp.className = 'ap-in ap-tara ap-noprint'; inp.placeholder = 'Tabloda ara…'; inp.value = d.ara; inp.dataset.tk = anahtar; inp.setAttribute('aria-label', 'Tabloda ara');
         kap.parentNode.insertBefore(inp, kap); inp._tablo = t;
       }
-      ths.forEach((th, i) => { if (th.colSpan > 1 || !(th.textContent || '').trim()) return; th.classList.add('ap-sirala'); th.dataset.tk = anahtar; th.dataset.ti = i; if (d.k === i) th.dataset.yon = d.y > 0 ? '▲' : '▼'; else delete th.dataset.yon; });
+      ths.forEach((th, i) => { if (th.colSpan > 1 || !(th.textContent || '').trim()) return; th.classList.add('ap-sirala'); th.dataset.tk = anahtar; th.dataset.ti = i; if (d.k === i) th.dataset.yon = d.y > 0 ? '▲' : '▼'; else delete th.dataset.yon; th.classList.toggle('ap-suzulu', !!(d.f && d.f[i] && d.f[i].length)); th.title = 'Sırala / süz'; });
       if (d.k >= 0 && grup) satir.forEach(r => { if (r.querySelector('td[colspan]')) r.style.display = 'none'; });      // gruplu tabloda sıralanınca ara başlıklar gizlenir (sıralama kaldırılınca geri gelir)
       if (d.k >= 0) satir.filter(r => !r.querySelector('td[colspan]')).sort((a, b) => { const va = hucreDeger(a, d.k), vb = hucreDeger(b, d.k), na = hucreSayi(va), nb = hucreSayi(vb);
         if (!va && vb) return 1; if (va && !vb) return -1; return (na != null && nb != null ? na - nb : va.localeCompare(vb, 'tr', {numeric: true})) * d.y; }).forEach(r => tb.appendChild(r));
-      if (d.ara) tabloSuz(t, d);
+      if (suzAktif(d)) tabloSuz(t, d);
     });
   }
   root.addEventListener('click', e => { const th = e.target.closest && e.target.closest('th.ap-sirala'); if (!th || e.target.closest('input,select,button,a')) return;
-    const d = TD[th.dataset.tk]; if (!d) return; const i = +th.dataset.ti; if (d.k !== i) { d.k = i; d.y = 1; } else if (d.y > 0) d.y = -1; else d.k = -1; render(); });
+    e.stopPropagation(); if (ssPop && ssPop.dataset.th === th.dataset.tk + ':' + th.dataset.ti) { ssKapat(); return; } sutunPopAc(th); if (ssPop) ssPop.dataset.th = th.dataset.tk + ':' + th.dataset.ti; });
+  root.addEventListener('mousedown', e => { if (e.target.closest && e.target.closest('th.ap-sirala')) e.stopPropagation(); });
+  root.addEventListener('input', e => { const t = e.target; if (t && t.classList && !t.classList.contains('ap-tara')) setTimeout(sutunSuzYenile, 0); });
   root.addEventListener('input', e => { const t = e.target; if (!t.classList || !t.classList.contains('ap-tara')) return; const d = TD[t.dataset.tk]; if (!d) return; d.ara = t.value; if (t._tablo) tabloSuz(t._tablo, d); });
   function render() {
     oturumYaz();
