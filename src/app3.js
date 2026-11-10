@@ -1104,6 +1104,7 @@
         }
         case 'ik-al': await ikdenAl(v ? v.split(',') : ['N', 'I']); return;      // İK (ASHİ Nöbet Sayım) arşivinden nöbet / izin verisi
         case 'ist-kmp': S.istKmp = !S.istKmp; break;
+        case 'ist-siki': try { localStorage.setItem('ap_ist_siki', istSiki() ? '0' : '1'); } catch (e) { S.istSikiYedek = !istSiki(); } break;
         case 'ist-tam': {      // Sürüm 13.58 (deneme): tarayıcı tam ekranı (izin yoksa yalnız sayfa içi tam görünüm)
           S.tamEkran = v === '1'; const d = document;
           try { if (S.tamEkran && !d.fullscreenElement && d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(() => {}); else if (!S.tamEkran && d.fullscreenElement) d.exitFullscreen().catch(() => {}); } catch (e) {}
