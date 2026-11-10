@@ -322,4 +322,5 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 /* Sürüm 13.58 (deneme): istasyon tablosu tam ekran */
 .ap-tamekran{padding:6px 10px;background:var(--ap-bg,#f8fafc);min-height:100vh;box-sizing:border-box}
 .ap-tam-cubuk{gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 6px}
-.ap-tamekran .ap-tw-ist{max-height:calc(100vh - 64px);overflow:auto}
+.ap-tam-ozet{margin:0 0 6px}.ap-tam-ozet>*{margin:0}
+.ap-tamekran .ap-tw-ist{max-height:calc(100vh - 110px);overflow:auto}
