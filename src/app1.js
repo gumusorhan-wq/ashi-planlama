@@ -293,3 +293,5 @@ function mount(root, opts = {}) {
 
 // Sürüm 13.57: istasyon tablosunda sıkı satırlar (varsayılan açık; tarayıcıda hatırlanır)
   function istSiki() { try { const v = localStorage.getItem('ap_ist_siki'); if (v != null) return v === '1'; } catch (e) { if (S.istSikiYedek != null) return S.istSikiYedek; } return true; }
+  // Sürüm 13.57: istasyon sayfasında üst bölüm (başlık, düğmeler, uyarılar, özet) gizlenebilir; tarayıcıda hatırlanır
+  function istUstGizli() { try { const v = localStorage.getItem('ap_ist_ust'); if (v != null) return v === '1'; } catch (e) { if (S.istUstYedek != null) return S.istUstYedek; } return false; }
