@@ -341,8 +341,8 @@
       <span class="ap-tag ${h && Math.abs(p - h.ihtiyac) < 0.05 ? 'ap-t-ok' : 'ap-t-ih'}" title="Planlanan / ihtiyaç">${h ? `${fmt(p)} / ${fmt(h.ihtiyac)}` : ''}</span>
       ${mesEksik.length && !b.ekipOf ? `<span class="ap-tag ap-t-ih" title="${esc(mesEksik.join(' · '))}">Mesaisi eksik: ${mesEksik.length}</span>` : ''}
       ${istas ? `<button class="ap-btn pri" data-act="oner" ${duz ? '' : 'disabled'} title="Kilitli olmayan değerleri yeniden hesaplar">Yeniden hesapla</button><button class="ap-btn" data-act="ist-onayla" data-v="1" ${duz ? '' : 'disabled'} title="Bu istasyondaki planlanan nöbet sayılarını sabitler (🔒)">Sayıları sabitle 🔒</button><button class="ap-btn" data-act="ist-onayla" data-v="0" ${duz ? '' : 'disabled'} title="Bu istasyondaki sabitlemeleri kaldırır">Sabitlemeyi kaldır</button>` : ''}
-      ${(S.plan.durum || 'taslak') !== 'kilitli' && !salt() ? `<button class="ap-btn pri sm" data-act="plan-kaydet">💾 Kaydet</button>` : ''}
-      <button class="ap-btn sm" data-act="ist-tam" data-v="0" style="margin-left:auto" title="Tam ekrandan çık (Esc)">✕ Tam ekrandan çık</button></div>
+      <button class="ap-btn sm" data-act="ist-tam" data-v="0" style="margin-left:auto" title="Tam ekrandan çık (Esc)">✕ Tam ekrandan çık</button>
+      ${(S.plan.durum || 'taslak') !== 'kilitli' && !salt() ? `<button class="ap-btn pri sm" data-act="plan-kaydet" title="Değişiklikler zaten otomatik kaydedilir; bu düğme bekleyen değişikliği hemen sunucuya yazar">💾 Kaydet</button>` : ''}</div>
       ${h && !b.ekipOf ? `<div class="ap-tam-ozet">${slotOzet(h, '')}</div>` : ''}
       ${tabloHtml()}`;
     return `<div class="ap-row ap-noprint" data-ust>${istTekHtml('ist', b.ad, birimler.map(x => x.ad))}
