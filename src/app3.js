@@ -1306,6 +1306,13 @@
   });
   // Açık seçim penceresi (aylar / istasyonlar): boşluğa tıklayınca ya da Esc ile kapanır
   document.addEventListener('click', e => { if ((S.arstatAc || S.gtAc || S.tp) && root.isConnected && !e.target.closest('[data-pop],.ap-pop')) { S.arstatAc = ''; S.gtAc = ''; S.gtBekle = null; S.tp = null; render(); } }, true);
+  // Sürüm 13.57: nöbet sayısı kutularında ↑ / ↓ ile 1 (Shift ile 0,5) artırıp azaltma; kutudan çıkınca (ya da Enter) kaydedilir
+  root.addEventListener('keydown', e => {
+    if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !e.target.matches || !e.target.matches(PLAN_KUTU) || e.target.disabled || e.target.readOnly) return;
+    e.preventDefault(); const t = e.target, d = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 0.5 : 1);
+    const v = Math.max(0, Math.round(((sayi(t.value) || 0) + d) * 100) / 100); t.value = fmt(v); t._kirli = true; try { t.select(); } catch (er) {}
+  });
+  root.addEventListener('focusout', e => { const t = e.target; if (t && t._kirli) { t._kirli = false; t.dispatchEvent(new Event('change', {bubbles: true})); } });
   root.addEventListener('keydown', e => {
     if (e.key !== 'Enter' || !e.target.matches || !e.target.matches(PLAN_KUTU)) return;
     e.preventDefault(); const l = [...root.querySelectorAll(PLAN_KUTU)], i = l.indexOf(e.target); if (i < 0) return;

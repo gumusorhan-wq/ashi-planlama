@@ -538,7 +538,7 @@
     return ({ana: anaHtml, pano: panoHtml, ist: istHtml, gorev: gorevHtml, personel: personelHtml, ozel: ozelHtml, stat: statHtml, talep: talepHtml, ayar: ayarHtml, arsiv: arsivHtml, arstat: arstatHtml, takip: takipHtml}[S.sayfa] || panoHtml)();
   }
   // Plan kutusunda Enter: değer kaydedilir ve odak alt satırın plan kutusuna geçer
-  const PLAN_KUTU = 'input[data-f=planlanan], input[data-n2=teklif]';
+  const PLAN_KUTU = 'input[data-f=planlanan], input[data-n2=teklif], input[data-n2=hedef]';      // Enter: alt satır · ↑/↓: ±1 (Shift ile ±0,5)
   function odakUygula() {
     if (S.odakSonraki == null) return;
     const l = root.querySelectorAll(PLAN_KUTU), i = S.odakSonraki; S.odakSonraki = null;
