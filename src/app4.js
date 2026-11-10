@@ -396,7 +396,8 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         if (k.durum === 'AİLE HEKİMLİĞİNDE' || k.durum === 'UZMANLIK EĞİTİMİ') return;
         if (ara && !C.TR(k.ad).includes(ara)) return;
         let n = 0; const tur = new Set();
-        l.forEach(i => { let c = 0; for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse(C.izinSon({...i, asos: true}) + 'T00:00:00Z'); ms += 864e5) if (new Date(ms).toISOString().slice(0, 7) === ay) c++; if (c) { n += c; tur.add(i.tur); } });
+        const gunVar = new Set();      // ASOS izni ile aynı günlere düşen talep iki kez sayılmaz
+        l.forEach(i => { let c = 0; for (let ms = Date.parse(i.bas + 'T00:00:00Z'); ms <= Date.parse((i.dahil ? i.bit : C.izinSon({...i, asos: true})) + 'T00:00:00Z'); ms += 864e5) { const d = new Date(ms).toISOString().slice(0, 10); if (d.slice(0, 7) === ay && !gunVar.has(d)) { gunVar.add(d); c++; } } if (c) { n += c; tur.add(i.tur); } });
         if (!n) return;
         arsivAy.add(ay);
         const e = kisiler.get(tc) || {ad: k.ad, unvan: k.unvan || '', ekip: k.birim || '', h: {}};
