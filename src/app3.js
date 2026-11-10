@@ -1104,6 +1104,11 @@
         }
         case 'ik-al': await ikdenAl(v ? v.split(',') : ['N', 'I']); return;      // İK (ASHİ Nöbet Sayım) arşivinden nöbet / izin verisi
         case 'ist-kmp': S.istKmp = !S.istKmp; break;
+        case 'ist-tam': {      // Sürüm 13.58 (deneme): tarayıcı tam ekranı (izin yoksa yalnız sayfa içi tam görünüm)
+          S.tamEkran = v === '1'; const d = document;
+          try { if (S.tamEkran && !d.fullscreenElement && d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(() => {}); else if (!S.tamEkran && d.fullscreenElement) d.exitFullscreen().catch(() => {}); } catch (e) {}
+          break;
+        }
         case 'rot-sekme': S.rotSekme = v; break;
         case 'ozet-sekme': S.ozetSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;
@@ -1303,6 +1308,9 @@
   // Açık seçim penceresi (aylar / istasyonlar): boşluğa tıklayınca ya da Esc ile kapanır
   document.addEventListener('click', e => { if ((S.arstatAc || S.gtAc || S.tp) && root.isConnected && !e.target.closest('[data-pop],.ap-pop')) { S.arstatAc = ''; S.gtAc = ''; S.gtBekle = null; S.tp = null; render(); } }, true);
   // Sürüm 13.57: nöbet sayısı kutularında ↑ / ↓ ile 1 (Shift ile 0,5) artırıp azaltma; kutudan çıkınca (ya da Enter) kaydedilir
+  // Tam ekrandan tarayıcıyla (Esc) çıkılınca görünüm de normale döner; sayfa içi görünümde Esc çıkış
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && S.tamEkran) { S.tamEkran = false; render(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.tamEkran && !document.fullscreenElement && !S.modal && !document.querySelector('[data-pop]:not([hidden])')) { S.tamEkran = false; render(); } });
   root.addEventListener('keydown', e => {
     if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || !e.target.matches || !e.target.matches(PLAN_KUTU) || e.target.disabled || e.target.readOnly) return;
     e.preventDefault(); const t = e.target, d = (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 0.5 : 1);
