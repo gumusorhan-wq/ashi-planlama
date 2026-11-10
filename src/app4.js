@@ -355,7 +355,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   // ---- İzin ve geçici görev takibi: personelin hangi aylarda izin kullandığı / geçici görevlendirildiği (kayıtlı tüm aylık planlardan) ----
   async function takipYukle() {
     const anahtarlar = ((await depo.keys()) || []).filter(k => String(k).startsWith('plan:')).sort(), veri = {};
-    const proje = p => (p.kayitlar || []).map(k => ({a: k.tc || k.ad, ad: k.ad, unvan: k.unvan || '', birim: k.birim || '', izin: (k.izin || []).map(i => ({tur: i.tur, gun: i.gun, bas: i.bas, bit: i.bit})), durum: k.durum || '', durumMetin: k.durumMetin || '', gorev: k.gorev && (k.gorev.hedef || k.gorev.yer) ? {hedef: k.gorev.hedef || '', yer: k.gorev.yer || '', tarih: k.gorev.tarih || ''} : null}));
+    const proje = p => (p.kayitlar || []).map(k => ({a: k.tc || k.ad, ad: k.ad, unvan: k.unvan || '', birim: k.birim || '', izin: (k.izin || []).map(i => ({tur: i.tur, gun: i.gun, bas: i.bas, bit: i.bit})), durum: k.durum || '', durumMetin: k.durumMetin || '', gorev: k.gorev && (k.gorev.hedef || k.gorev.yer) ? {hedef: k.gorev.hedef || '', yer: k.gorev.yer || '', tarih: k.gorev.tarih || '', bas: k.gorev.bas || '', bit: k.gorev.bit || ''} : null, gecmisAsos: k.gecmisAsos || []}));
     for (const key of anahtarlar) { const p = await depo.get(key); if (p && p.kayitlar) veri[String(key).slice(5)] = proje(p); }
     if (S.plan) veri[ayAnahtari()] = proje(S.plan);
     try { S.izinArsivT = (await depo.get('izinArsiv')) || null; } catch (e) { S.izinArsivT = null; }      // Sürüm 13.57: yüklenen izin dosyalarındaki bütün izinler
@@ -405,9 +405,24 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         kisiler.set(tc, e);
       }));
     }
+    // Sürüm 13.57: planı olmayan aylarda geçici görevler, sonraki planların personel listesindeki (ASOS) geçici görev tarihlerinden gelir
+    //   (ör. Aralık planı Kasım'da yüklendiğinde 15.10–15.12 görevi Kasım sütununda da görünür). Ayın 1'inde biten görev o aya yazılmaz.
+    const gorevAy = new Set(), planAy = Object.keys(veri).sort();
+    aylar.filter(ay => !veri[ay]).forEach(ay => planAy.filter(p => p > ay).forEach(p => veri[p].forEach(r => {
+      if (!(r.gecmisAsos || []).includes(ay)) return;
+      const g = r.gorev && r.gorev.bas && r.gorev.bas.slice(0, 7) <= ay && (!r.gorev.bit || r.gorev.bit.slice(0, 7) >= ay) ? r.gorev : null;
+      if (g && g.bit && g.bit === ay + '-01' && g.bas !== g.bit) return;
+      if (T.ist.length && !T.ist.includes(r.birim)) return;
+      if (r.durum === 'AİLE HEKİMLİĞİNDE' || r.durum === 'UZMANLIK EĞİTİMİ') return;
+      if (ara && !C.TR(r.ad).includes(ara)) return;
+      const e = kisiler.get(r.a) || {ad: r.ad, unvan: r.unvan, ekip: r.birim, h: {}}, h = e.h[ay];
+      if (h && h.gorevVar) return;
+      e.h[ay] = {...(h || {izinGun: 0, izinTur: [], durumIzin: '', arsiv: true}), gorev: g, gorevVar: true, gorevYok: !g, durumMetin: g ? '' : 'GEÇİCİ GÖREVDE (personel listesinden)'};
+      kisiler.set(r.a, e); gorevAy.add(ay);
+    })));
     const satir = [...kisiler.values()].sort((a, b) => trCollator.compare(a.ekip, b.ekip) || trCollator.compare(a.ad, b.ad));
     const izinVar = h => h && (h.izinGun > 0 || h.durumIzin), gorevVar = h => h && h.gorevVar;
-    return {aylar, satir, izinVar, gorevVar, T, ayEt, yillar, planli: ay => !!veri[ay] || arsivAy.has(ay)};
+    return {aylar, satir, izinVar, gorevVar, T, ayEt, yillar, planli: ay => !!veri[ay] || arsivAy.has(ay) || gorevAy.has(ay)};
   }
   function takipExcel() {
     const {aylar, satir, izinVar, gorevVar, ayEt, yillar} = takipHazirla(), wb = XLSX.utils.book_new(), temiz = s => String(s == null ? '' : s);
@@ -443,7 +458,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     return `<div class="ap-card"><h2>İzin ve geçici görev takibi</h2><p class="ap-note">Kayıtlı aylık planlardan (${tumAylar.length} ay${tumAylar.length ? ': ' + takipKisa(tumAylar[0]) + ' – ' + takipKisa(tumAylar[tumAylar.length - 1]) : ''}) personelin hangi aylarda izin kullandığı ve hangi aylarda geçici görevlendirildiği. Seçili yılın 12 ayı birlikte görünür; birden çok yıl seçilebilir, boş bırakılırsa kayıtlı tüm yıllar.</p>
       <div class="ap-row" data-ust>${pop('yil', etYil, yilIc)}${pop('ist', etIst, istIc)}<input class="ap-in" data-act="takip-ara" placeholder="Ad ara…" value="${esc(T.ara || '')}"><label class="ap-note"><input type="checkbox" data-act="takip-sadece" ${T.sadece ? 'checked' : ''}> Yalnız kaydı olanlar</label><button class="ap-btn" data-act="takip-yenile" title="Kayıtlı planları yeniden okur">Yenile</button><button class="ap-btn" data-act="takip-excel">Excel'e aktar</button></div></div>
       <div class="ap-subnav ap-noprint" data-ust><button class="${izinSekme ? 'on' : ''}" data-act="takip-sekme" data-v="izin">İzin takibi</button><button class="${izinSekme ? '' : 'on'}" data-act="takip-sekme" data-v="gorev">Geçici görev takibi</button></div>
-      <div class="ap-card"><div class="ap-note" style="margin-bottom:6px">${gorunen.length} kişi · ${sYil.join(', ') || '—'} (${aylar.length} ay sütunu; planı olmayan aylarda izinler yüklenen izin dosyalarından gelir, görevlendirme boş kalır)${izinSekme ? ' · hücre: o ayda kullanılan izin günü ve kısaltma (üzerine gelince tam ad)' : ' · hücre: simgeye tıklayınca görev yeri ve tarih'}</div>${tablo}</div>`;
+      <div class="ap-card"><div class="ap-note" style="margin-bottom:6px">${gorunen.length} kişi · ${sYil.join(', ') || '—'} (${aylar.length} ay sütunu; planı olmayan aylarda izinler yüklenen izin dosyalarından, geçici görevler sonraki ayın personel listesindeki görev tarihlerinden gelir)${izinSekme ? ' · hücre: o ayda kullanılan izin günü ve kısaltma (üzerine gelince tam ad)' : ' · hücre: simgeye tıklayınca görev yeri ve tarih'}</div>${tablo}</div>`;
   }
   function arstatHtml() {
     if (S.arsivVeri === null) { if (!S.arsivYuk) { S.arsivYuk = true; arsivYukle().then(() => { S.arsivYuk = false; render(); }); } return '<div class="ap-card">Arşiv yükleniyor…</div>'; }
