@@ -1943,7 +1943,7 @@ function mount(root, opts = {}) {
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>ÜNVAN</th><th>KAYNAK</th><th>HEDEF</th><th>TARİH</th><th>YOLLUK</th><th>GEREKÇE</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="ap-empty">Görevlendirme yok</td></tr>'}</tbody></table></div>${S.gtAc ? gorevTarihPop() : ''}</div>`;
     const tekay = sekme === 'tekay' ? (() => { const L = tekAyGorevler(), ilk = ayIlk(), son = sonrakiAyIlk(), n = t => L.filter(k => yollukTur(k) === t).length;
       const sat = L.map((k, i) => { const t = gorevTarihleri(k.gorev), y = yollukTur(k); return `<tr><td class="num">${i + 1}</td><td>${esc(k.ad)}</td><td>${esc(k.unvan || '')}</td><td>${esc(k.birim || '')}</td><td>${esc(k.gorev.hedef || k.gorev.yer || '')}</td><td>${trTarih(t.bas || ilk)}</td><td>${trTarih(t.bit || son)}</td><td>${y === 'Y' ? 'Yolluklu' : y === 'N' ? 'Yolluksuz' : '<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Seçilmemiş</span>'}</td><td>${esc(k.gorev.gerekce || '')}</td></tr>`; }).join('');
-      return `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">Tek ay görevleri — ${esc(ayEtiket())} (${L.length})</h2><span class="ap-tag">Yolluklu ${n('Y')}</span><span class="ap-tag">Yolluksuz ${n('N')}</span>${n('') ? `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Yolluğu seçilmemiş ${n('')}</span>` : ''}<button class="ap-btn" style="margin-left:auto" data-act="gorev-tekay-excel" title="Yolluklu ve Yolluksuz ayrı sayfa">📄 Excel'e aktar</button></div>
+      return `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">Tek ay görevleri — ${esc(ayEtiket())} (${L.length})</h2><span class="ap-tag">Yolluklu ${n('Y')}</span><span class="ap-tag">Yolluksuz ${n('N')}</span>${n('') ? `<span class="ap-tag" style="background:#ffedd5;color:#9a3412">Yolluğu seçilmemiş ${n('')}</span>` : ''}<button class="ap-btn" style="margin-left:auto" data-act="gorev-tekay-excel" title="İlk sayfada tablonun tamamı; Yolluklu ve Yolluksuz ayrıca ayrı sayfalarda">📄 Excel'e aktar</button></div>
         <p class="ap-note">Yalnız bu ay başlayıp bu ay biten (1 aylık) görevlendirmeler; uzun süreli (3 ay+) görevler girmez. Sütun başlığına tıklayarak sıralayabilir ve süzebilirsiniz (ör. YOLLUK › yalnız Yolluklu). Yolluk ve gerekçe "Görevlendirmeler" sekmesinden değiştirilir.</p>
         <div class="ap-tw"><table class="ap-t"><thead><tr><th>Sıra</th><th>Ad soyad</th><th>Ünvan</th><th>Kadro istasyonu</th><th>Görev yeri</th><th>Başlangıç</th><th>Bitiş</th><th>Yolluk</th><th>Gerekçe</th></tr></thead><tbody>${sat || '<tr><td colspan="9" class="ap-empty">Bu ay için 1 aylık görevlendirme yok</td></tr>'}</tbody></table></div></div>`; })() : '';
     return nav + ({deg: degerlendirme, rot: sekme === 'rot' ? rotasyonHtml() : '', ozet, list: liste, dis, tekay}[sekme] || degerlendirme);
@@ -4484,16 +4484,22 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         case 'kilavuz': S.modal = kilavuzHtml; break;
         case 'modal-kapat': S.modal = null; S.asos = null; break;
         case 'png': { const b = S.plan.birimler.find(x => x.ad === v); pngCiz(b).toBlob(bl => indir(bl, `${b.ad}-${S.y}-${C.pad(S.m)}.png`)); break; }
-        case 'gorev-tekay-excel': {      // Sürüm 13.57: yalnız bu ayın 1 aylık görevlendirmeleri; Yolluklu / Yolluksuz ayrı sayfa (yolluğu seçilmemişler ayrı sayfada uyarı olarak)
+        case 'gorev-tekay-excel': {      // Sürüm 13.57: yalnız bu ayın 1 aylık görevlendirmeleri; ilk sayfa tümü, Yolluklu / Yolluksuz ayrı sayfa (yolluğu seçilmemişler ayrı sayfada uyarı olarak)
           const ilk = ayIlk(), son = sonrakiAyIlk(), L = tekAyGorevler();
           if (!L.length) { toast('Bu ay için 1 aylık görevlendirme yok.'); break; }
           const wb = XLSX.utils.book_new(), bas = ['Sıra', 'Ad soyad', 'Ünvan', 'Kadro istasyonu', 'Görev yeri', 'Başlangıç', 'Bitiş', 'Gerekçe'];
           const sat = l => l.map((k, i) => { const t = gorevTarihleri(k.gorev); return [i + 1, k.ad, k.unvan || '', k.birim || '', k.gorev.hedef || k.gorev.yer || '', trTarih(t.bas || ilk), trTarih(t.bit || son), k.gorev.gerekce || '']; });
           const sayfa = (ad, l) => { const ws = XLSX.utils.aoa_to_sheet([[`${ayEtiket()} — ${ad} görevlendirmeler (${l.length} kişi)`], [], bas, ...sat(l)]); ws['!cols'] = [6, 28, 22, 20, 24, 12, 12, 30].map(w => ({wch: w})); XLSX.utils.book_append_sheet(wb, ws, ad.slice(0, 31)); };
           const Y = L.filter(k => yollukTur(k) === 'Y'), N = L.filter(k => yollukTur(k) === 'N'), B = L.filter(k => !yollukTur(k));
+          {   // Sürüm 13.57: ilk sayfa ekrandaki tablonun tamamı (Yolluk sütunuyla); ardından Yolluklu / Yolluksuz ayrı sayfalar
+            const yz = k => ({Y: 'Yolluklu', N: 'Yolluksuz'})[yollukTur(k)] || 'Seçilmemiş';
+            const ws = XLSX.utils.aoa_to_sheet([[`${ayEtiket()} — Tek ay görevleri (${L.length} kişi: ${Y.length} yolluklu, ${N.length} yolluksuz, ${B.length} seçilmemiş)`], [],
+              [...bas.slice(0, 7), 'Yolluk', 'Gerekçe'], ...sat(L).map((r, i) => [...r.slice(0, 7), yz(L[i]), r[7]])]);
+            ws['!cols'] = [6, 28, 22, 20, 24, 12, 12, 12, 30].map(w => ({wch: w})); XLSX.utils.book_append_sheet(wb, ws, 'Tümü');
+          }
           sayfa('Yolluklu', Y); sayfa('Yolluksuz', N); if (B.length) sayfa('Yolluk seçilmemiş', B);
           xlsxIndir(wb, `Tek-ay-gorevlendirme-${S.y}-${C.pad(S.m)}.xlsx`);
-          toast(`${Y.length} yolluklu, ${N.length} yolluksuz${B.length ? `, ${B.length} yolluğu seçilmemiş (ayrı sayfada)` : ''} görevlendirme indirildi.`); break;
+          toast(`${L.length} görevlendirme indirildi (Tümü sayfası + ${Y.length} yolluklu, ${N.length} yolluksuz${B.length ? `, ${B.length} yolluğu seçilmemiş` : ''} ayrı sayfalarda).`); break;
         }
         case 'gorev-excel': {      // Görevlendirme sayfasının tüm bölümleri tek Excel dosyasında
           const wb = XLSX.utils.book_new(), ek = (ad, bas, sat) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([bas, ...sat]), ad), r1 = x => Math.round(x * 100) / 100;
