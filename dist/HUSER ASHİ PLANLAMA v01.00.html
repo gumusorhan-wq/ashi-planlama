@@ -4509,16 +4509,12 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         case 'gorev-tekay-excel': {      // Sürüm 13.57: yalnız bu ayın 1 aylık görevlendirmeleri; ilk sayfa tümü, Yolluklu / Yolluksuz ayrı sayfa (yolluğu seçilmemişler ayrı sayfada uyarı olarak)
           const ilk = ayIlk(), son = sonrakiAyIlk(), L = tekAyGorevler();
           if (!L.length) { toast('Bu ay için 1 aylık görevlendirme yok.'); break; }
-          const wb = XLSX.utils.book_new(), bas = ['Sıra', 'Ad soyad', 'Ünvan', 'Kadro istasyonu', 'Görev yeri', 'Başlangıç', 'Bitiş', 'Gerekçe'];
-          const sat = l => l.map((k, i) => { const t = gorevTarihleri(k.gorev); return [i + 1, k.ad, k.unvan || '', k.birim || '', k.gorev.hedef || k.gorev.yer || '', trTarih(t.bas || ilk), trTarih(t.bit || son), k.gorev.gerekce || '']; });
-          const sayfa = (ad, l) => { const ws = XLSX.utils.aoa_to_sheet([[`${ayEtiket()} — ${ad} görevlendirmeler (${l.length} kişi)`], [], bas, ...sat(l)]); ws['!cols'] = [6, 28, 22, 20, 24, 12, 12, 30].map(w => ({wch: w})); XLSX.utils.book_append_sheet(wb, ws, ad.slice(0, 31)); };
+          const wb = XLSX.utils.book_new(), bas = ['Sıra', 'Ad soyad', 'Ünvan', 'Kadro istasyonu', 'Görev yeri', 'Başlangıç', 'Bitiş', 'Yolluk', 'Gerekçe'];
+          const yz = k => ({Y: 'Yolluklu', N: 'Yolluksuz'})[yollukTur(k)] || 'Seçilmemiş';
+          const sat = l => l.map((k, i) => { const t = gorevTarihleri(k.gorev); return [i + 1, k.ad, k.unvan || '', k.birim || '', k.gorev.hedef || k.gorev.yer || '', trTarih(t.bas || ilk), trTarih(t.bit || son), yz(k), k.gorev.gerekce || '']; });
+          const sayfa = (ad, l, baslik) => { const ws = XLSX.utils.aoa_to_sheet([[baslik || `${ayEtiket()} — ${ad} görevlendirmeler (${l.length} kişi)`], [], bas, ...sat(l)]); ws['!cols'] = [6, 28, 22, 20, 24, 12, 12, 12, 30].map(w => ({wch: w})); XLSX.utils.book_append_sheet(wb, ws, ad.slice(0, 31)); };
           const Y = L.filter(k => yollukTur(k) === 'Y'), N = L.filter(k => yollukTur(k) === 'N'), B = L.filter(k => !yollukTur(k));
-          {   // Sürüm 13.57: ilk sayfa ekrandaki tablonun tamamı (Yolluk sütunuyla); ardından Yolluklu / Yolluksuz ayrı sayfalar
-            const yz = k => ({Y: 'Yolluklu', N: 'Yolluksuz'})[yollukTur(k)] || 'Seçilmemiş';
-            const ws = XLSX.utils.aoa_to_sheet([[`${ayEtiket()} — Tek ay görevleri (${L.length} kişi: ${Y.length} yolluklu, ${N.length} yolluksuz, ${B.length} seçilmemiş)`], [],
-              [...bas.slice(0, 7), 'Yolluk', 'Gerekçe'], ...sat(L).map((r, i) => [...r.slice(0, 7), yz(L[i]), r[7]])]);
-            ws['!cols'] = [6, 28, 22, 20, 24, 12, 12, 12, 30].map(w => ({wch: w})); XLSX.utils.book_append_sheet(wb, ws, 'Tümü');
-          }
+          sayfa('Tümü', L, `${ayEtiket()} — Tek ay görevleri (${L.length} kişi: ${Y.length} yolluklu, ${N.length} yolluksuz, ${B.length} seçilmemiş)`);      // Sürüm 13.57: ilk sayfa tablonun tamamı; her sayfada Yolluk sütunu
           sayfa('Yolluklu', Y); sayfa('Yolluksuz', N); if (B.length) sayfa('Yolluk seçilmemiş', B);
           xlsxIndir(wb, `Tek-ay-gorevlendirme-${S.y}-${C.pad(S.m)}.xlsx`);
           toast(`${L.length} görevlendirme indirildi (Tümü sayfası + ${Y.length} yolluklu, ${N.length} yolluksuz${B.length ? `, ${B.length} yolluğu seçilmemiş` : ''} ayrı sayfalarda).`); break;
