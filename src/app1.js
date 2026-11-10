@@ -62,7 +62,8 @@ function mount(root, opts = {}) {
     if (!kilitVar || !S.plan || !guncelAy() || S.rol === 'salt_okur') return null;
     const ay = `${S.y}-${C.pad(S.m)}`;
     if (S.plan.durum === 'kilitli') return S.kilitAcBekle && S.rol === 'yonetici' ? `${ay}|ana` : null;      // kilitli ay: yalnız yönetici "Kilidi aç" dediğinde planlama kilidi istenir
-    if (S.modul === 2) { if (S.rol === 'istasyon' && S.plan.durum !== 'kesin') return null; const i = typeof n2Ist === 'function' ? n2Ist() : ''; return i ? `${ay}|ist|${i}` : null; }   // istasyon, plan kesinleşmeden düzenleyemez: kilit almaz
+    // Sürüm 13.57: plan kesinleşince istasyonun nöbet listesini istasyon sorumlusu düzenler; planlama yalnız görür, "Düzenle" derse kilidi alır
+    if (S.modul === 2) { if (S.rol === 'istasyon' && S.plan.durum !== 'kesin') return null; if (S.rol !== 'istasyon' && S.plan.durum === 'kesin' && !S.n2Duzenle) return null; const i = typeof n2Ist === 'function' ? n2Ist() : ''; return i ? `${ay}|ist|${i}` : null; }   // istasyon, plan kesinleşmeden düzenleyemez: kilit almaz
     return S.rol === 'istasyon' ? null : `${ay}|ana`;
   }
   function kilitGuncelle() { if (!kilitVar) return; const k = kilitKapsam(); if (k === S.kilit.kapsam) return; S.kilit = {kapsam: k, bende: false, kim: ''}; opts.kilit.iste(k); }

@@ -1303,7 +1303,8 @@ function mount(root, opts = {}) {
     if (!kilitVar || !S.plan || !guncelAy() || S.rol === 'salt_okur') return null;
     const ay = `${S.y}-${C.pad(S.m)}`;
     if (S.plan.durum === 'kilitli') return S.kilitAcBekle && S.rol === 'yonetici' ? `${ay}|ana` : null;      // kilitli ay: yalnız yönetici "Kilidi aç" dediğinde planlama kilidi istenir
-    if (S.modul === 2) { if (S.rol === 'istasyon' && S.plan.durum !== 'kesin') return null; const i = typeof n2Ist === 'function' ? n2Ist() : ''; return i ? `${ay}|ist|${i}` : null; }   // istasyon, plan kesinleşmeden düzenleyemez: kilit almaz
+    // Sürüm 13.57: plan kesinleşince istasyonun nöbet listesini istasyon sorumlusu düzenler; planlama yalnız görür, "Düzenle" derse kilidi alır
+    if (S.modul === 2) { if (S.rol === 'istasyon' && S.plan.durum !== 'kesin') return null; if (S.rol !== 'istasyon' && S.plan.durum === 'kesin' && !S.n2Duzenle) return null; const i = typeof n2Ist === 'function' ? n2Ist() : ''; return i ? `${ay}|ist|${i}` : null; }   // istasyon, plan kesinleşmeden düzenleyemez: kilit almaz
     return S.rol === 'istasyon' ? null : `${ay}|ana`;
   }
   function kilitGuncelle() { if (!kilitVar) return; const k = kilitKapsam(); if (k === S.kilit.kapsam) return; S.kilit = {kapsam: k, bende: false, kim: ''}; opts.kilit.iste(k); }
@@ -2754,9 +2755,10 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   const n2Ist = () => n2Kendi() !== null ? (S.n2.ist = n2Kendi()) : S.n2.ist && S.plan && S.plan.birimler.some(b => b.ad === S.n2.ist) ? S.n2.ist : (S.n2.ist = (S.plan && (S.plan.birimler.find(b => b.tur === 'istasyon' && !b.ekipOf) || {}).ad) || '');
   const n2Birim = () => S.plan && S.plan.birimler.find(b => b.ad === n2Ist());
   function n2Depo(ad) { const N = (S.plan.nobet = S.plan.nobet || {}); return N[ad] = N[ad] || {istek: {}, izin: {}, liste: null, kural: {}, kisiler: null}; }
-  const n2Duz = () => S.rol !== 'salt_okur' && guncelAy() && !(S.plan && S.plan.durum === 'kilitli') && kilitBende();
+  const n2PlanIzle = () => S.rol !== 'istasyon' && S.rol !== 'salt_okur' && !!S.plan && S.plan.durum === 'kesin' && !S.n2Duzenle && guncelAy();      // planlama, kesin planda istasyonu kilitlemeden izler
+  const n2Duz = () => S.rol !== 'salt_okur' && guncelAy() && !(S.plan && S.plan.durum === 'kilitli') && !n2PlanIzle() && kilitBende();
   function mut2(fn, islem, detay) {
-    if (!n2Duz()) { toast(S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
+    if (!n2Duz()) { toast(n2PlanIzle() ? 'İstasyonun listesini değiştirmek için üstteki "Düzenle" düğmesine basın (istasyon sorumlusu o sırada düzenleyemez).' : S.plan && S.plan.durum === 'kilitli' ? 'Bu ay kilitli.' : !kilitBende() ? kilitMesaj() : 'Salt okur modundasınız.'); return false; }
     const ist = n2Ist();
     fn(); S.n2.oneri = null; if (islem) logla(islem, detay); if (ist) n2Depo(ist).damga = damgaYeni(); kaydet(); return true;
   }
@@ -2800,7 +2802,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   function n2UstHtml(b) {
     const kisit = n2Kendi(), ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (kisit === null || x.ad === kisit));
     return `<div class="ap-card"><div class="ap-row"><span class="ap-note">İstasyon</span>${istTekHtml('n2', b.ad, ists.map(x => x.ad))}
-      <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span></div>${damgaHtml(((S.plan.nobet || {})[b.ad] || {}).damga)}</div>`;
+      <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span>${S.rol !== 'istasyon' && S.rol !== 'salt_okur' && S.plan.durum === 'kesin' && guncelAy() ? (S.n2Duzenle ? `<button class="ap-btn" style="margin-left:auto" data-act="n2-duzenle" data-v="0" title="İstasyonun kilidi bırakılır; istasyon sorumlusu yeniden düzenleyebilir">Düzenlemeyi bırak</button>` : `<span class="ap-note" style="margin-left:auto">İzliyorsunuz (istasyon sorumlusu düzenleyebilir)</span><button class="ap-btn" data-act="n2-duzenle" data-v="1" title="Bu istasyonun nöbet listesini siz düzenlersiniz; bu sırada istasyon sorumlusu salt okunur görür">Düzenle</button>`) : ''}</div>${damgaHtml(((S.plan.nobet || {})[b.ad] || {}).damga)}</div>`;
   }
   function n2Html() {
     if (!S.plan) return `<div class="ap-card ap-empty"><h2>Modül 2 — İstasyon nöbet listesi</h2><p>Bu ay için plan yok. Önce Modül 1'den personel listelerini yükleyin.</p></div>`;
@@ -3110,6 +3112,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         mut2(() => { const o = n2OnayYaz(b.ad); T.satir.forEach(x => { if (x.tutar) o.teklif[x.k.id] = x.tek; }); o.durum = 'gonderildi'; o.gonderZaman = Date.now(); o.ret = ''; }, 'İstasyon planı planlamaya gönderildi', `${b.ad}: ${T.degisenSay} değişiklik`);
         toast('Planınız planlama birimine gönderildi.'); break;
       }
+      case 'n2-duzenle': S.n2Duzenle = v === '1'; break;
       case 'n2-hedef-oto': if (n2Duz() && (await onay('Elle değiştirilen nöbet hedefleri otomatik sayılara dönsün mü?'))) mut2(() => { n2Depo(b.ad).hedef = {}; }, 'Modül 2: nöbet hedefleri otomatiğe döndü', b.ad); break;
       case 'n2-teklif-sifirla': if (n2Duzenlenir(b.ad) && (await onay('Yaptığınız değişiklikler geri alınsın mı?'))) mut2(() => { n2OnayYaz(b.ad).teklif = {}; }, 'İstasyon teklifi sıfırlandı', b.ad); break;
       case 'talep-onayla': { const bb = S.plan.birimler.find(x => x.ad === v); if (!bb || salt()) break; if ((await onay(`${bb.ad} istasyonunun planı kesin plana işlensin mi?`))) { talepOnayla(bb); toast(`${bb.ad} planı onaylandı.`); } break; }
