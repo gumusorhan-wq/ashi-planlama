@@ -321,9 +321,8 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 
 /* Sürüm 13.57: istasyon tablosu sıkı satırlar — personelin hepsi tek ekranda */
 .ap-ist.siki{font-size:12.5px}
-.ap-ist.siki td{padding:1px 4px;line-height:1.25}
-.ap-ist.siki .ap-in,.ap-ist.siki .ap-sel,.ap-ist.siki .ap-ssbtn{padding:2px 5px !important;font-size:12px !important;min-height:0 !important;height:24px !important;line-height:18px !important}
+.ap-ist.siki td{padding:1px 4px;line-height:1.2}
+.ap-ist.siki .ap-in,.ap-ist.siki .ap-sel,.ap-ist.siki .ap-ssbtn{padding:1px 5px !important;font-size:12px !important;min-height:0 !important;height:22px !important;line-height:18px !important}
 .ap-ist.siki .ap-rolnot{display:none}
-.ap-ist.siki .ap-stp{min-height:0}
-.ap-ist.siki .ap-stb button{height:11px;line-height:9px}
-.ap-ist.siki .ap-note{font-size:10.5px;line-height:1.2}
+.ap-ist.siki .ap-stb button{height:10px;line-height:8px}
+.ap-ist.siki td .ap-note{font-size:10px;line-height:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
