@@ -1104,8 +1104,6 @@
         }
         case 'ik-al': await ikdenAl(v ? v.split(',') : ['N', 'I']); return;      // İK (ASHİ Nöbet Sayım) arşivinden nöbet / izin verisi
         case 'ist-kmp': S.istKmp = !S.istKmp; break;
-        case 'ist-ust': try { localStorage.setItem('ap_ist_ust', istUstGizli() ? '0' : '1'); } catch (e) { S.istUstYedek = !istUstGizli(); } break;
-        case 'ist-siki': try { localStorage.setItem('ap_ist_siki', istSiki() ? '0' : '1'); } catch (e) { S.istSikiYedek = !istSiki(); } break;
         case 'rot-sekme': S.rotSekme = v; break;
         case 'ozet-sekme': S.ozetSekme = v; break;
         case 'p-git': S.pSayfa = Math.max(0, parseInt(v, 10) || 0); break;

@@ -290,8 +290,3 @@ function mount(root, opts = {}) {
   // Planlama yetkilisi bu durumu elle değiştirebilir: k.idariNobetElle true (nöbet tutar) / false (nöbet tutmaz); alan yoksa rapordan otomatik
   const idariNobetOto = k => { if (!k || !k.idariNobet || !k.idariNobet.aylar) return false; const t = S.y * 12 + S.m - 1; return Object.keys(k.idariNobet.aylar).some(a => { const x = (+a.slice(0, 4)) * 12 + (+a.slice(5)) - 1; return x <= t && x > t - 6; }); };
   const idariNobetVar = k => !!k && (typeof k.idariNobetElle === 'boolean' ? k.idariNobetElle : idariNobetOto(k));
-
-// Sürüm 13.57: istasyon tablosunda sıkı satırlar (varsayılan açık; tarayıcıda hatırlanır)
-  function istSiki() { try { const v = localStorage.getItem('ap_ist_siki'); if (v != null) return v === '1'; } catch (e) { if (S.istSikiYedek != null) return S.istSikiYedek; } return true; }
-  // Sürüm 13.57: istasyon sayfasında üst bölüm (başlık, düğmeler, uyarılar, özet) gizlenebilir; tarayıcıda hatırlanır
-  function istUstGizli() { try { const v = localStorage.getItem('ap_ist_ust'); if (v != null) return v === '1'; } catch (e) { if (S.istUstYedek != null) return S.istUstYedek; } return false; }
