@@ -334,3 +334,5 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 .ap-ist.siki .ap-stp{height:22px}.ap-ist.siki .ap-stb{gap:0}
 .ap-ist.siki .ap-stb button{height:10px;line-height:8px}
 .ap-ist.siki td .ap-note{font-size:10px;line-height:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+/* Sürüm 13.63: o ay plan yokken plana bağlı menü bölümleri soluk */
+.ap-yit.ap-ysoluk,.ap-yit.ap-ysoluk:hover{opacity:.45;cursor:not-allowed;background:none;color:#64748b}

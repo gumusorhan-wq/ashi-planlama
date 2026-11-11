@@ -34,7 +34,9 @@
     const it = (on, act, v, ad, ikon, ek) => `<button type="button" class="ap-yit ${on ? 'on' : ''}" data-act="${act}" data-v="${v}" title="${esc(ad)}">${yanIc(ikon)}<span class="ap-ytx">${ad}</span>${ek || ''}</button>`;
     const sp = sayfaListesi(), m1Sec = sp.filter(([k]) => !YAN_VERI.includes(k)), veri = sp.filter(([k]) => YAN_VERI.includes(k));
     const s1 = ([k, t]) => it(S.modul !== 2 && S.sayfa === k, 'yan1', k, t, k, k === 'talep' && talepSay() ? `<span class="ap-ysay">${talepSay()}</span>` : '');
-    const n2s = n2Acik() ? S.n2.sekme : 'plan', s2 = N2_SEKME.filter(() => n2Acik()).map(([k, t]) => it(S.modul === 2 && n2s === k, 'yan2', k, t, 'n2-' + k)).join('');
+    // Sürüm 13.63: o ay plan yokken plana bağlı bölümler soluk ve tıklanmaz (hepsi aynı 'plan yok' ekranını açıyordu); Ana Sayfa nasıl başlanacağını anlatır
+    const s1y = ([k, t]) => !S.plan && k !== 'ana' && !YAN_VERI.includes(k) ? it(false, 'yan1', k, t, k, '').replace('class="ap-yit ', 'disabled aria-disabled="true" class="ap-yit ap-ysoluk ').replace(/title="[^"]*"/, `title="${esc(ayEtiket())} için plan yok"`) : s1([k, t]);
+    const n2s = n2Acik() ? S.n2.sekme : 'plan', s2 = N2_SEKME.filter(() => n2Acik()).map(([k, t]) => { const h = it(S.modul === 2 && n2s === k, 'yan2', k, t, 'n2-' + k); return S.plan ? h : h.replace('class="ap-yit ', 'disabled aria-disabled="true" class="ap-yit ap-ysoluk ').replace(/title="[^"]*"/, `title="${esc(ayEtiket())} için plan yok"`); }).join('');
     const aktif = S.modul === 2 ? (N2_SEKME.find(x => x[0] === n2s) || [, ''])[1] : (SAYFALAR.find(x => x[0] === S.sayfa) || [, ''])[1];
     const kisaAy = `${AYLAR[S.m].slice(0, 3)} ${String(S.y).slice(2)}`;
     return `<nav class="ap-yan ${S.yanAcik ? 'acik' : ''} ${S.yanDar ? 'dar' : ''}" aria-label="Planlama menüsü">
@@ -43,7 +45,7 @@
       <div class="ap-yanust"><div class="ap-ay"><button class="ap-btn sm" data-act="ay-" title="Önceki ay">‹</button><button class="ap-ayac" data-pop data-act="tp-ay-ac" title="Ay seç">${ayEtiket()} ▾</button><button class="ap-btn sm" data-act="ay+" title="Sonraki ay">›</button></div>
         ${S.plan ? `<div class="ap-ydurum"><span class="ap-badge ap-b-${d}" title="${DURUM_IPUCU[d] || ''}">${DURUM_AD[d] || d}</span>${guncelAy() && planlamaRol() ? durumSecHtml(d) : ''}</div>` : ''}
         ${opts.kullanici ? '' : `<select class="ap-sel" data-act="rol" title="Rol (demo)">${Object.entries(ROLLER).map(([k, v]) => `<option value="${k}" ${k === S.rol ? 'selected' : ''}>${v}</option>`).join('')}</select>`}</div>
-      <div class="ap-yanic">${m1 ? `<div class="ap-ysec">MODÜL 1 · PLANLAMA</div>${m1Sec.map(s1).join('')}` : ''}
+      <div class="ap-yanic">${m1 ? `<div class="ap-ysec">MODÜL 1 · PLANLAMA</div>${m1Sec.map(s1y).join('')}` : ''}
         <div class="ap-ysec">MODÜL 2 · NÖBET LİSTESİ</div>${s2}
         ${m1 && veri.length ? `<div class="ap-ysec">VERİ</div>${veri.map(s1).join('')}` : ''}</div>
       <button type="button" class="ap-ydar" data-act="yan-dar" title="${S.yanDar ? 'Menüyü genişlet' : 'Menüyü daralt'}" aria-label="${S.yanDar ? 'Menüyü genişlet' : 'Menüyü daralt'}">${S.yanDar ? '»' : '«'}<span class="ap-ytx">${S.yanDar ? '' : 'Menüyü daralt'}</span></button></nav>`;
@@ -446,7 +448,7 @@
     const D = durumlar(), f = S.filtre, q = C.TR(f.q);
     let liste = S.plan.kayitlar.filter(k => (!f.durum || k.durum === f.durum || (f.durum === '_izin' && izinGun(k) > 0)) && (!f.birim || k.birim === f.birim) && (!f.sinif || k.sinif === f.sinif) && (!f.ozel || ozelUyar(k, f.ozel)) && (!f.surucu || (k.sinif === 'memur' && C.kadroTip(k) === 'ATT' && C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}).tip === f.surucu)) && (!q || C.TR(k.ad + ' ' + (k.tc || '')).includes(q)) && (planlamaRol() || !gizliKisi(k)));
     liste = [...liste.filter(k => !gizliKisi(k)), ...liste.filter(gizliKisi)];
-    const boyut = S.pBoyut || 50, sayfaSay = Math.max(1, Math.ceil(liste.length / boyut)); if (S.pSayfa >= sayfaSay) S.pSayfa = sayfaSay - 1; if (S.pSayfa < 0) S.pSayfa = 0;
+    const boyut = S.pBoyut === 0 ? Math.max(1, liste.length) : (S.pBoyut || 50), sayfaSay = Math.max(1, Math.ceil(liste.length / boyut)); if (S.pSayfa >= sayfaSay) S.pSayfa = sayfaSay - 1; if (S.pSayfa < 0) S.pSayfa = 0;
     const bas = S.pSayfa * boyut, gos = liste.slice(bas, bas + boyut);
     const rows = gos.map(k => {
       const dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
@@ -455,9 +457,9 @@
     }).join('');
     const pager = () => { const dugme = (v, t, on, dis) => `<button class="ap-btn sm ${on ? 'on' : ''}" data-act="p-git" data-v="${v}" ${dis ? 'disabled' : ''}>${t}</button>`;
       const p = S.pSayfa, bas0 = Math.max(0, Math.min(p - 3, sayfaSay - 7)), nums = []; for (let i = bas0; i < Math.min(sayfaSay, bas0 + 7); i++) nums.push(dugme(i, i + 1, i === p));
-      return `<div class="ap-pager ap-noprint">${dugme(0, '«', false, p === 0)}${dugme(p - 1, '‹ Önceki', false, p === 0)}${nums.join('')}${dugme(p + 1, 'Sonraki ›', false, p >= sayfaSay - 1)}${dugme(sayfaSay - 1, '»', false, p >= sayfaSay - 1)}
+      return `<div class="ap-pager ap-noprint">${sayfaSay > 1 ? dugme(0, '«', false, p === 0) + dugme(p - 1, '‹ Önceki', false, p === 0) + nums.join('') + dugme(p + 1, 'Sonraki ›', false, p >= sayfaSay - 1) + dugme(sayfaSay - 1, '»', false, p >= sayfaSay - 1) : ''}
         <span class="ap-note">${liste.length ? bas + 1 : 0}–${Math.min(liste.length, bas + boyut)} / ${liste.length} · Sayfa ${p + 1}/${sayfaSay}</span>
-        <select class="ap-sel" data-act="p-boyut">${[25, 50, 100, 200].map(n => `<option value="${n}" ${n === boyut ? 'selected' : ''}>${n} / sayfa</option>`).join('')}</select></div>`; };
+        <select class="ap-sel" data-act="p-boyut"><option value="0" ${S.pBoyut === 0 ? 'selected' : ''}>Tümü (tek sayfa)</option>${[25, 50, 100, 200].map(n => `<option value="${n}" ${S.pBoyut !== 0 && n === boyut ? 'selected' : ''}>${n} / sayfa</option>`).join('')}</select></div>`; };
     return `<div class="ap-row ap-noprint" data-ust><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''} title="Personel Listesi Raporu ve EKİP listesini birlikte seçebilirsiniz">Personel listelerini yükle</button>
       <input class="ap-in" data-act="f-q" data-liste-ara placeholder="Ad veya TC ara" value="${esc(f.q)}">
       ${istTekHtml('fbirim', f.birim || '', S.plan.birimler.map(b => b.ad), {bos: 'Tüm birimler', kucuk: true})}
@@ -465,7 +467,7 @@
       <select class="ap-sel" data-act="f-surucu" title="ATT sürücülüğü"><option value="">ATT sürücülüğü: tümü</option><option value="dogrulanmadi" ${f.surucu === 'dogrulanmadi' ? 'selected' : ''}>Doğrulanmadı</option><option value="surucu" ${f.surucu === 'surucu' ? 'selected' : ''}>Sürücü</option><option value="degil" ${f.surucu === 'degil' ? 'selected' : ''}>Sürücü değil</option></select>
       <select class="ap-sel" data-act="f-durum"><option value="">Tüm durumlar</option><option value="_izin" ${f.durum === '_izin' ? 'selected' : ''}>İzinli</option>${Object.keys(D).map(a => `<option ${a === f.durum ? 'selected' : ''}>${a}</option>`).join('')}</select>
       ${f.ozel ? `<span class="ap-chip sec">${esc(f.ozelAd || 'İstatistik süzgeci')} <a href="#" data-act="f-ozel-sil" title="Süzgeci kaldır">✕</a></span>` : ''}<span class="ap-note">${liste.length} kayıt${S.plan.disKurum && S.plan.disKurum.length ? ` · Dış kurum: ${S.plan.disKurum.length}` : ''}</span></div>
-      ${pager()}<div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>TC</th><th>ÜNVAN</th><th>SINIF</th><th>BİRİM</th><th>NÖBET ROLÜ</th><th>SÜRÜCÜLÜK</th><th>DURUM</th><th>GÖREV BAŞLANGICI</th><th>4/B 4 YIL DOLUMU</th><th>YILLIK İZİN KALAN</th></tr></thead><tbody>${rows || '<tr><td colspan="11" class="ap-empty">Kayıt yok</td></tr>'}</tbody></table></div>${pager()}`;
+      ${pager()}<div class="ap-tw"><table class="ap-t"><thead><tr><th>AD SOYAD</th><th>TC</th><th>ÜNVAN</th><th>SINIF</th><th>BİRİM</th><th>NÖBET ROLÜ</th><th>SÜRÜCÜLÜK</th><th>DURUM</th><th>GÖREV BAŞLANGICI</th><th>4/B 4 YIL DOLUMU</th><th>YILLIK İZİN KALAN</th></tr></thead><tbody>${rows || '<tr><td colspan="11" class="ap-empty">Kayıt yok</td></tr>'}</tbody></table></div>${sayfaSay > 1 ? pager() : ''}`;
   }
 
   function ozelHtml() {
@@ -542,7 +544,8 @@
   }
   function sayfaHtml() {
     if (S.modul === 2) return n2Html();
-    if (!S.plan) return bosHtml();
+    if (!S.plan && !YAN_VERI.includes(S.sayfa)) return bosHtml();      // Sürüm 13.63: Arşiv, Arşiv istatistikleri ve Ayarlar o ayın planı olmadan da açılır
+    if (!S.plan) return (opts.gomulu ? `<div class="ap-sbas"><div><h2>${esc((SAYFALAR.find(x => x[0] === S.sayfa) || [, ""])[1])}</h2></div></div>` : "") + sayfaGovde();
     if (!SAYFALAR.some(x => x[0] === S.sayfa)) S.sayfa = 'ana';
     const ic = sayfaGovde();      // önce gövde: istasyon sayfası seçili istasyonu (S.ist) burada belirler
     return sayfaBasHtml() + ic;

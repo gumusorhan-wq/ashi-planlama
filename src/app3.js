@@ -1369,7 +1369,7 @@
       else if (a === 'tahmini') { S.ayar.tahminiGoster = t.checked; await ayarKaydet(); }
       else if (a === 'rot-kaynak') S.rotKaynak = t.value;
       else if (a === 'rot-ist') S.rotIst = t.value;
-      else if (a === 'p-boyut') { S.pBoyut = parseInt(t.value, 10) || 50; S.pSayfa = 0; }
+      else if (a === 'p-boyut') { S.pBoyut = Number.isFinite(parseInt(t.value, 10)) ? parseInt(t.value, 10) : 0; S.pSayfa = 0; }
       else if (a === 'tema') { S.ayar.tema = t.value; await ayarKaydet(); }
       else if (a === 'ekip-of') {
         const b = S.plan.birimler.find(x => x.ad === t.dataset.v);
