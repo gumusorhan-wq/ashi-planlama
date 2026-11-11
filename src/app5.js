@@ -57,8 +57,15 @@
 
   function n2UstHtml(b) {
     const kisit = n2Kendi(), ists = S.plan.birimler.filter(x => x.tur === 'istasyon' && !x.ekipOf && (kisit === null || x.ad === kisit));
-    return `<div class="ap-card"><div class="ap-row"><span class="ap-note">İstasyon</span>${istTekHtml('n2', b.ad, ists.map(x => x.ad))}
+    return `<div class="ap-card" data-ust><div class="ap-row"><span class="ap-note">İstasyon</span>${istTekHtml('n2', b.ad, ists.map(x => x.ad))}
       <span class="ap-note">${ayEtiket()} · ${NC.gunSayisi(S.y, S.m)} gün · nöbet 09:00–09:00</span>${S.rol !== 'istasyon' && S.rol !== 'salt_okur' && S.plan.durum === 'kesin' && guncelAy() ? (S.n2Duzenle ? `<button class="ap-btn" style="margin-left:auto" data-act="n2-duzenle" data-v="0" title="İstasyonun kilidi bırakılır; istasyon sorumlusu yeniden düzenleyebilir">Düzenlemeyi bırak</button>` : `<span class="ap-note" style="margin-left:auto">İzliyorsunuz (istasyon sorumlusu düzenleyebilir)</span><button class="ap-btn" data-act="n2-duzenle" data-v="1" title="Bu istasyonun nöbet listesini siz düzenlersiniz; bu sırada istasyon sorumlusu salt okunur görür">Düzenle</button>`) : ''}</div>${damgaHtml(((S.plan.nobet || {})[b.ad] || {}).damga)}</div>`;
+  }
+  // Sürüm 13.62: Modül 2 sayfalarında da Modül 1'deki gibi sayfa başlığı, son kayıt ve görünür Kaydet (gömülü modda; sol menüde sekme çubuğu yok)
+  function n2BasHtml(b) {
+    if (!opts.gomulu) return '';
+    const baslik = (N2_SEKME.find(x => x[0] === S.n2.sekme) || N2_SEKME[0])[1], d = n2Depo(b.ad).damga;
+    const kay = n2Duz() && !salt() ? `<div class="ap-sbas-sag ap-sbas-dg"><button class="ap-btn pri sm ap-noprint" data-act="plan-kaydet" title="Değişiklikler zaten otomatik kaydedilir; bu düğme bekleyen değişikliği hemen sunucuya yazar">💾 Kaydet</button>${S.sonKayit ? `<span class="ap-note" title="Son kayıt">✓ ${S.sonKayit}</span>` : ''}</div>` : '';
+    return `<div class="ap-sbas"><div><h2>${esc(baslik)}</h2>${damgaHtml(d)}</div>${kay}</div>`;
   }
   function n2Html() {
     if (!S.plan) return `<div class="ap-card ap-empty"><h2>Modül 2 — İstasyon nöbet listesi</h2><p>Bu ay için plan yok. Önce Modül 1'den personel listelerini yükleyin.</p></div>`;
@@ -67,7 +74,7 @@
     if (!n2Acik()) return n2UstHtml(b) + `<div class="ap-card ap-empty"><h2>${ayEtiket()} planı henüz kesinleşmedi</h2><p>Planlama birimi planı kesinleştirip istasyonlara gönderdiğinde nöbet hedefleriniz ve nöbet listesi araçları burada açılır.</p></div>`;
     const s = S.n2.sekme;
     // 12.47'den beri planlama onayı yok: plan kesinleşince istasyon nöbet listesi araçlarını doğrudan kullanır
-    return n2UstHtml(b) + ({plan: n2PlanHtml, istek: n2IstekHtml, liste: n2ListeHtml, denetim: n2DenetimHtml, paket: n2PaketHtml}[s] || n2PlanHtml)(b);
+    return n2BasHtml(b) + n2UstHtml(b) + ({plan: n2PlanHtml, istek: n2IstekHtml, liste: n2ListeHtml, denetim: n2DenetimHtml, paket: n2PaketHtml}[s] || n2PlanHtml)(b);
   }
   // ---- Planlama: Modül 1'de hazırlanan, bu istasyonun kendi planlaması (istasyon sorumlusu için yalnız onaydan sonra; sağlık nedenleri görünmez) ----
   const NB_AD = {dok: 'Ekip şefi', isci: 'Sürücü', ms: 'Sürücü', ke: 'Ekip şefi · YSP', ka: 'Ekip şefi · YSP · Sürücü', ysp: 'YSP', sy: 'YSP · Sürücü'};

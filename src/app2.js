@@ -403,7 +403,7 @@
     const dq = C.TR(S.disAra || '').trim(), dist = S.disIst || '';
     const disSat = disK.map(k => { const g = k.gorev || {}, bk = birimler.find(x => x.ad === k.birim) || {ad: k.birim}, dt = D[k.durum] || {}, ara = C.TR([k.ad, k.birim, g.hedef || '', g.yer || '', k.durumMetin || ''].join(' ')), gor = (!dq || ara.includes(dq)) && (!dist || k.birim === dist); return `<tr data-ara="${esc(ara)}" data-kay="${esc(k.birim)}" style="${gor ? '' : 'display:none'}"><td>${esc(k.ad)}</td><td>${esc(k.unvan)}</td><td>${esc(k.birim)}</td><td>${esc(k.durum || '')}</td><td>${gorevHucre(k, birimler, bk, {disarida: true}, duz ? '' : 'disabled')}</td></tr>`; }).join('');
     const dis = `<div class="ap-card"><div class="ap-row"><h2 style="margin:0">İstasyon dışı görevliler (${disK.length})</h2>
-      <input class="ap-in" id="ap-d-kisi" placeholder="Kişi / yer ara (listeyi süzer)…" value="${esc(S.disAra || '')}" autocomplete="off">
+      <input class="ap-in" id="ap-d-kisi" data-liste-ara placeholder="Kişi / yer ara (listeyi süzer)…" value="${esc(S.disAra || '')}" autocomplete="off">
       <label class="ap-note" title="Yalnız seçilen kadro istasyonunun personeli listelenir">Kadro istasyonu süz ${istTekHtml('dist', dist, [...new Set(disK.map(k => k.birim))].sort(trCollator.compare), {bos: 'Tümü', kucuk: true})}</label></div><p class="ap-note">Geçici görevde olup başka bir <b>istasyona</b> atanmamış personel (Başhekimlik, KKM, ilçe sağlık müdürlüğü, hastane vb. ya da yeri henüz seçilmemiş). Bu kişilere kendi istasyonlarında nöbet yazılmaz. Yeri "Görev yeri" sütunundan seçebilir ya da yazabilirsiniz.</p>
       <div class="ap-tw"><table class="ap-t"><thead><tr><th>Ad soyad</th><th>Ünvan</th><th>Kadro istasyonu</th><th>Durum</th><th style="min-width:230px">Görev yeri / tarih</th></tr></thead><tbody>${disSat || '<tr><td colspan="5" class="ap-empty">İstasyon dışında görevli personel yok</td></tr>'}</tbody></table></div></div>`;
     const sekmeler = [['deg', 'Personel ihtiyacı değerlendirmesi'], ['rot', 'Aylık rotasyon'], ['list', `Görevlendirmeler (${gk.length})`], ['dis', `İstasyon dışı görevliler (${disK.length})`], ['tekay', `Tek ay görevleri (${tekAyGorevler().length})`], ['ozet', 'Açık / fazla istasyonlar']];
@@ -414,7 +414,7 @@
       esles: `<div class="ap-card"><h2>Eşleştirme önerisi</h2>${oner.map(t => `<div>${esc(t)}</div>`).join('')}<div class="ap-note">Öneri yalnız tam kişi önerir: gelen kişi hedef istasyonda bütün mesaisini doldurabilmeli (bir kişilik açık yoksa personel önerilmez). Yakınlık ilçe merkezleri arası yaklaşık km; branş uyumu kişi seçerken denetlenir. Kişi seçerken 4/B kuralı (4 yıl dolmadan başka istasyona görevlendirme yasak) otomatik denetlenir.</div></div>`};
     const ozet = `<div class="ap-subnav ap-noprint" data-ust>${oSek.map(([v, t]) => `<button class="${oa === v ? 'on' : ''}" data-act="ozet-sekme" data-v="${v}">${t}</button>`).join('')}</div>${oKart[oa]}`;
     const liste = `<div class="ap-card"><div class="ap-row" data-ust><h2 style="margin:0">Görevlendirmeler (${gk.length})</h2>
-      <input class="ap-in" type="search" id="ap-g-kisi" value="${esc(S.gAra || '')}" placeholder="Listede ara (ad, kaynak, hedef)…" title="Yazdıkça aşağıdaki görevlendirme listesi süzülür">
+      <input class="ap-in" type="search" id="ap-g-kisi" data-liste-ara value="${esc(S.gAra || '')}" placeholder="Listede ara (ad, kaynak, hedef)…" title="Yazdıkça aşağıdaki görevlendirme listesi süzülür">
       <label class="ap-note" title="Seçilen istasyondan görevli çıkanlar ve o istasyona gelenler listelenir">İstasyon süz ${istTekHtml('gist', S.gIst || '', birimler.map(b => b.ad), {bos: 'Tümü', kucuk: true})}</label>
       <span class="ap-note">Yeni görevlendirme:</span><select class="ap-sel" id="ap-g-sec" title="Görevlendirilecek kişi (arayarak seçin)"><option value="">— kişi seçin —</option>${S.plan.kayitlar.filter(k => !gizliKisi(k) && (!k.gorev || !(k.gorev.hedef || k.gorev.yer))).sort((a, b) => trCollator.compare(a.ad, b.ad)).map(k => `<option value="${esc(k.id)}" ${S.gSecId === k.id ? 'selected' : ''}>${esc(k.ad)} · ${esc(k.birim || '')}</option>`).join('')}</select><span class="ap-note">→</span>${(() => { const h = birimler.some(b => b.ad === S.gYeniHedef) ? S.gYeniHedef : (birimler[0] || {}).ad || ''; return `<input type="hidden" id="ap-g-hedef" value="${esc(h)}">${istTekHtml('gyh', h, birimler.map(b => b.ad), {kucuk: true})}`; })()}
       <button class="ap-btn pri" data-act="g-ekle" ${duz ? '' : 'disabled'}>Görevlendir</button>
@@ -450,7 +450,7 @@
     const bas = S.pSayfa * boyut, gos = liste.slice(bas, bas + boyut);
     const rows = gos.map(k => {
       const dy = k.dortB && k.memBas ? C.dortYilDurum(k.memBas, ayIlk()) : null;
-      return `<tr><td>${esc(k.ad)}${k.asosYok ? ' <span class="ap-tag ap-t-fz" title="ASOS listelerinde bulunamadı">ASOS\'ta yok</span>' : ''}</td><td>${esc(k.tc || '')}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}</td><td>${SINIF_AD[k.sinif] || ''}</td><td>${esc(k.birim)}</td><td>${C.GRUP_AD[C.grupBelirle(k, {degil: S.ayar.surDegilEsik / 100}, S.ayar)]}${k.rolManuel ? ' (elle)' : ''}</td><td>${(() => { if (k.sinif !== 'memur' || C.kadroTip(k) !== 'ATT') return ''; const sd = C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}); return sd.tip === 'surucu' ? `Sürücü${sd.kaynak === 'kayit' ? ' (%' + Math.round(100 * sd.pay) + ')' : ' (elle)'}` : sd.tip === 'degil' ? 'Sürücü değil' : '<span class="ap-tag ap-t-fz">Doğrulanmadı</span>'; })()}</td><td>${esc(durumGosterim(k))}</td>
+      return `<tr><td style="white-space:nowrap">${esc(k.ad)}${k.asosYok ? ' <span class="ap-tag ap-t-fz" title="ASOS listelerinde bulunamadı">ASOS\'ta yok</span>' : ''}</td><td>${esc(k.tc || '')}</td><td>${esc(k.unvan)}${k.dortB ? ' <span class="ap-tag ap-t-fz">4/B</span>' : ''}</td><td>${SINIF_AD[k.sinif] || ''}</td><td>${esc(k.birim)}</td><td>${C.GRUP_AD[C.grupBelirle(k, {degil: S.ayar.surDegilEsik / 100}, S.ayar)]}${k.rolManuel ? ' (elle)' : ''}</td><td>${(() => { if (k.sinif !== 'memur' || C.kadroTip(k) !== 'ATT') return ''; const sd = C.surucuDurumu(k, {degil: S.ayar.surDegilEsik / 100}); return sd.tip === 'surucu' ? `Sürücü${sd.kaynak === 'kayit' ? ' (%' + Math.round(100 * sd.pay) + ')' : ' (elle)'}` : sd.tip === 'degil' ? 'Sürücü değil' : '<span class="ap-tag ap-t-fz">Doğrulanmadı</span>'; })()}</td><td>${esc(durumGosterim(k))}</td>
       <td>${k.memBas ? k.memBas.split('-').reverse().join('.') : ''}${k.dortB && !k.memBas ? '<span class="ap-tag ap-t-ih">tarih yok</span>' : ''}</td><td>${dy ? (dy.uygun ? 'Uygun' : esc(dy.dolum.split('-').reverse().join('.'))) : ''}</td><td class="num">${k.yillikKalan != null ? fmt(k.yillikKalan) : ''}</td></tr>`;
     }).join('');
     const pager = () => { const dugme = (v, t, on, dis) => `<button class="ap-btn sm ${on ? 'on' : ''}" data-act="p-git" data-v="${v}" ${dis ? 'disabled' : ''}>${t}</button>`;
@@ -459,7 +459,7 @@
         <span class="ap-note">${liste.length ? bas + 1 : 0}–${Math.min(liste.length, bas + boyut)} / ${liste.length} · Sayfa ${p + 1}/${sayfaSay}</span>
         <select class="ap-sel" data-act="p-boyut">${[25, 50, 100, 200].map(n => `<option value="${n}" ${n === boyut ? 'selected' : ''}>${n} / sayfa</option>`).join('')}</select></div>`; };
     return `<div class="ap-row ap-noprint" data-ust><button class="ap-btn pri" data-act="plan-asos" ${salt() ? 'disabled' : ''} title="Personel Listesi Raporu ve EKİP listesini birlikte seçebilirsiniz">Personel listelerini yükle</button>
-      <input class="ap-in" data-act="f-q" placeholder="Ad veya TC ara" value="${esc(f.q)}">
+      <input class="ap-in" data-act="f-q" data-liste-ara placeholder="Ad veya TC ara" value="${esc(f.q)}">
       ${istTekHtml('fbirim', f.birim || '', S.plan.birimler.map(b => b.ad), {bos: 'Tüm birimler', kucuk: true})}
       <select class="ap-sel" data-act="f-sinif"><option value="">Tüm sınıflar</option>${Object.entries(SINIF_AD).map(([a, t]) => `<option value="${a}" ${a === f.sinif ? 'selected' : ''}>${t}</option>`).join('')}</select>
       <select class="ap-sel" data-act="f-surucu" title="ATT sürücülüğü"><option value="">ATT sürücülüğü: tümü</option><option value="dogrulanmadi" ${f.surucu === 'dogrulanmadi' ? 'selected' : ''}>Doğrulanmadı</option><option value="surucu" ${f.surucu === 'surucu' ? 'selected' : ''}>Sürücü</option><option value="degil" ${f.surucu === 'degil' ? 'selected' : ''}>Sürücü değil</option></select>
@@ -682,12 +682,13 @@
   }
   function tabloSiralaFiltrele() {
     const sayfa = S.modul === 2 ? 'n2:' + S.n2.sekme : S.sayfa + ':' + (S.gorevSekme || '');
+    const kendiAra = !!root.querySelector('[data-liste-ara]');      // Sürüm 13.62: sayfanın kendi arama kutusu varsa (Personel 'Ad veya TC ara' vb.) ikinci 'Tabloda ara' kutusu açılmaz
     root.querySelectorAll('.ap-main table.ap-t').forEach((t, ti) => {
       if (t.matches('.n2, .n2l, [data-sirasiz]') || !t.tBodies[0]) return;
       const tb = t.tBodies[0], satir = [...tb.rows]; if (satir.length < 2) return;
       const ths = [...t.querySelectorAll('thead tr:last-child th')]; if (!ths.length) return;
       const anahtar = `${sayfa}:${ti}:${ths.length}`, d = TD[anahtar] || (TD[anahtar] = {k: -1, y: 1, ara: ''}), grup = satir.some(r => r.querySelector('td[colspan]'));
-      if (satir.length >= 8 && !satir.some(r => r.dataset.ara != null)) {      // kendi arama kutusu olan listelerde (data-ara) ikinci kutu açılmaz
+      if (satir.length >= 8 && !kendiAra && !satir.some(r => r.dataset.ara != null)) {      // kendi arama kutusu olan listelerde (data-ara) ikinci kutu açılmaz
         const kap = t.closest('.ap-tw') || t, inp = document.createElement('input');
         inp.className = 'ap-in ap-tara ap-noprint'; inp.placeholder = 'Tabloda ara…'; inp.value = d.ara; inp.dataset.tk = anahtar; inp.setAttribute('aria-label', 'Tabloda ara');
         kap.parentNode.insertBefore(inp, kap); inp._tablo = t;
