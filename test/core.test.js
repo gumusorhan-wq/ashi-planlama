@@ -173,3 +173,7 @@ console.log('çekirdek testleri geçti');
 { const kk = Array.from({length: 11}, (_, i) => ({id: 'b' + i, sinif: 'memur', durum: '', izin: i === 0 ? [{gun: 3}] : [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}}));
   const hb = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 9}, 3), ob = C.oneri(hb);
   yk(kk.reduce((a, k) => a + ob.get(k.id), 0), 93); }
+// Sürüm 13.70: eksik dağıtımda herkes tam hedef, eksik tek kişiden düşer
+{ const kk = Array.from({length: 13}, (_, i) => ({id: 'e' + i, sinif: 'memur', durum: '', izin: [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}}));
+  const he = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 8}, 3), oe = C.oneri(he), v = kk.map(k => oe.get(k.id));
+  assert.strictEqual(v.filter(x => Math.abs(x - 23 / 3) > 1e-9).length, 1, v.join(' ')); yk(v.reduce((a, b) => a + b, 0), 93); }

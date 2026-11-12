@@ -557,6 +557,11 @@ const APCore = (() => {
     }
     return V;
   }
+  function eksikDus(havuz, H) {
+    const V = H.slice(); let d = H.reduce((a, b) => a + b, 0) - havuz;
+    for (let i = V.length - 1; i >= 0 && d > 1e-6; i--) { const k = Math.min(d, V[i]); V[i] = Math.max(0, ucte(V[i] - k)); d -= k; }
+    return V;
+  }
   // Bir istasyon için hesap. kisiler: o istasyonda çalışan (gelenler dahil, giden hariç) kayıtlar. 
   // Her kayıt için {mesai, hedef, nobetYok} üretir; ihtiyaç, kapasite ve öneri döner.
   function istasyonHesap(kisiler, y, m, ozel, durumlar, ayar, yuva) {
@@ -670,7 +675,8 @@ const APCore = (() => {
       // yalnız artan fazla nöbet uygun personele (en az fazlası olandan başlayarak, azamiyi aşmadan) dağıtılır; bu artışların küsuratı farklı olabilir (8 / 8,5 / 8,33)
       const sumH = L.reduce((x, s) => x + s.hedef, 0);
       if (g !== 'isci' && L.length && total > sumH + 1e-6) { fazlaDagit(total - sumH, L.map(s => s.hedef), L.map(s => s.azami)).forEach((v, i) => sonuc.set(L[i].k.id, ucte(v))); return; }
-      const V = g === 'isci' ? L.map(s => s.hedef) : dagitSinirli(Math.floor(Math.max(0, total) * 3 + 1e-6) / 3, L.map(s => s.hedef), L.map(s => s.azami), 1 / 3);
+      // Sürüm 13.70: grubun payı hedeflere yetmiyorsa herkes tam hedefini alır; eksik tek kişiden düşülür (listede en alttaki), yetmezse bir üstündekinden
+      const V = g === 'isci' ? L.map(s => s.hedef) : eksikDus(Math.floor(Math.max(0, total) * 3 + 1e-6) / 3, L.map(s => s.hedef));
       if (g !== 'isci') {      // işçinin 12 saatlik vardiyası yüzünden kalan yarım (12 sa) parça: x,33'lü bir kişiye eklenir → x,5 (12 sa)
         const artik = Math.max(0, total) - V.reduce((x, v) => x + v, 0);
         if (artik > 1 / 6 - 1e-6) {
