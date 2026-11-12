@@ -535,6 +535,26 @@ const APCore = (() => {
     return out;
   }
 
+  // Hedefin üstündeki fazla nöbetin dağıtımı: hedefler olduğu gibi kalır. Önce tam sayıya tamamlama (7,67 → 8, sonra 9…), her turda fazlası en az olana;
+  // sonra kalan küsurat (8 saatlik 1/3 ya da 12 saatlik 1/2 parça) geçerli bir değere (x,33 / x,5 / x,67 / tam) oturacak biçimde verilir
+  function fazlaDagit(E, H, A) {
+    const V = H.slice(), fark = i => V[i] - H[i], gec = v => Math.abs(v * 3 - Math.round(v * 3)) < 1e-6 || Math.abs(v * 2 - Math.round(v * 2)) < 1e-6;
+    let r = Math.floor(E * 6 + 1e-6) / 6;
+    for (let t = 0; t < 10000 && r > 1e-6; t++) {
+      let en = -1, c = 0;
+      for (let i = 0; i < V.length; i++) { const ust = Math.floor(V[i] + 1e-6) + 1, cost = ust - V[i]; if (ust > A[i] + 1e-6 || cost > r + 1e-6) continue; if (en < 0 || fark(i) < fark(en) - 1e-9) { en = i; c = cost; } }
+      if (en < 0) break; V[en] = Math.floor(V[en] + 1e-6) + 1; r -= c;
+    }
+    for (let t = 0; t < 50 && r > 1e-6; t++) {
+      let en = -1, es = 0;
+      for (let i = 0; i < V.length; i++) for (let k = Math.round(r * 6); k >= 1; k--) {
+        const st = k / 6; if (V[i] + st > A[i] + 1e-6 || !gec(V[i] + st)) continue;
+        if (en < 0 || st > es + 1e-9 || (Math.abs(st - es) < 1e-9 && fark(i) < fark(en) - 1e-9)) { en = i; es = st; } break;
+      }
+      if (en < 0) break; V[en] += es; r -= es;
+    }
+    return V;
+  }
   // Bir istasyon için hesap. kisiler: o istasyonda çalışan (gelenler dahil, giden hariç) kayıtlar. 
   // Her kayıt için {mesai, hedef, nobetYok} üretir; ihtiyaç, kapasite ve öneri döner.
   function istasyonHesap(kisiler, y, m, ozel, durumlar, ayar, yuva) {
@@ -644,18 +664,23 @@ const APCore = (() => {
       // Hedefin üstüne fazla nöbet yazılan memur/doktorda nöbet tam sayıya yuvarlanır: önce aşağı, eksik kalan toplam küsuratı en büyük olanlardan başlayarak azamiyi aşmadan yukarı tamamlanır (ör. 8,67 / 8,67 / 8,66 → 9 / 9 / 8)
       // Sürüm 13.57: işçi her durumda mesaisine göre hedef vardiyasını tutar (kilitli memur sürücüler sürücüyü doldursa da düşürülmez)
       // Sürüm 13.71: memur / doktor küsuratı 8 saatlik parçalarla (1/3 nöbet: 0,33 = 8 sa, 0,67 = 16 sa); 0,01'lik artıklar (7,66 / 7,67) çıkmaz
+      // Sürüm 13.70: grubun payı hedeflerin toplamını aşıyorsa herkes önce tam hedefini alır (7,67 → 7,67; kimse hedefin altına inmez),
+      // yalnız artan fazla nöbet uygun personele (en az fazlası olandan başlayarak, azamiyi aşmadan) dağıtılır; bu artışların küsuratı farklı olabilir (8 / 8,5 / 8,33)
+      const sumH = L.reduce((x, s) => x + s.hedef, 0);
+      if (g !== 'isci' && L.length && total > sumH + 1e-6) { fazlaDagit(total - sumH, L.map(s => s.hedef), L.map(s => s.azami)).forEach((v, i) => sonuc.set(L[i].k.id, ucte(v))); return; }
       const V = g === 'isci' ? L.map(s => s.hedef) : dagitSinirli(Math.floor(Math.max(0, total) * 3 + 1e-6) / 3, L.map(s => s.hedef), L.map(s => s.azami), 1 / 3);
       if (g !== 'isci') {      // işçinin 12 saatlik vardiyası yüzünden kalan yarım (12 sa) parça: x,33'lü bir kişiye eklenir → x,5 (12 sa)
         const artik = Math.max(0, total) - V.reduce((x, v) => x + v, 0);
         if (artik > 1 / 6 - 1e-6) {
           const kes = v => Math.round((v - Math.floor(v + 1e-6)) * 3), oda = (j, d) => V[j] + d <= L[j].azami + 1e-6 && V[j] + d >= -1e-6;
-          const i1 = V.findIndex((v, j) => kes(v) === 1 && oda(j, 1 / 6));      // x,33 → x,5
+          const i1 = V.findIndex((v, j) => kes(v) === 1 && oda(j, 1 / 6) && V[j] + 1 / 6 <= L[j].hedef + 1e-6);      // x,33 → x,5 (eksik grupta kimse hedefini aşmaz)
           if (i1 >= 0) V[i1] = Math.floor(V[i1] + 1e-6) + 0.5;
           else {
-            const a = V.findIndex((v, j) => kes(v) === 0 && oda(j, 0.5)), b = V.findIndex((v, j) => j !== a && kes(v) > 0 && oda(j, -1 / 3));
-            if (a >= 0 && b >= 0) { V[a] = Math.round(V[a]) + 0.5; V[b] = ucte(V[b] - 1 / 3); }      // x,0 → x,5 ve başka biri −8 sa
-            else { const c = V.findIndex((v, j) => kes(v) === 2 && oda(j, -1 / 6)), d = V.findIndex((v, j) => j !== c && oda(j, 1 / 3));
-              if (c >= 0 && d >= 0) { V[c] = Math.floor(V[c] + 1e-6) + 0.5; V[d] = ucte(V[d] + 1 / 3); } }      // x,67 → x,5 ve başka biri +8 sa
+            // eksik grupta önce hedefi aşmayan yol: x,67 → x,5 ve hedefinin altındaki başka biri +8 sa (kimse hedefin üstüne çıkmaz)
+            const c0 = V.findIndex((v, j) => kes(v) === 2 && oda(j, -1 / 6)), d0 = V.findIndex((v, j) => j !== c0 && V[j] + 1 / 3 <= L[j].hedef + 1e-6 && oda(j, 1 / 3));
+            if (c0 >= 0 && d0 >= 0) { V[c0] = Math.floor(V[c0] + 1e-6) + 0.5; V[d0] = ucte(V[d0] + 1 / 3); }
+            else { const a = V.findIndex((v, j) => kes(v) === 0 && oda(j, 0.5) && V[j] + 0.5 <= L[j].hedef + 1e-6), b = V.findIndex((v, j) => j !== a && kes(v) > 0 && oda(j, -1 / 3));
+              if (a >= 0 && b >= 0) { V[a] = Math.round(V[a]) + 0.5; V[b] = ucte(V[b] - 1 / 3); } }      // x,0 → x,5 ve başka biri −8 sa (hedef aşılmaz; yol yoksa 4 saatlik parça boş kalır)
           }
         }
       }

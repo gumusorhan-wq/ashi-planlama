@@ -159,3 +159,7 @@ console.log('çekirdek testleri geçti');
 // Sürüm 13.57: NÖBET MUAFİYETİ eski hesap (nöbet yok), NÖBET MUAFİYETİ MESAİ gündüz 8 saat (hedef = mesai / 24)
 { assert.strictEqual(C.DURUM_VARSAYILAN['NÖBET MUAFİYETİ'].gunduz8, undefined); assert.strictEqual(C.DURUM_VARSAYILAN['NÖBET MUAFİYETİ MESAİ'].gunduz8, true);
   assert.strictEqual(C.durumAnahtar ? C.durumAnahtar('Nöbet muafiyeti mesai') : 'NÖBET MUAFİYETİ MESAİ', 'NÖBET MUAFİYETİ MESAİ'); console.log('muafiyet mesai testleri geçti'); }
+// Sürüm 13.70: fazla nöbet dağıtımı — herkes önce tam hedefini (Aralık 7,67) alır, artan yalnız uygun kişilere eklenir; 0,01'lik artık ve hedefin altı yok
+{ const kk = Array.from({length: 12}, (_, i) => ({id: 'a' + i, sinif: 'memur', durum: '', izin: [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}}));
+  const ha = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 8, isciEk: 0}, 3), oa = C.oneri(ha), v = kk.map(k => oa.get(k.id));
+  assert.ok(v.every(x => Math.abs(x - 23 / 3) < 1e-9 || x === 8), v.join(' ')); assert.strictEqual(v.filter(x => x === 8).length, 3); yk(v.reduce((a, b) => a + b, 0), 93); }
