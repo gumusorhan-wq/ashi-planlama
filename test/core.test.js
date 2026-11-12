@@ -61,7 +61,7 @@ assert.strictEqual(top, 90); assert.ok([...o2.values()].every(v => v >= 7 && v <
 h2 = C.istasyonHesap(mk(10, 'm', 'memur'), 2026, 11, {}, D2, AY, 3);              // azami 80 < 90 → gerçek ihtiyaç
 assert.strictEqual(h2.durum, 'ihtiyac'); o2 = C.oneri(h2); assert.ok([...o2.values()].every(v => v === 8)); assert.strictEqual(h2.farkAzami, -10);
 h2 = C.istasyonHesap(mk(14, 'm', 'memur'), 2026, 11, {}, D2, AY, 3);              // hedef 98 > 90 → mesai dolmaz, hepsi ≤7
-assert.strictEqual(h2.durum, 'fazla'); o2 = C.oneri(h2); assert.strictEqual([...o2.values()].reduce((a, b) => a + b, 0), 90);
+assert.strictEqual(h2.durum, 'fazla'); o2 = C.oneri(h2); yk([...o2.values()].reduce((a, b) => a + b, 0), 90);   // 13.71: üçte birler toplamı kayan nokta
 // izinli kişi: hedef + 1 ile sınırlı (azami 8'i geçmez)
 const kk = mk(11, 'm', 'memur'); kk[0].izin = [{gun: 10}];
 h2 = C.istasyonHesap(kk, 2026, 11, {}, D2, AY, 3); const s0 = h2.satir[0];

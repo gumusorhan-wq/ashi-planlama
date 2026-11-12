@@ -287,7 +287,7 @@
   function tekAyGorevler() { const ilk = ayIlk(), son = sonrakiAyIlk();
     return S.plan.kayitlar.filter(k => { if (gizliKisi(k)) return false; const g = k.gorev; if (!g || !(g.hedef || g.yer) || !gorevAktif(g) || xlUzunGorev(g)) return false; const t = gorevTarihleri(g); return (!t.bas || t.bas >= ilk) && (!t.bit || t.bit <= son); })
       .sort((a, b) => trCollator.compare(a.birim || '', b.birim || '') || trCollator.compare(a.ad, b.ad)); }
-  const yollukTur = k => { const y = C.TR((k.gorev && k.gorev.yolluk) || ''); return y === 'YOLLUKLU' ? 'Y' : y === 'YOLLUKSUZ' ? 'N' : ''; };
+  const yollukTur = k => { const y = C.TR((k.gorev && k.gorev.yolluk) || ''); return y === 'YOLLUKLU' ? 'Y' : y === 'YOLLUKSUZ' ? 'N' : y === 'SUREKLI GOREVLENDIRME' ? 'S' : ''; };
   function asosSinif(a) {
     // Sürüm 13.57: istihdam şekli belirleyicidir — 657 / memur / 4-A / 4-B olan şoför / sürücü memurdur (işçi değil); işçi yalnız istihdam şekli işçi / 4-D ise
     // ya da istihdam şekli boşken ünvan / branş işçi, şoför, sürücü ise
@@ -669,7 +669,7 @@
   }
   // ---------- Toplu Excel (planlama biriminin aylık dosya düzeni: Personel Bilgileri, İstatistik, Kurum Dışına Giden/Gelen, KKM, Başhekimlik, ilçe sırasıyla istasyonlar) ----------
   const XL_RENK = {...Object.fromEntries(Object.entries(RENK).map(([a, b]) => [a, b.slice(1)])), sep: '002060', baslik: 'FFFF00', ozet: 'B7DEE8'};
-  const XL_LEJANT = [['1 AYLIK GELEN PERSONEL', 'gelen'], ['GİDEN PERSONEL', 'giden'], ['YILLIK İZİNLİ PERSONEL', 'izin'], ['RAPORLU PERSONEL', 'rapor'], ['ANALIK HAKKINDAKİ PERSONEL', 'analik'], ['UZUN SÜRELİ GÖREVLENDİRME 3 AY VE ÜZERİ', 'uzun']];
+  const XL_LEJANT = [['GEÇİCİ GÖREVLİ (YOLLUKLU / YOLLUKSUZ)', 'gelen'], ['GİDEN PERSONEL', 'giden'], ['YILLIK İZİNLİ PERSONEL', 'izin'], ['RAPORLU PERSONEL', 'rapor'], ['ANALIK HAKKINDAKİ PERSONEL', 'analik'], ['SÜREKLİ GÖREVLENDİRME', 'uzun'], ['YOLLUĞU SEÇİLMEMİŞ GEÇİCİ GÖREVLİ', 'giden']];
   const ILCE_SIRA = ['YUNUSEMRE', 'SEHZADELER', 'SARUHANLI', 'AKHISAR', 'SOMA', 'GOLMARMARA', 'KIRKAGAC', 'GORDES', 'DEMIRCI', 'KOPRUBASI', 'AHMETLI', 'TURGUTLU', 'SALIHLI', 'ALASEHIR', 'SARIGOL', 'KULA', 'SELENDI'];
   const xlTarihler = metin => [...String(metin || '').matchAll(/(\d{2}\.\d{2}\.\d{4})/g)].map(x => x[1]);
   const xlGorevMetin = k => { const g = k.gorev; if (!g || !(g.hedef || g.yer)) return ''; return [g.hedef || g.yer, g.tarih, g.gerekce && !/PERSONEL İHTİYACI/.test(g.gerekce) ? g.gerekce : ''].filter(Boolean).join(' / '); };
@@ -1006,7 +1006,7 @@
       case 'durum': mut(() => { k.durum = v; k.durumMetin = ''; k.durumManuel = true; }, 'Durum değişti', `${k.ad}: ${v || '—'}`); break;
       case 'izinGun': { const n = sayi(v); mut(() => { k.izin = k.izin || []; if (n > 0) { if (k.izin[0]) k.izin[0].gun = n; else k.izin.push({gun: n, tur: 'YILLIK İZİN'}); } else k.izin = []; }, 'İzin değişti', `${k.ad}: ${n} gün`); break; }
       case 'izinTur': mut(() => { if (!k.izin || !k.izin[0]) k.izin = [{gun: 0, tur: v}]; else k.izin[0].tur = v; }, 'İzin türü', `${k.ad}: ${v}`); break;
-      case 'planlanan': S.toplu = true; try { mut(() => { k.planlanan = v === '' ? null : sayi(v); k.kilit = v !== ''; }, 'Planlanan nöbet (elle)', `${k.ad}: ${v}`); } finally { S.toplu = false; } break;      // elle değişiklikte diğer kişilerin değerleri yeniden hesaplanmaz
+      case 'planlanan': S.toplu = true; try { mut(() => { k.planlanan = v === '' ? null : (k.sinif !== 'isci' && Math.abs(sayi(v) * 3 - Math.round(sayi(v) * 3)) < 0.06 ? C.ucte(sayi(v)) : sayi(v)); k.kilit = v !== ''; }, 'Planlanan nöbet (elle)', `${k.ad}: ${v}`); } finally { S.toplu = false; } break;      // elle değişiklikte diğer kişilerin değerleri yeniden hesaplanmaz
       case 'aciklama': S.toplu = true; try { mut(() => { k.aciklama = String(v || '').trim(); }, 'Kişi açıklaması', `${k.ad}: ${k.aciklama}`); } finally { S.toplu = false; } break;
       case 'kilit': mut(() => { k.kilit = !!v; }, v ? 'Kilitlendi' : 'Kilit açıldı', k.ad); break;
       case 'yolluk': mut(() => { k.gorev = k.gorev || {yer: '', hedef: null, kaynak: 'manuel', yolluk: '', tarih: '', gerekce: ''}; k.gorev.yolluk = v; }, 'Yolluk durumu', `${k.ad}: ${v}`); break;
@@ -1276,12 +1276,12 @@
           const ilk = ayIlk(), son = sonrakiAyIlk(), L = tekAyGorevler();
           if (!L.length) { toast('Bu ay için 1 aylık görevlendirme yok.'); break; }
           const wb = XLSX.utils.book_new(), bas = ['Sıra', 'Ad soyad', 'Ünvan', 'Kadro istasyonu', 'Görev yeri', 'Başlangıç', 'Bitiş', 'Yolluk', 'Gerekçe'];
-          const yz = k => ({Y: 'Yolluklu', N: 'Yolluksuz'})[yollukTur(k)] || 'Seçilmemiş';
+          const yz = k => ({Y: 'Yolluklu', N: 'Yolluksuz', S: 'Sürekli görevlendirme'})[yollukTur(k)] || 'Seçilmemiş';
           const sat = l => l.map((k, i) => { const t = gorevTarihleri(k.gorev); return [i + 1, k.ad, k.unvan || '', k.birim || '', k.gorev.hedef || k.gorev.yer || '', trTarih(t.bas || ilk), trTarih(t.bit || son), yz(k), k.gorev.gerekce || '']; });
           const sayfa = (ad, l, baslik) => { const ws = XLSX.utils.aoa_to_sheet([[baslik || `${ayEtiket()} — ${ad} görevlendirmeler (${l.length} kişi)`], [], bas, ...sat(l)]); ws['!cols'] = [6, 28, 22, 20, 24, 12, 12, 12, 30].map(w => ({wch: w})); XLSX.utils.book_append_sheet(wb, ws, ad.slice(0, 31)); };
           const Y = L.filter(k => yollukTur(k) === 'Y'), N = L.filter(k => yollukTur(k) === 'N'), B = L.filter(k => !yollukTur(k));
           sayfa('Tümü', L, `${ayEtiket()} — Tek ay görevleri (${L.length} kişi: ${Y.length} yolluklu, ${N.length} yolluksuz, ${B.length} seçilmemiş)`);      // Sürüm 13.57: ilk sayfa tablonun tamamı; her sayfada Yolluk sütunu
-          sayfa('Yolluklu', Y); sayfa('Yolluksuz', N); if (B.length) sayfa('Yolluk seçilmemiş', B);
+          sayfa('Yolluklu', Y); sayfa('Yolluksuz', N); { const Sg = L.filter(k => yollukTur(k) === 'S'); if (Sg.length) sayfa('Sürekli görevlendirme', Sg); } if (B.length) sayfa('Yolluk seçilmemiş', B);
           xlsxIndir(wb, `Tek-ay-gorevlendirme-${S.y}-${C.pad(S.m)}.xlsx`);
           toast(`${L.length} görevlendirme indirildi (Tümü sayfası + ${Y.length} yolluklu, ${N.length} yolluksuz${B.length ? `, ${B.length} yolluğu seçilmemiş` : ''} ayrı sayfalarda).`); break;
         }

@@ -164,6 +164,8 @@ const APCore = (() => {
     return taban.map(u => Math.round(u * adim * 1e6) / 1e6);
   }
   // adim: dağıtım kesinliği. İşçi 0,5 (12 saatlik nöbet); memur/doktor 0,01 (tam oran; yuvarlamayı kullanıcı yapar)
+  // Sürüm 13.71: nöbet sayısını 8 saatlik parçaya (1/3) oturtur; 7,67 / 7,66 / 7,666… → 7⅔
+  const ucte = v => (Math.abs(v * 3 - Math.round(v * 3)) < 0.06 ? Math.round(v * 3) / 3 : Math.round(v * 6) / 6);      // üçte bir (8 sa); yarım (12 sa) korunur
   function dagitSinirli(havuz, hedefler, azamiler, adim) {
     adim = adim || ADIM;
     const toplam = hedefler.reduce((a, b) => a + b, 0);
@@ -289,13 +291,28 @@ const APCore = (() => {
       const L = ser(g), t = x => x.es + x.ysp + x.sur, total = t(f1.fill[g]) + t(f2.fill[g]);
       // Hedefin üstüne fazla nöbet yazılan memur/doktorda nöbet tam sayıya yuvarlanır: önce aşağı, eksik kalan toplam küsuratı en büyük olanlardan başlayarak azamiyi aşmadan yukarı tamamlanır (ör. 8,67 / 8,67 / 8,66 → 9 / 9 / 8)
       // Sürüm 13.57: işçi her durumda mesaisine göre hedef vardiyasını tutar (kilitli memur sürücüler sürücüyü doldursa da düşürülmez)
-      const V = g === 'isci' ? L.map(s => s.hedef) : dagitSinirli(Math.max(0, total), L.map(s => s.hedef), L.map(s => s.azami), 0.01);
+      // Sürüm 13.71: memur / doktor küsuratı 8 saatlik parçalarla (1/3 nöbet: 0,33 = 8 sa, 0,67 = 16 sa); 0,01'lik artıklar (7,66 / 7,67) çıkmaz
+      const V = g === 'isci' ? L.map(s => s.hedef) : dagitSinirli(Math.floor(Math.max(0, total) * 3 + 1e-6) / 3, L.map(s => s.hedef), L.map(s => s.azami), 1 / 3);
+      if (g !== 'isci') {      // işçinin 12 saatlik vardiyası yüzünden kalan yarım (12 sa) parça: x,33'lü bir kişiye eklenir → x,5 (12 sa)
+        const artik = Math.max(0, total) - V.reduce((x, v) => x + v, 0);
+        if (artik > 1 / 6 - 1e-6) {
+          const kes = v => Math.round((v - Math.floor(v + 1e-6)) * 3), oda = (j, d) => V[j] + d <= L[j].azami + 1e-6 && V[j] + d >= -1e-6;
+          const i1 = V.findIndex((v, j) => kes(v) === 1 && oda(j, 1 / 6));      // x,33 → x,5
+          if (i1 >= 0) V[i1] = Math.floor(V[i1] + 1e-6) + 0.5;
+          else {
+            const a = V.findIndex((v, j) => kes(v) === 0 && oda(j, 0.5)), b = V.findIndex((v, j) => j !== a && kes(v) > 0 && oda(j, -1 / 3));
+            if (a >= 0 && b >= 0) { V[a] = Math.round(V[a]) + 0.5; V[b] = ucte(V[b] - 1 / 3); }      // x,0 → x,5 ve başka biri −8 sa
+            else { const c = V.findIndex((v, j) => kes(v) === 2 && oda(j, -1 / 6)), d = V.findIndex((v, j) => j !== c && oda(j, 1 / 3));
+              if (c >= 0 && d >= 0) { V[c] = Math.floor(V[c] + 1e-6) + 0.5; V[d] = ucte(V[d] + 1 / 3); } }      // x,67 → x,5 ve başka biri +8 sa
+          }
+        }
+      }
       if (g !== 'isci') {
         const fz = V.map((v, i) => v > L[i].hedef + 0.01 ? i : -1).filter(i => i >= 0), hedefT = fz.reduce((x, i) => x + V[i], 0);
         const R = V.slice(); fz.forEach(i => { R[i] = Math.max(L[i].hedef, Math.floor(V[i] + 0.01)); });
         let eksik = hedefT - fz.reduce((x, i) => x + R[i], 0);
         fz.slice().sort((x, y) => (V[y] - Math.floor(V[y] + 0.01)) - (V[x] - Math.floor(V[x] + 0.01))).forEach(i => { if (eksik <= 0.01) return; const ust = Math.min(L[i].azami, Math.ceil(V[i] - 0.01)); if (ust > R[i]) { eksik -= ust - R[i]; R[i] = ust; } });
-        R.forEach((v, i) => sonuc.set(L[i].k.id, Math.round(v * 100) / 100));      // 7,666… → 7,67
+        R.forEach((v, i) => sonuc.set(L[i].k.id, ucte(v)));      // 7,666… tam üçte iki olarak saklanır (ekranda 7,67; üç kişi toplamı 23)
       } else V.forEach((v, i) => sonuc.set(L[i].k.id, Math.round(v * 100) / 100));
     });
     // Tam sayıya yuvarlama ihtiyacı aşarsa (ör. 94 / 93) fazlalık, nöbet branşına sığmayan gruptan başlayarak en çok nöbeti olandan 1'er nöbet geri alınır (hedefin altına inilmez)
@@ -306,7 +323,7 @@ const APCore = (() => {
       const aday = GRUPLAR.filter(g => g !== 'isci').flatMap(g => ser(g).map(s2 => ({s2, g, v: sonuc.get(s2.k.id) || 0}))).filter(x => x.v - 1 >= x.s2.hedef - 0.01)
         .sort((x, y) => ((tasan[y.g] >= 0.99) - (tasan[x.g] >= 0.99)) || (y.v - y.s2.hedef) - (x.v - x.s2.hedef));
       if (!aday.length) break;
-      sonuc.set(aday[0].s2.k.id, Math.round((aday[0].v - 1) * 100) / 100);
+      sonuc.set(aday[0].s2.k.id, ucte(aday[0].v - 1));
     }
     return sonuc;
   }
@@ -438,7 +455,7 @@ const APCore = (() => {
   }
 
   const api = {izinSon, surucuDurumu, rolToplam, rolSinifla, rolBelirle, kadroTip, memurSurucu, grupBelirle, akis, YETENEK, GRUP_AD, GRUPLAR, ilceAdi, mesafeKm, ILCE_KONUM, aylariListele, muafiyetCoz, tarihIso, dortB, dortYilDurum, kadroYilDurum, gorevlendirmeEngeli, TR, iso, pad, gunSayisi, gunSaat, ayMesai, kisiMesai, hedefNobet, dagit, dagitSinirli, istasyonHesap, oneri, istAnahtar,
-    durumAnahtar, sinifTespit, DURUM_VARSAYILAN, OZEL_TUR, RESMI, MESAI, YUVA_VARSAYILAN, ADIM};
+    durumAnahtar, sinifTespit, DURUM_VARSAYILAN, OZEL_TUR, RESMI, MESAI, YUVA_VARSAYILAN, ADIM, ucte};
   return api;
 })();
 if (typeof module !== 'undefined') module.exports = APCore;

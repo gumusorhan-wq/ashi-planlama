@@ -144,6 +144,8 @@ function mount(root, opts = {}) {
     S.plan = (await depo.get(anahtar(S.y, S.m))) || null;
     if (S.plan && guncelAy()) ofUygula(S.plan);
     // Sürüm 13.57: istihdam şekli 657 / memur / 4-A / 4-B olup eski kurala göre işçi sayılmış şoför / sürücüler memur olur (657 memur sürücü)
+    // Sürüm 13.71: eski planlarda kalan 7,66 / 7,67 / 7,34 gibi değerler 8 saatlik parçaya (1/3) oturtulur
+    if (S.plan) S.plan.kayitlar.forEach(k => { if (k.sinif !== 'isci' && k.planlanan != null && Number.isFinite(+k.planlanan)) k.planlanan = C.ucte(+k.planlanan); });
     if (S.plan) S.plan.kayitlar.forEach(k => { if (k.sinif === 'isci' && /657|MEMUR|4\s*\/?\s*A\b|4\s*\/?\s*B\b|SOZLESMELI|KADROLU/.test(C.TR(k.kadroTur || '')) && !/ISCI|4\s*\/?\s*D\b/.test(C.TR(k.kadroTur || ''))) k.sinif = 'memur'; });
     try { const py = S.m === 1 ? S.y - 1 : S.y, pm = S.m === 1 ? 12 : S.m - 1, op = await depo.get(anahtar(py, pm)); S.oncePlanBirim = new Map(); ((op && op.kayitlar) || []).forEach(k => { if (k.tc) S.oncePlanBirim.set(k.tc, {birim: k.birim, kadroTarih: k.kadroTarih || ''}); });
       // Modül 2: önceki ayın nöbet listeleri (son günlerdeki nöbetler dinlenme / gün aşırı kurallarında hesaba katılır)
@@ -221,11 +223,13 @@ function mount(root, opts = {}) {
   // ---------- görünüm yardımcıları ----------
   // Satır rengi: ekran, PNG ve Excel'de aynı (planlama biriminin aylık dosyasındaki renk açıklaması)
   const RENK = {gelen: '#8DB4E2', giden: '#C0504D', izin: '#FFFF00', rapor: '#A6A6A6', analik: '#B1A0C7', uzun: '#9BBB59'};
-  const RENK_LEJANT = [['gelen', '1 aylık gelen personel'], ['giden', 'Giden personel'], ['izin', 'Yıllık izinli personel'], ['rapor', 'Raporlu personel'], ['analik', 'Analık hakkındaki personel (doğum, gebe, süt izni)'], ['uzun', 'Uzun süreli görevle gelen personel (3 ay ve üzeri)']];
+  // Sürüm 13.71 (kullanıcı kararı): geçici görevli rengi süreden değil Yolluk seçiminden — yolluklu / yolluksuz mavi, sürekli görevlendirme yeşil, seçilmemiş kırmızı
+  const YOLLUK_SEC = ['', 'YOLLUKLU', 'YOLLUKSUZ', 'SÜREKLİ GÖREVLENDİRME'];
+  const RENK_LEJANT = [['gelen', 'Geçici görevli (yolluklu / yolluksuz)'], ['giden', 'Giden personel'], ['izin', 'Yıllık izinli personel'], ['rapor', 'Raporlu personel'], ['analik', 'Analık hakkındaki personel (doğum, gebe, süt izni)'], ['uzun', 'Sürekli görevlendirme'], ['giden', 'Yolluğu seçilmemiş geçici görevli']];
   function satirRenk(k, gelen) {
     const D = durumlar(), d = k.durum || '';
     if (gizliKisi(k)) return (D[d] && D[d].renk) || RENK.rapor;   // aile hekimliği / uzmanlık eğitimi: pasif (gri), görev bilgisi olsa da kırmızı olmaz
-    if (gelen || d === 'GEÇİCİ GÖREVLİ') return k.gorev && xlUzunGorev(k.gorev) ? RENK.uzun : RENK.gelen;   // 3 ay+ gelen de yeşil (uzun süreli)
+    if (gelen || d === 'GEÇİCİ GÖREVLİ') { const y = yollukTur(k); return y === 'S' ? RENK.uzun : (y === 'Y' || y === 'N') ? RENK.gelen : RENK.giden; }
     if (k.gorev && (k.gorev.hedef || k.gorev.yer) && (D[d] || {}).disarida) return RENK.giden;   // kadrosunun olduğu yerde giden hep kırmızı; yeşil yalnız gittiği yerde (uzun süreli gelen)
     if (/RAPORLU/.test(d)) return RENK.rapor;
     if (/ANALIK|DOĞUM|GEBE|GEBELİK/.test(d) || k.sut > 0) return RENK.analik;
