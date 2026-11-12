@@ -62,6 +62,11 @@ const APCore = (() => {
     'ANALIK MESAİ':        {renk: '#B1A0C7', nobetYok: true,  mesaiYok: false},
     'GEBE MESAİ':          {renk: '#B1A0C7', nobetYok: true,  mesaiYok: false},
     'RİSKLİ GEBELİK':      {renk: '#B1A0C7', nobetYok: true,  mesaiYok: true},
+    'NÖBET MUAFİYETİ':     {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
+    // Sürüm 13.57: gündüz 8 saat (09:00–17:00) çalışan muafiyetli; saatleri nöbetin 8 saatlik parçası sayılır (hedef = mesai / 24). Elle seçilir.
+    'NÖBET MUAFİYETİ MESAİ': {renk: '#FCD5B4', nobetYok: true, mesaiYok: false, gunduz8: true},
+    // Sürüm 13.70: muafiyeti devam eden ama dilekçeyle nöbete geçmiş personel — normal nöbet tutar (hedef ve azami diğer personel gibi). Elle seçilir.
+    'NÖBET MUAFİYETİ NÖBET': {renk: '#FDE9D9', nobetYok: false, mesaiYok: false},
     'RAPORLU':             {renk: '#A6A6A6', nobetYok: true,  mesaiYok: true},
     'HEYET RAPORLU':       {renk: '#A6A6A6', nobetYok: true,  mesaiYok: true},
     'ÜCRETSİZ İZİN':       {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
@@ -72,9 +77,6 @@ const APCore = (() => {
     'NÖBET USULÜ':         {renk: null,      nobetYok: false, mesaiYok: false},
     'AİLE HEKİMLİĞİNDE':   {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true,  disarida: true, disKurum: true},
     'SÖZLEŞMELİ ÇALIŞIYOR': {renk: '#D9D9D9', nobetYok: true, mesaiYok: true, disarida: true, disKurum: true},      // 663 sayılı KHK vb. sözleşmeyle başka kurumda: nöbet tutmaz
-    'NÖBET MUAFİYETİ':     {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
-    // Sürüm 13.57: gündüz 8 saat (09:00–17:00) çalışan muafiyetli; saatleri nöbetin 8 saatlik parçası sayılır (hedef = mesai / 24). Elle seçilir.
-    'NÖBET MUAFİYETİ MESAİ': {renk: '#FCD5B4', nobetYok: true, mesaiYok: false, gunduz8: true},
     'UZMANLIK EĞİTİMİ':    {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
     'PASİF':               {renk: '#EEEEEE', nobetYok: true,  mesaiYok: true,  pasif: true}
   };
@@ -90,7 +92,7 @@ const APCore = (() => {
       [/AILE HEK/, 'AİLE HEKİMLİĞİNDE'], [/UZMANLIK/, 'UZMANLIK EĞİTİMİ'], [/SOZLESMELI CALIS|663 SAYILI/, 'SÖZLEŞMELİ ÇALIŞIYOR'],
       [/UCRETSIZ/, 'ÜCRETSİZ İZİN'], [/ASKER/, 'ASKERLİK İZNİ'], [/YARI|YART/, 'YARI ZAMANLI'],
       [/SAGLIK MAZ.*MESAI|MAZERET.*MESAI|SAGLIK MAZ/, 'SAĞLIK MAZERETİ MESAİ'],
-      [/NOBET MUAF.*MESAI/, 'NÖBET MUAFİYETİ MESAİ'], [/NOBET MUAF/, 'NÖBET MUAFİYETİ'], [/MESAI USULU/, 'MESAİ USULÜ'], [/NOBET USULU/, 'NÖBET USULÜ']
+      [/NOBET MUAF.*MESAI/, 'NÖBET MUAFİYETİ MESAİ'], [/NOBET MUAF.*(NOBET|DILEKCE)/, 'NÖBET MUAFİYETİ NÖBET'], [/NOBET MUAF/, 'NÖBET MUAFİYETİ'], [/MESAI USULU/, 'MESAİ USULÜ'], [/NOBET USULU/, 'NÖBET USULÜ']
     ];
     for (const [re, k] of kural) if (re.test(t)) return k;
     return '';
@@ -349,6 +351,30 @@ const APCore = (() => {
         .sort((x, y) => ((tasan[y.g] >= 0.99) - (tasan[x.g] >= 0.99)) || (y.v - y.s2.hedef) - (x.v - x.s2.hedef));
       if (!aday.length) break;
       sonuc.set(aday[0].s2.k.id, ucte(aday[0].v - 1));
+    }
+    // Sürüm 13.70: grup paylarının yuvarlanmasından boşta kalan parçalar (ör. 0,33 = 8 sa) azamiyi aşmadan, gerçekten açık bir nöbet branşını dolduran kişiye verilir.
+    // Önce tam sayıya tamamlayan artış (7,67 → 8), yoksa geçerli bir parça (8 sa / 12 sa); her turda fazlası en az olan kişi
+    const gecerli = v => Math.abs(v * 3 - Math.round(v * 3)) < 1e-6 || Math.abs(v * 2 - Math.round(v * 2)) < 1e-6;
+    const acikNe = () => { const sup = {}; GRUPLAR.forEach(g => { sup[g] = kilitSup[g] + ser(g).reduce((x, s2) => x + (sonuc.get(s2.k.id) || 0), 0); }); const r = akis(sup, {es: D3, ysp: D3, sur: D3}, ae).rem; return r.es + r.ysp + r.sur; };
+    const adaylar = GRUPLAR.filter(g => g !== 'isci').flatMap(g => ser(g));
+    for (let tur = 0; tur < 300; tur++) {
+      const a0 = acikNe(); if (a0 < 1 / 6 - 0.011) break;
+      const sira = adaylar.map(s2 => ({s2, v: sonuc.get(s2.k.id) || 0})).filter(x => x.v + 1e-6 < x.s2.azami).sort((x, y) => (x.v - x.s2.hedef) - (y.v - y.s2.hedef));
+      let oldu = false;
+      for (const tamMi of [true, false]) {
+        for (const x of sira) {
+          const adimlar = tamMi ? [Math.floor(x.v + 1e-6) + 1 - x.v] : [1 / 3, 0.5, 2 / 3, 1 / 6, 5 / 6];
+          for (const st of adimlar) {
+            const nv = x.v + st; if (st > a0 + 0.011 || nv > x.s2.azami + 1e-6 || !gecerli(nv)) continue;
+            sonuc.set(x.s2.k.id, ucte(nv));
+            if (a0 - acikNe() >= st - 0.011) { oldu = true; break; }
+            sonuc.set(x.s2.k.id, x.v);
+          }
+          if (oldu) break;
+        }
+        if (oldu) break;
+      }
+      if (!oldu) break;
     }
     return sonuc;
   }

@@ -414,6 +414,11 @@ const APCore = (() => {
     'ANALIK MESAİ':        {renk: '#B1A0C7', nobetYok: true,  mesaiYok: false},
     'GEBE MESAİ':          {renk: '#B1A0C7', nobetYok: true,  mesaiYok: false},
     'RİSKLİ GEBELİK':      {renk: '#B1A0C7', nobetYok: true,  mesaiYok: true},
+    'NÖBET MUAFİYETİ':     {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
+    // Sürüm 13.57: gündüz 8 saat (09:00–17:00) çalışan muafiyetli; saatleri nöbetin 8 saatlik parçası sayılır (hedef = mesai / 24). Elle seçilir.
+    'NÖBET MUAFİYETİ MESAİ': {renk: '#FCD5B4', nobetYok: true, mesaiYok: false, gunduz8: true},
+    // Sürüm 13.70: muafiyeti devam eden ama dilekçeyle nöbete geçmiş personel — normal nöbet tutar (hedef ve azami diğer personel gibi). Elle seçilir.
+    'NÖBET MUAFİYETİ NÖBET': {renk: '#FDE9D9', nobetYok: false, mesaiYok: false},
     'RAPORLU':             {renk: '#A6A6A6', nobetYok: true,  mesaiYok: true},
     'HEYET RAPORLU':       {renk: '#A6A6A6', nobetYok: true,  mesaiYok: true},
     'ÜCRETSİZ İZİN':       {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
@@ -424,9 +429,6 @@ const APCore = (() => {
     'NÖBET USULÜ':         {renk: null,      nobetYok: false, mesaiYok: false},
     'AİLE HEKİMLİĞİNDE':   {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true,  disarida: true, disKurum: true},
     'SÖZLEŞMELİ ÇALIŞIYOR': {renk: '#D9D9D9', nobetYok: true, mesaiYok: true, disarida: true, disKurum: true},      // 663 sayılı KHK vb. sözleşmeyle başka kurumda: nöbet tutmaz
-    'NÖBET MUAFİYETİ':     {renk: '#FCD5B4', nobetYok: true,  mesaiYok: false},
-    // Sürüm 13.57: gündüz 8 saat (09:00–17:00) çalışan muafiyetli; saatleri nöbetin 8 saatlik parçası sayılır (hedef = mesai / 24). Elle seçilir.
-    'NÖBET MUAFİYETİ MESAİ': {renk: '#FCD5B4', nobetYok: true, mesaiYok: false, gunduz8: true},
     'UZMANLIK EĞİTİMİ':    {renk: '#D9D9D9', nobetYok: true,  mesaiYok: true},
     'PASİF':               {renk: '#EEEEEE', nobetYok: true,  mesaiYok: true,  pasif: true}
   };
@@ -442,7 +444,7 @@ const APCore = (() => {
       [/AILE HEK/, 'AİLE HEKİMLİĞİNDE'], [/UZMANLIK/, 'UZMANLIK EĞİTİMİ'], [/SOZLESMELI CALIS|663 SAYILI/, 'SÖZLEŞMELİ ÇALIŞIYOR'],
       [/UCRETSIZ/, 'ÜCRETSİZ İZİN'], [/ASKER/, 'ASKERLİK İZNİ'], [/YARI|YART/, 'YARI ZAMANLI'],
       [/SAGLIK MAZ.*MESAI|MAZERET.*MESAI|SAGLIK MAZ/, 'SAĞLIK MAZERETİ MESAİ'],
-      [/NOBET MUAF.*MESAI/, 'NÖBET MUAFİYETİ MESAİ'], [/NOBET MUAF/, 'NÖBET MUAFİYETİ'], [/MESAI USULU/, 'MESAİ USULÜ'], [/NOBET USULU/, 'NÖBET USULÜ']
+      [/NOBET MUAF.*MESAI/, 'NÖBET MUAFİYETİ MESAİ'], [/NOBET MUAF.*(NOBET|DILEKCE)/, 'NÖBET MUAFİYETİ NÖBET'], [/NOBET MUAF/, 'NÖBET MUAFİYETİ'], [/MESAI USULU/, 'MESAİ USULÜ'], [/NOBET USULU/, 'NÖBET USULÜ']
     ];
     for (const [re, k] of kural) if (re.test(t)) return k;
     return '';
@@ -701,6 +703,30 @@ const APCore = (() => {
         .sort((x, y) => ((tasan[y.g] >= 0.99) - (tasan[x.g] >= 0.99)) || (y.v - y.s2.hedef) - (x.v - x.s2.hedef));
       if (!aday.length) break;
       sonuc.set(aday[0].s2.k.id, ucte(aday[0].v - 1));
+    }
+    // Sürüm 13.70: grup paylarının yuvarlanmasından boşta kalan parçalar (ör. 0,33 = 8 sa) azamiyi aşmadan, gerçekten açık bir nöbet branşını dolduran kişiye verilir.
+    // Önce tam sayıya tamamlayan artış (7,67 → 8), yoksa geçerli bir parça (8 sa / 12 sa); her turda fazlası en az olan kişi
+    const gecerli = v => Math.abs(v * 3 - Math.round(v * 3)) < 1e-6 || Math.abs(v * 2 - Math.round(v * 2)) < 1e-6;
+    const acikNe = () => { const sup = {}; GRUPLAR.forEach(g => { sup[g] = kilitSup[g] + ser(g).reduce((x, s2) => x + (sonuc.get(s2.k.id) || 0), 0); }); const r = akis(sup, {es: D3, ysp: D3, sur: D3}, ae).rem; return r.es + r.ysp + r.sur; };
+    const adaylar = GRUPLAR.filter(g => g !== 'isci').flatMap(g => ser(g));
+    for (let tur = 0; tur < 300; tur++) {
+      const a0 = acikNe(); if (a0 < 1 / 6 - 0.011) break;
+      const sira = adaylar.map(s2 => ({s2, v: sonuc.get(s2.k.id) || 0})).filter(x => x.v + 1e-6 < x.s2.azami).sort((x, y) => (x.v - x.s2.hedef) - (y.v - y.s2.hedef));
+      let oldu = false;
+      for (const tamMi of [true, false]) {
+        for (const x of sira) {
+          const adimlar = tamMi ? [Math.floor(x.v + 1e-6) + 1 - x.v] : [1 / 3, 0.5, 2 / 3, 1 / 6, 5 / 6];
+          for (const st of adimlar) {
+            const nv = x.v + st; if (st > a0 + 0.011 || nv > x.s2.azami + 1e-6 || !gecerli(nv)) continue;
+            sonuc.set(x.s2.k.id, ucte(nv));
+            if (a0 - acikNe() >= st - 0.011) { oldu = true; break; }
+            sonuc.set(x.s2.k.id, x.v);
+          }
+          if (oldu) break;
+        }
+        if (oldu) break;
+      }
+      if (!oldu) break;
     }
     return sonuc;
   }
@@ -1432,6 +1458,8 @@ function mount(root, opts = {}) {
     // Sürüm 13.56 (09.11.2026): nöbet kaydında sürücü payı %0'dan büyük olan her AABT / ATT sürücü nöbetine girer (önce payı yüksek olan); eski kayıtlı %15 bir kez 0 yapılır
     if (!S.ayar.surucuPayV2) { S.ayar.surDegilEsik = 0; S.ayar.surucuPayV2 = true; }
     Object.keys(C.DURUM_VARSAYILAN).forEach(k => { if (!S.ayar.durumlar[k]) S.ayar.durumlar[k] = C.DURUM_VARSAYILAN[k]; });
+    // Sürüm 13.70: durum listesi varsayılan sırayla (muafiyet durumları raporlunun üstünde); kullanıcının eklediği durumlar sonda
+    { const d = S.ayar.durumlar, s2 = {}; Object.keys(C.DURUM_VARSAYILAN).forEach(k => { s2[k] = d[k]; }); Object.keys(d).forEach(k => { if (!(k in s2)) s2[k] = d[k]; }); S.ayar.durumlar = s2; }
     // Sürüm 12.47: yarı zamanlı nöbet listesine girer (mesainin yarısı kadar); eski kayıtlı ayarda 'Nöbet yok' işaretliyse bir kez kaldırılır
     if (!S.ayar.yariZamanliV2 && S.ayar.durumlar['YARI ZAMANLI']) { S.ayar.durumlar['YARI ZAMANLI'] = {...S.ayar.durumlar['YARI ZAMANLI'], nobetYok: false, mesaiOran: 0.5}; S.ayar.yariZamanliV2 = true; }
   }
@@ -3773,7 +3801,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         rp.eslesen++;
         k.izin = (k.izin || []).filter(i => !i.asos); if (/DOĞUM|RAPORLU|MUAFİYET/.test(k.durumB || '')) { k.durumB = ''; k.durumMetinB = ''; } k.sut = 0;
         l.forEach(r => { const h = asosAyHesabi(r); if (h.durumB && !k.durumB) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; } k.sut = Math.max(k.sut || 0, h.sut); k.izin = k.izin.concat(h.izin.map(i => ({...i, asos: true}))); if (h.izin.length) rp.izinli++; if (h.durumB === 'NÖBET MUAFİYETİ' || h.sut) rp.muafiyet++; });
-        if (!k.durumManuel) { k.durum = k.durumB || k.durumA || (k.durum === 'GEÇİCİ GÖREVLİ' ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : '')); k.durumMetin = k.durumMetinB || k.durumMetinA || ''; }
+        if (!k.durumManuel && !(k.durum === 'NÖBET MUAFİYETİ NÖBET' && k.durumB === 'NÖBET MUAFİYETİ')) { k.durum = k.durumB || k.durumA || (k.durum === 'GEÇİCİ GÖREVLİ' ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : '')); k.durumMetin = k.durumMetinB || k.durumMetinA || ''; }
       });
       rp.eslesmeyen = bk.size - rp.eslesen;
       rp.izinArsiv = izinArsivHazirla(satirlar);      // Sürüm 13.57: dosyadaki bütün tarihli izinler (yalnız bu ay değil) — İzin takibi tablosu için
@@ -3831,7 +3859,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         k.gecmisAsos = [...new Set([...(k.gecmisAsos || []), ...gg.gecmis])].sort();
         if (gelenKaynak) { k.durumB = 'GEÇİCİ GÖREVLİ'; k.kurumDisiGelen = true; }
       }
-      if (!k.durumManuel) k.durum = k.durumB || k.durumA || (gelenKaynak ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : ''));
+      if (!k.durumManuel && !(k.durum === 'NÖBET MUAFİYETİ NÖBET' && k.durumB === 'NÖBET MUAFİYETİ')) k.durum = k.durumB || k.durumA || (gelenKaynak ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : ''));
       if (!k.durumManuel) k.durumMetin = k.durumMetinB || k.durumMetinA || '';
       if (k.gorev && (k.gorev.hedef || k.gorev.yer)) rapor.gorevli++;
       goruldu.add(k.id);
@@ -4096,7 +4124,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
       dogumOnce: K.filter(k => k.durum === 'DOĞUM ÖNCESİ'), dogumSonra: K.filter(k => k.durum === 'DOĞUM SONRASI'),
       yarim: K.filter(k => k.durum === 'YARI ZAMANLI'), ucretsiz: K.filter(k => k.durum === 'ÜCRETSİZ İZİN'), askerlik: K.filter(k => k.durum === 'ASKERLİK İZNİ'),
       saglik: K.filter(k => k.durum === 'SAĞLIK MAZERETİ MESAİ' || (k.gorev && /SAĞLIK MAZERETİ/.test(k.gorev.gerekce || ''))),
-      muaf: K.filter(k => k.durum === 'NÖBET MUAFİYETİ' || k.durum === 'NÖBET MUAFİYETİ MESAİ'), rapor: K.filter(k => /RAPORLU/.test(k.durum || '')),
+      muaf: K.filter(k => /^NÖBET MUAFİYETİ/.test(k.durum || '')), rapor: K.filter(k => /RAPORLU/.test(k.durum || '')),
       disGiden: K.filter(k => !gizliKisi(k) && dis(k)), disGelen: K.filter(k => k.kurumDisiGelen || k.durumB === 'GEÇİCİ GÖREVLİ' || (k.durum === 'GEÇİCİ GÖREVLİ' && !k.gorev) || (k.gorev && k.gorev.hedef && !['istasyon', 'kkm', 'bashekimlik'].includes(birimTur(k.birim)))),
       aile: K.filter(k => k.durum === 'AİLE HEKİMLİĞİNDE')};
   }
@@ -4116,7 +4144,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     bolum('YARIM ZAMANLI ÇALIŞAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ VE BİTİŞ TARİHİ'], G.yarim, k => [G.durumTarih(k).join(' – ')]);
     bolum('ÜCRETSİZ İZİN', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLAYIŞ TARİHİ', 'BİTİŞ TARİHİ', 'AÇIKLAMALAR'], G.ucretsiz, k => { const t = G.durumTarih(k).length ? [dt(k, 0), dt(k, 1)] : izinT(k, /UCRETSIZ/); return [...t, k.aciklama || '']; });
     bolum('SAĞLIK MAZERETİ OLAN PERSONEL LİSTESİ', ['AD SOYAD', 'ÜNVANI', 'KADRO YERİ', 'GÖREV YERİ', 'GÖREVLENDİRME TARİHLERİ'], G.saglik, k => [yer(k) === k.birim ? '' : yer(k), gt(k)]);
-    bolum('NÖBET MUAFİYETİ OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ', 'AÇIKLAMA'], G.muaf, k => [dt(k, 0), dt(k, 1), k.durumMetin || '']);
+    bolum('NÖBET MUAFİYETİ OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ', 'AÇIKLAMA'], G.muaf, k => [dt(k, 0), dt(k, 1), k.durum === 'NÖBET MUAFİYETİ NÖBET' ? ['Dilekçe ile nöbet tutuyor', k.durumMetin].filter(Boolean).join(' · ') : (k.durumMetin || '')]);
     bolum('RAPORLU PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'RAPOR TÜRÜ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ'], G.rapor, k => [k.durum, dt(k, 0), dt(k, 1)]);
     bolum('ASKERLİK İZNİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ'], G.askerlik, k => [dt(k, 0), dt(k, 1)]);
     return xlSayfa(aoa, {cols: [5, 32, 16, 24, 26, 30, 18, 18, 16, 16, 16], stil: (r, c) => gen[r] != null && c >= gen[r] ? null : stil[r] === 'b' ? (c === 0 ? {font: {bold: true, sz: 13}, dolgu: XL_RENK.baslik, hiza: {horizontal: 'left'}} : null) : stil[r] === 'h' ? {font: {bold: true}, kenar: true, dolgu: XL_RENK.baslik, sar: true} : stil[r] === 'v' ? {kenar: true} : null});

@@ -163,3 +163,13 @@ console.log('çekirdek testleri geçti');
 { const kk = Array.from({length: 12}, (_, i) => ({id: 'a' + i, sinif: 'memur', durum: '', izin: [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}}));
   const ha = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 8, isciEk: 0}, 3), oa = C.oneri(ha), v = kk.map(k => oa.get(k.id));
   assert.ok(v.every(x => Math.abs(x - 23 / 3) < 1e-9 || x === 8), v.join(' ')); assert.strictEqual(v.filter(x => x === 8).length, 3); yk(v.reduce((a, b) => a + b, 0), 93); }
+// Sürüm 13.70: muafiyeti süren ama dilekçeyle nöbet tutan normal hedef alır; durum listesinde raporlunun üstünde
+{ const k1 = {id: 'nm', sinif: 'memur', durum: 'NÖBET MUAFİYETİ NÖBET', izin: [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}};
+  const hm = C.istasyonHesap([k1], 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 8}, 3);
+  assert.ok(!hm.satir[0].nobetYok && Math.abs(hm.satir[0].hedef - 23 / 3) < 1e-9);
+  const ks = Object.keys(C.DURUM_VARSAYILAN); assert.ok(ks.indexOf('NÖBET MUAFİYETİ NÖBET') < ks.indexOf('RAPORLU') && ks.indexOf('NÖBET MUAFİYETİ MESAİ') < ks.indexOf('RAPORLU'));
+  assert.strictEqual(C.durumAnahtar('Nöbet muafiyeti - nöbet (dilekçe)'), 'NÖBET MUAFİYETİ NÖBET'); }
+// Sürüm 13.70: yuvarlamadan boşta parça (0,33) kalmaz
+{ const kk = Array.from({length: 11}, (_, i) => ({id: 'b' + i, sinif: 'memur', durum: '', izin: i === 0 ? [{gun: 3}] : [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}}));
+  const hb = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 9}, 3), ob = C.oneri(hb);
+  yk(kk.reduce((a, k) => a + ob.get(k.id), 0), 93); }

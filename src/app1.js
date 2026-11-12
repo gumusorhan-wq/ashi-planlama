@@ -131,6 +131,8 @@ function mount(root, opts = {}) {
     // Sürüm 13.56 (09.11.2026): nöbet kaydında sürücü payı %0'dan büyük olan her AABT / ATT sürücü nöbetine girer (önce payı yüksek olan); eski kayıtlı %15 bir kez 0 yapılır
     if (!S.ayar.surucuPayV2) { S.ayar.surDegilEsik = 0; S.ayar.surucuPayV2 = true; }
     Object.keys(C.DURUM_VARSAYILAN).forEach(k => { if (!S.ayar.durumlar[k]) S.ayar.durumlar[k] = C.DURUM_VARSAYILAN[k]; });
+    // Sürüm 13.70: durum listesi varsayılan sırayla (muafiyet durumları raporlunun üstünde); kullanıcının eklediği durumlar sonda
+    { const d = S.ayar.durumlar, s2 = {}; Object.keys(C.DURUM_VARSAYILAN).forEach(k => { s2[k] = d[k]; }); Object.keys(d).forEach(k => { if (!(k in s2)) s2[k] = d[k]; }); S.ayar.durumlar = s2; }
     // Sürüm 12.47: yarı zamanlı nöbet listesine girer (mesainin yarısı kadar); eski kayıtlı ayarda 'Nöbet yok' işaretliyse bir kez kaldırılır
     if (!S.ayar.yariZamanliV2 && S.ayar.durumlar['YARI ZAMANLI']) { S.ayar.durumlar['YARI ZAMANLI'] = {...S.ayar.durumlar['YARI ZAMANLI'], nobetYok: false, mesaiOran: 0.5}; S.ayar.yariZamanliV2 = true; }
   }

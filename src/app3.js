@@ -442,7 +442,7 @@
         rp.eslesen++;
         k.izin = (k.izin || []).filter(i => !i.asos); if (/DOĞUM|RAPORLU|MUAFİYET/.test(k.durumB || '')) { k.durumB = ''; k.durumMetinB = ''; } k.sut = 0;
         l.forEach(r => { const h = asosAyHesabi(r); if (h.durumB && !k.durumB) { k.durumB = h.durumB; k.durumMetinB = h.durumMetin; } k.sut = Math.max(k.sut || 0, h.sut); k.izin = k.izin.concat(h.izin.map(i => ({...i, asos: true}))); if (h.izin.length) rp.izinli++; if (h.durumB === 'NÖBET MUAFİYETİ' || h.sut) rp.muafiyet++; });
-        if (!k.durumManuel) { k.durum = k.durumB || k.durumA || (k.durum === 'GEÇİCİ GÖREVLİ' ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : '')); k.durumMetin = k.durumMetinB || k.durumMetinA || ''; }
+        if (!k.durumManuel && !(k.durum === 'NÖBET MUAFİYETİ NÖBET' && k.durumB === 'NÖBET MUAFİYETİ')) { k.durum = k.durumB || k.durumA || (k.durum === 'GEÇİCİ GÖREVLİ' ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : '')); k.durumMetin = k.durumMetinB || k.durumMetinA || ''; }
       });
       rp.eslesmeyen = bk.size - rp.eslesen;
       rp.izinArsiv = izinArsivHazirla(satirlar);      // Sürüm 13.57: dosyadaki bütün tarihli izinler (yalnız bu ay değil) — İzin takibi tablosu için
@@ -500,7 +500,7 @@
         k.gecmisAsos = [...new Set([...(k.gecmisAsos || []), ...gg.gecmis])].sort();
         if (gelenKaynak) { k.durumB = 'GEÇİCİ GÖREVLİ'; k.kurumDisiGelen = true; }
       }
-      if (!k.durumManuel) k.durum = k.durumB || k.durumA || (gelenKaynak ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : ''));
+      if (!k.durumManuel && !(k.durum === 'NÖBET MUAFİYETİ NÖBET' && k.durumB === 'NÖBET MUAFİYETİ')) k.durum = k.durumB || k.durumA || (gelenKaynak ? 'GEÇİCİ GÖREVLİ' : (k.gorev && (k.gorev.hedef || k.gorev.yer) ? 'GEÇİCİ GÖREVDE' : ''));
       if (!k.durumManuel) k.durumMetin = k.durumMetinB || k.durumMetinA || '';
       if (k.gorev && (k.gorev.hedef || k.gorev.yer)) rapor.gorevli++;
       goruldu.add(k.id);
@@ -765,7 +765,7 @@
       dogumOnce: K.filter(k => k.durum === 'DOĞUM ÖNCESİ'), dogumSonra: K.filter(k => k.durum === 'DOĞUM SONRASI'),
       yarim: K.filter(k => k.durum === 'YARI ZAMANLI'), ucretsiz: K.filter(k => k.durum === 'ÜCRETSİZ İZİN'), askerlik: K.filter(k => k.durum === 'ASKERLİK İZNİ'),
       saglik: K.filter(k => k.durum === 'SAĞLIK MAZERETİ MESAİ' || (k.gorev && /SAĞLIK MAZERETİ/.test(k.gorev.gerekce || ''))),
-      muaf: K.filter(k => k.durum === 'NÖBET MUAFİYETİ' || k.durum === 'NÖBET MUAFİYETİ MESAİ'), rapor: K.filter(k => /RAPORLU/.test(k.durum || '')),
+      muaf: K.filter(k => /^NÖBET MUAFİYETİ/.test(k.durum || '')), rapor: K.filter(k => /RAPORLU/.test(k.durum || '')),
       disGiden: K.filter(k => !gizliKisi(k) && dis(k)), disGelen: K.filter(k => k.kurumDisiGelen || k.durumB === 'GEÇİCİ GÖREVLİ' || (k.durum === 'GEÇİCİ GÖREVLİ' && !k.gorev) || (k.gorev && k.gorev.hedef && !['istasyon', 'kkm', 'bashekimlik'].includes(birimTur(k.birim)))),
       aile: K.filter(k => k.durum === 'AİLE HEKİMLİĞİNDE')};
   }
@@ -785,7 +785,7 @@
     bolum('YARIM ZAMANLI ÇALIŞAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ VE BİTİŞ TARİHİ'], G.yarim, k => [G.durumTarih(k).join(' – ')]);
     bolum('ÜCRETSİZ İZİN', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLAYIŞ TARİHİ', 'BİTİŞ TARİHİ', 'AÇIKLAMALAR'], G.ucretsiz, k => { const t = G.durumTarih(k).length ? [dt(k, 0), dt(k, 1)] : izinT(k, /UCRETSIZ/); return [...t, k.aciklama || '']; });
     bolum('SAĞLIK MAZERETİ OLAN PERSONEL LİSTESİ', ['AD SOYAD', 'ÜNVANI', 'KADRO YERİ', 'GÖREV YERİ', 'GÖREVLENDİRME TARİHLERİ'], G.saglik, k => [yer(k) === k.birim ? '' : yer(k), gt(k)]);
-    bolum('NÖBET MUAFİYETİ OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ', 'AÇIKLAMA'], G.muaf, k => [dt(k, 0), dt(k, 1), k.durumMetin || '']);
+    bolum('NÖBET MUAFİYETİ OLAN PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ', 'AÇIKLAMA'], G.muaf, k => [dt(k, 0), dt(k, 1), k.durum === 'NÖBET MUAFİYETİ NÖBET' ? ['Dilekçe ile nöbet tutuyor', k.durumMetin].filter(Boolean).join(' · ') : (k.durumMetin || '')]);
     bolum('RAPORLU PERSONEL LİSTESİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'RAPOR TÜRÜ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ'], G.rapor, k => [k.durum, dt(k, 0), dt(k, 1)]);
     bolum('ASKERLİK İZNİ', ['AD-SOYAD', 'UNVAN', 'GÖREV YERİ', 'BAŞLANGIÇ TARİHİ', 'BİTİŞ TARİHİ'], G.askerlik, k => [dt(k, 0), dt(k, 1)]);
     return xlSayfa(aoa, {cols: [5, 32, 16, 24, 26, 30, 18, 18, 16, 16, 16], stil: (r, c) => gen[r] != null && c >= gen[r] ? null : stil[r] === 'b' ? (c === 0 ? {font: {bold: true, sz: 13}, dolgu: XL_RENK.baslik, hiza: {horizontal: 'left'}} : null) : stil[r] === 'h' ? {font: {bold: true}, kenar: true, dolgu: XL_RENK.baslik, sar: true} : stil[r] === 'v' ? {kenar: true} : null});
