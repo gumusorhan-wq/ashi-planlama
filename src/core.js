@@ -322,7 +322,8 @@ const APCore = (() => {
       // Sürüm 13.70: grubun payı hedeflerin toplamını aşıyorsa herkes önce tam hedefini alır (7,67 → 7,67; kimse hedefin altına inmez),
       // yalnız artan fazla nöbet uygun personele (en az fazlası olandan başlayarak, azamiyi aşmadan) dağıtılır; bu artışların küsuratı farklı olabilir (8 / 8,5 / 8,33)
       const sumH = L.reduce((x, s) => x + s.hedef, 0);
-      if (g !== 'isci' && L.length && total > sumH + 1e-6) { fazlaDagit(total - sumH, L.map(s => s.hedef), L.map(s => s.azami)).forEach((v, i) => sonuc.set(L[i].k.id, ucte(v))); return; }
+      // fazla nöbet grup grup değil, aşağıdaki ortak adımda bütün istasyona adil dağıtılır (herkes 8 olmadan kimse 9 olmaz; nöbet branşı uygunsa)
+      if (g !== 'isci' && L.length && total > sumH - 0.02) { L.forEach(s => sonuc.set(s.k.id, ucte(s.hedef))); return; }
       // Sürüm 13.70: grubun payı hedeflere yetmiyorsa herkes tam hedefini alır; eksik tek kişiden düşülür (listede en alttaki), yetmezse bir üstündekinden
       const V = g === 'isci' ? L.map(s => s.hedef) : eksikDus(Math.floor(Math.max(0, total) * 3 + 1e-6) / 3, L.map(s => s.hedef));
       if (g !== 'isci') {      // işçinin 12 saatlik vardiyası yüzünden kalan yarım (12 sa) parça: x,33'lü bir kişiye eklenir → x,5 (12 sa)
@@ -362,10 +363,13 @@ const APCore = (() => {
     // Önce tam sayıya tamamlayan artış (7,67 → 8), yoksa geçerli bir parça (8 sa / 12 sa); her turda fazlası en az olan kişi
     const gecerli = v => Math.abs(v * 3 - Math.round(v * 3)) < 1e-6 || Math.abs(v * 2 - Math.round(v * 2)) < 1e-6;
     const acikNe = () => { const sup = {}; GRUPLAR.forEach(g => { sup[g] = kilitSup[g] + ser(g).reduce((x, s2) => x + (sonuc.get(s2.k.id) || 0), 0); }); const r = akis(sup, {es: D3, ysp: D3, sur: D3}, ae).rem; return r.es + r.ysp + r.sur; };
-    const adaylar = GRUPLAR.filter(g => g !== 'isci').flatMap(g => ser(g));
-    for (let tur = 0; tur < 300; tur++) {
+    // eşitlikte önce sürücü olabilen ATT / AABT (eski fazla nöbet önceliği), sonra liste sırası
+    const ONC = {sy: 0, ka: 1, ms: 2, ke: 3, dok: 4, ysp: 5};
+    const adaylar = GRUPLAR.filter(g => g !== 'isci').flatMap(g => ser(g).map(s2 => ({s2, o: ONC[g] ?? 9}))).map((x, n) => ({...x, n}));
+    for (let tur = 0; tur < 1000; tur++) {
       const a0 = acikNe(); if (a0 < 1 / 6 - 0.011) break;
-      const sira = adaylar.map(s2 => ({s2, v: sonuc.get(s2.k.id) || 0})).filter(x => x.v + 1e-6 < x.s2.azami).sort((x, y) => (x.v - x.s2.hedef) - (y.v - y.s2.hedef));
+      const sira = adaylar.map(a => ({s2: a.s2, o: a.o, n: a.n, v: sonuc.get(a.s2.k.id) || 0})).filter(x => x.v + 1e-6 < x.s2.azami)
+        .sort((x, y) => (Math.round((x.v - x.s2.hedef) * 6) - Math.round((y.v - y.s2.hedef) * 6)) || (x.o - y.o) || (x.n - y.n));
       let oldu = false;
       for (const tamMi of [true, false]) {
         for (const x of sira) {

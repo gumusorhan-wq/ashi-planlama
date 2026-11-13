@@ -177,3 +177,7 @@ console.log('çekirdek testleri geçti');
 { const kk = Array.from({length: 13}, (_, i) => ({id: 'e' + i, sinif: 'memur', durum: '', izin: [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}}));
   const he = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 8}, 3), oe = C.oneri(he), v = kk.map(k => oe.get(k.id));
   assert.strictEqual(v.filter(x => Math.abs(x - 23 / 3) > 1e-9).length, 1, v.join(' ')); yk(v.reduce((a, b) => a + b, 0), 93); }
+// Sürüm 13.70: fazla nöbet bütün istasyona adil — aynı branşı tutabilen biri hedefte (7,67) kalırken başkası 9 olmaz
+{ const kk = Array.from({length: 9}, (_, i) => ({id: 'f' + i, sinif: 'memur', durum: '', izin: [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}}));
+  const hf = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 9}, 3), of = C.oneri(hf), v = kk.map(k => of.get(k.id));
+  assert.ok(!(v.some(x => x < 8 - 1e-6) && v.some(x => x > 8 + 1e-6)), v.join(' ')); }
