@@ -50,7 +50,12 @@
   }
   // İstasyonun nöbet listesinde boş kalacak günler (Pano, Nöbet hedefleri ve Nöbet listesi aynı hesabı gösterir)
   // Liste oluşturulmuşsa listedeki gerçek boşluklar, yoksa kişilerin nöbet adetlerinden tahmin (kaynak: 'liste' | 'tahmin'); 0,5 gün = 12 saatlik vardiya
+  // Sürüm 13.78 (HUSER 13.77.3): liste plandan eskiyse (bir kişinin listedeki nöbeti planından en az 1 nöbet farklı ya da plandaki kişi listede yok)
+  // Pano eski listeyi değil bugünkü planın tahminini gösterir ve listenin yeniden oluşturulması gerektiğini söyler
+  function n2ListeEski(b) { try { const D = n2Deneti(b); return D.d.ihlal.filter(i => i.tur === 'adet' && Math.abs(i.fark || 0) >= 0.9).length; } catch (e) { return 0; } }
   function n2BosTahmin(b) { try { if (!S.plan || b.ekipOf) return null; const dp = (S.plan.nobet || {})[b.ad];
+    const eski = dp && dp.liste ? n2ListeEski(b) : 0;
+    if (eski) { const G = n2Girdi(b); return {...NC.kapasiteAnalizi(G.girdi, G.kural), kaynak: 'tahmin', listeEski: eski}; }
     if (dp && dp.liste) { const o = n2Bosluk(dp.liste, NC.gunSayisi(S.y, S.m)), bos = {}; if (o.es) bos.es = o.es; if (o.ysp) bos.ysp = o.ysp; if (o.sur || o.surYari) bos.sur = o.sur + o.surYari / 2; return {kaynak: 'liste', bos, toplam: o.es + o.ysp + o.sur + o.surYari / 2}; }
     const G = n2Girdi(b); return {...NC.kapasiteAnalizi(G.girdi, G.kural), kaynak: 'tahmin'}; } catch (e) { console.warn('boş tahmini', e); return null; } }
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
