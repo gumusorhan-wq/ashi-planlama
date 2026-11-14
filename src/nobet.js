@@ -360,27 +360,40 @@ const NobetCore = (() => {
     let sert = sertSay(denetle(liste, H).ihlal), bolunen = 0, deneme = 0; const t0 = Date.now();      // deneme ve süre sınırı: büyük / eksik kadroda tarayıcıyı bekletmesin
     for (let tur = 0; tur < 200; tur++) {
       const sa = saat(), fark = p => p.plan == null || p.isci ? 0 : sa.get(p.id) - p.plan * 24;      // saat cinsinden: + fazla, − eksik
-      const eksik = P.filter(p => fark(p) <= -4).sort((a, b) => fark(a) - fark(b));
+      const eksik = P.filter(p => fark(p) <= -0.9).sort((a, b) => fark(a) - fark(b));
       // Sürüm 13.78 (HUSER 13.77.2): önce en az seçeneği olan fazla (ör. yalnız sürücü yuvası tutan): o yuvayı tutabilen eksik kişi azdır;
       // esnek fazlalar (ekip şefi / YSP) sona kalır. Böylece sürücünün fazlası sürücü olamayana gitmez, sürücü azamiyi aşmaz.
       const tuttugu = A => { const t = new Set(); for (let d = 1; d <= N; d++) yuvalar.forEach(y => { if (liste[d][y] === A.id) t.add(y); }); return t; };
       const esnek = A => { const t = tuttugu(A); return eksik.filter(B => B.id !== A.id && [...t].some(y => B.yet.includes(y))).length; };
-      const fazla = P.filter(p => fark(p) >= 4).map(p => ({p, e: esnek(p)})).sort((a, b) => a.e - b.e || fark(b.p) - fark(a.p)).map(x => x.p);
-      let yapildi = false;
-      for (const A of fazla) { for (const B of eksik) {
-        const s0 = Math.round(Math.min(-fark(B), fark(A)) / 4) * 4, sa1 = Math.max(4, Math.min(20, s0));
-        for (let d = 1; d <= N && !yapildi; d++) {
+      const fazla = P.filter(p => fark(p) >= 0.9).map(p => ({p, e: esnek(p)})).sort((a, b) => a.e - b.e || fark(b.p) - fark(a.p)).map(x => x.p);
+      // A'nın bir nöbetinin sa1 saatini B'ye verir (B o gün boşsa, yuvayı tutabiliyorsa ve sert ihlal artmıyorsa)
+      const tas = (A, B, sa1) => {
+        for (let d = 1; d <= N; d++) {
           const L = liste[d]; if (B.izin.has(d)) continue;
           if (['es', 'ysp', 'sur', 'surG', 'surA'].some(t => L[t] === B.id) || Object.values(L.bol || {}).some(b => b && b.id === B.id)) continue;
           for (const y of yuvalar) { if (L[y] !== A.id || (L.bol && L.bol[y]) || !B.yet.includes(y) || (y === 'es' && attMi(B) && !attMi(A))) continue;
-            if (++deneme > 4000 || (deneme % 50 === 0 && Date.now() - t0 > 1500)) return bolunen;
+            if (++deneme > 6000 || (deneme % 50 === 0 && Date.now() - t0 > 2000)) return null;
             // kısa parça hep önce: nöbet sahibi (ilk parça, 09:00'dan) kısa süreli olan, ikinci kişi uzun parçayı alır (8 sa → 16 sa)
             const kisaB = sa1 < 12; if (kisaB) L[y] = B.id;
             L.bol = {...(L.bol || {}), [y]: kisaB ? {id: A.id, saat: 24 - sa1} : {id: B.id, saat: sa1}};
             const s2 = sertSay(denetle(liste, H).ihlal);
-            if (s2 <= sert) { sert = s2; bolunen++; yapildi = true; break; }
+            if (s2 <= sert) { sert = s2; bolunen++; return true; }
             if (kisaB) L[y] = A.id; delete L.bol[y]; if (!Object.keys(L.bol).length) delete L.bol; }
         }
+        return false;
+      };
+      let yapildi = false;
+      for (const A of fazla) { for (const B of eksik) {
+        const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));      // Sürüm 13.78: saat saat (5 + 19, 7 + 17)
+        const x = tas(A, B, sa1); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
+        if (yapildi) break; }
+      // Sürüm 13.78: doğrudan olmuyorsa (ör. fazlası olan yalnız ekip şefi / sürücü, eksik olan yalnız YSP tutuyor) aradaki bir kişi üzerinden:
+      // A'nın saati C'ye, sonraki turda C'den B'ye geçer (C'nin toplamı değişmez)
+      if (!yapildi) for (const A of fazla) { for (const B of eksik) {
+        const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));
+        for (const C of P) { if (C === A || C === B || C.isci || C.plan == null || Math.abs(fark(C)) >= 0.9) continue;
+          const tC = tuttugu(C); if (![...tC].some(y => B.yet.includes(y))) continue;
+          const x = tas(A, C, sa1); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
         if (yapildi) break; }
         if (yapildi) break; }
       if (!yapildi) break;

@@ -522,7 +522,7 @@ const APCore = (() => {
   }
   // adim: dağıtım kesinliği. İşçi 0,5 (12 saatlik nöbet); memur/doktor 0,01 (tam oran; yuvarlamayı kullanıcı yapar)
   // Sürüm 13.71: nöbet sayısını 8 saatlik parçaya (1/3) oturtur; 7,67 / 7,66 / 7,666… → 7⅔
-  const ucte = v => (Math.abs(v * 3 - Math.round(v * 3)) < 0.06 ? Math.round(v * 3) / 3 : Math.round(v * 6) / 6);      // üçte bir (8 sa); yarım (12 sa) korunur
+  const ucte = v => (Math.abs(v * 3 - Math.round(v * 3)) < 0.06 ? Math.round(v * 3) / 3 : Math.abs(v * 6 - Math.round(v * 6)) < 0.06 ? Math.round(v * 6) / 6 : Math.round(v * 24) / 24);      // Sürüm 13.78: saatlik değer (1 sa = 1/24) korunur      // üçte bir (8 sa); yarım (12 sa) korunur
   function dagitSinirli(havuz, hedefler, azamiler, adim) {
     adim = adim || ADIM;
     const toplam = hedefler.reduce((a, b) => a + b, 0);
@@ -716,19 +716,19 @@ const APCore = (() => {
     }
     // Sürüm 13.70: grup paylarının yuvarlanmasından boşta kalan parçalar (ör. 0,33 = 8 sa) azamiyi aşmadan, gerçekten açık bir nöbet branşını dolduran kişiye verilir.
     // Önce tam sayıya tamamlayan artış (7,67 → 8), yoksa geçerli bir parça (8 sa / 12 sa); her turda fazlası en az olan kişi
-    const gecerli = v => Math.abs(v * 3 - Math.round(v * 3)) < 1e-6 || Math.abs(v * 2 - Math.round(v * 2)) < 1e-6;
+    const gecerli = v => Math.abs(v * 24 - Math.round(v * 24)) < 1e-4;      // Sürüm 13.78 (HUSER 13.78): her tam saat geçerli (nöbet listesi saat saat böler: 5 + 19, 7 + 17)
     const acikNe = () => { const sup = {}; GRUPLAR.forEach(g => { sup[g] = kilitSup[g] + ser(g).reduce((x, s2) => x + (sonuc.get(s2.k.id) || 0), 0); }); const r = akis(sup, {es: D3, ysp: D3, sur: D3}, ae).rem; return r.es + r.ysp + r.sur; };
     // eşitlikte önce sürücü olabilen ATT / AABT (eski fazla nöbet önceliği), sonra liste sırası
     const ONC = {sy: 0, ka: 1, ms: 2, ke: 3, dok: 4, ysp: 5};
     const adaylar = GRUPLAR.filter(g => g !== 'isci').flatMap(g => ser(g).map(s2 => ({s2, o: ONC[g] ?? 9}))).map((x, n) => ({...x, n}));
     for (let tur = 0; tur < 1000; tur++) {
-      const a0 = acikNe(); if (a0 < 1 / 6 - 0.011) break;
+      const a0 = acikNe(), aH = Math.round(a0 * 24) / 24; if (aH < 1 / 24 - 1e-6) break;
       const sira = adaylar.map(a => ({s2: a.s2, o: a.o, n: a.n, v: sonuc.get(a.s2.k.id) || 0})).filter(x => x.v + 1e-6 < x.s2.azami)
         .sort((x, y) => (Math.round((x.v - x.s2.hedef) * 6) - Math.round((y.v - y.s2.hedef) * 6)) || (x.o - y.o) || (x.n - y.n));
       let oldu = false;
       for (const tamMi of [true, false]) {
         for (const x of sira) {
-          const adimlar = tamMi ? [Math.floor(x.v + 1e-6) + 1 - x.v] : [1 / 3, 0.5, 2 / 3, 1 / 6, 5 / 6];
+          const adimlar = tamMi ? [Math.floor(x.v + 1e-6) + 1 - x.v] : [1 / 3, 0.5, 2 / 3, 1 / 6, 5 / 6, aH];      // aH: kalan açık saat cinsinden (ör. 4 sa)
           for (const st of adimlar) {
             const nv = x.v + st; if (st > a0 + 0.011 || nv > x.s2.azami + 1e-6 || !gecerli(nv)) continue;
             sonuc.set(x.s2.k.id, ucte(nv));
@@ -741,6 +741,20 @@ const APCore = (() => {
       }
       // Sürüm 13.78 (HUSER 13.77.4): kalan açık geçerli parçadan küçükse (ör. 0,17 = 4 sa; 7,67 + 0,17 = 7,83 geçersiz) en küçük geçerli artışla kapatılır
       // (7,67 → 8; en çok 4 saat fazla yazılır) — eskiden "azamiyle kapanır" denip Yeniden hesapla açığı dağıtmıyordu
+      // önce tam kapatan çift: biri artar, fazlası olan biri (hedefin altına inmeden) azalır (ör. 8 → 8,5 ve 9 → 8,67: +1/6, toplam tam 93)
+      if (!oldu && a0 < 1 / 3 + 0.011) {
+        const tum = adaylar.map(a => ({s2: a.s2, v: sonuc.get(a.s2.k.id) || 0}));
+        dis: for (const x of sira) for (const ar of [1 / 2, 1 / 3, 1 / 6, 2 / 3, 5 / 6]) {
+          const nx = x.v + ar; if (nx > x.s2.azami + 1e-6 || !gecerli(nx)) continue;
+          const az = ar - Math.round(a0 * 6) / 6; if (az < 1 / 6 - 0.011) continue;      // açık 0,17 gibi yuvarlanmış gelir: 4 saatlik parçaya çevrilir
+          for (const y of tum.slice().sort((p, q) => (q.v - q.s2.hedef) - (p.v - p.s2.hedef))) {
+            if (y.s2 === x.s2) continue; const ny = y.v - az; if (ny < y.s2.hedef - 0.01 || !gecerli(ny)) continue;
+            sonuc.set(x.s2.k.id, ucte(nx)); sonuc.set(y.s2.k.id, ucte(ny));
+            if (acikNe() < 0.011) { oldu = true; break dis; }
+            sonuc.set(x.s2.k.id, x.v); sonuc.set(y.s2.k.id, y.v);
+          }
+        }
+      }
       if (!oldu && a0 < 1 / 3 + 0.011) {
         for (const x of sira) {
           for (const st of [1 / 6, 1 / 3]) {
@@ -1260,27 +1274,40 @@ const NobetCore = (() => {
     let sert = sertSay(denetle(liste, H).ihlal), bolunen = 0, deneme = 0; const t0 = Date.now();      // deneme ve süre sınırı: büyük / eksik kadroda tarayıcıyı bekletmesin
     for (let tur = 0; tur < 200; tur++) {
       const sa = saat(), fark = p => p.plan == null || p.isci ? 0 : sa.get(p.id) - p.plan * 24;      // saat cinsinden: + fazla, − eksik
-      const eksik = P.filter(p => fark(p) <= -4).sort((a, b) => fark(a) - fark(b));
+      const eksik = P.filter(p => fark(p) <= -0.9).sort((a, b) => fark(a) - fark(b));
       // Sürüm 13.78 (HUSER 13.77.2): önce en az seçeneği olan fazla (ör. yalnız sürücü yuvası tutan): o yuvayı tutabilen eksik kişi azdır;
       // esnek fazlalar (ekip şefi / YSP) sona kalır. Böylece sürücünün fazlası sürücü olamayana gitmez, sürücü azamiyi aşmaz.
       const tuttugu = A => { const t = new Set(); for (let d = 1; d <= N; d++) yuvalar.forEach(y => { if (liste[d][y] === A.id) t.add(y); }); return t; };
       const esnek = A => { const t = tuttugu(A); return eksik.filter(B => B.id !== A.id && [...t].some(y => B.yet.includes(y))).length; };
-      const fazla = P.filter(p => fark(p) >= 4).map(p => ({p, e: esnek(p)})).sort((a, b) => a.e - b.e || fark(b.p) - fark(a.p)).map(x => x.p);
-      let yapildi = false;
-      for (const A of fazla) { for (const B of eksik) {
-        const s0 = Math.round(Math.min(-fark(B), fark(A)) / 4) * 4, sa1 = Math.max(4, Math.min(20, s0));
-        for (let d = 1; d <= N && !yapildi; d++) {
+      const fazla = P.filter(p => fark(p) >= 0.9).map(p => ({p, e: esnek(p)})).sort((a, b) => a.e - b.e || fark(b.p) - fark(a.p)).map(x => x.p);
+      // A'nın bir nöbetinin sa1 saatini B'ye verir (B o gün boşsa, yuvayı tutabiliyorsa ve sert ihlal artmıyorsa)
+      const tas = (A, B, sa1) => {
+        for (let d = 1; d <= N; d++) {
           const L = liste[d]; if (B.izin.has(d)) continue;
           if (['es', 'ysp', 'sur', 'surG', 'surA'].some(t => L[t] === B.id) || Object.values(L.bol || {}).some(b => b && b.id === B.id)) continue;
           for (const y of yuvalar) { if (L[y] !== A.id || (L.bol && L.bol[y]) || !B.yet.includes(y) || (y === 'es' && attMi(B) && !attMi(A))) continue;
-            if (++deneme > 4000 || (deneme % 50 === 0 && Date.now() - t0 > 1500)) return bolunen;
+            if (++deneme > 6000 || (deneme % 50 === 0 && Date.now() - t0 > 2000)) return null;
             // kısa parça hep önce: nöbet sahibi (ilk parça, 09:00'dan) kısa süreli olan, ikinci kişi uzun parçayı alır (8 sa → 16 sa)
             const kisaB = sa1 < 12; if (kisaB) L[y] = B.id;
             L.bol = {...(L.bol || {}), [y]: kisaB ? {id: A.id, saat: 24 - sa1} : {id: B.id, saat: sa1}};
             const s2 = sertSay(denetle(liste, H).ihlal);
-            if (s2 <= sert) { sert = s2; bolunen++; yapildi = true; break; }
+            if (s2 <= sert) { sert = s2; bolunen++; return true; }
             if (kisaB) L[y] = A.id; delete L.bol[y]; if (!Object.keys(L.bol).length) delete L.bol; }
         }
+        return false;
+      };
+      let yapildi = false;
+      for (const A of fazla) { for (const B of eksik) {
+        const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));      // Sürüm 13.78: saat saat (5 + 19, 7 + 17)
+        const x = tas(A, B, sa1); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
+        if (yapildi) break; }
+      // Sürüm 13.78: doğrudan olmuyorsa (ör. fazlası olan yalnız ekip şefi / sürücü, eksik olan yalnız YSP tutuyor) aradaki bir kişi üzerinden:
+      // A'nın saati C'ye, sonraki turda C'den B'ye geçer (C'nin toplamı değişmez)
+      if (!yapildi) for (const A of fazla) { for (const B of eksik) {
+        const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));
+        for (const C of P) { if (C === A || C === B || C.isci || C.plan == null || Math.abs(fark(C)) >= 0.9) continue;
+          const tC = tuttugu(C); if (![...tC].some(y => B.yet.includes(y))) continue;
+          const x = tas(A, C, sa1); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
         if (yapildi) break; }
         if (yapildi) break; }
       if (!yapildi) break;
@@ -1809,7 +1836,7 @@ function mount(root, opts = {}) {
         <div class="r"><span title="Nöbet yazılan toplam / ayda dolması gereken nöbet">Yazılan / gereken nöbet</span><b>${fmt(p)} / ${h.ihtiyac}</b></div>
         <div class="r"><span title="${fazlaMod ? 'Yazılan nöbet değildir: herkes azami nöbetini (DOKTOR-AABT-ATT ' + fmt(azamiDeger(b)) + ') tutsa bu istasyonda en çok tutulabilecek nöbet. Gereken nöbetten büyükse fazla mesaiyle açık kapatılabilir.' : 'Yazılan nöbet değildir: herkes yalnız mesaisini tamamlasa tutulabilecek nöbet.'}">${fazlaMod ? 'En çok tutulabilir (azamiyle)' : 'En çok tutulabilir (mesaiyle)'}</span>${(() => { const kap = fazlaMod ? h.azamiKap : h.kapasite; return h.planKarsilar && p > kap + 0.005 ? `<b title="Kişilere azaminin üstünde elle nöbet yazıldı / sabitlendi: kapasite yazılan nöbete göre gösterilir">${fmt(p)} <span class="ap-note">(elle; azamiyle ${fmt(kap)})</span></b>` : `<b>${fmt(kap)}</b>`; })()}</div>
         <div class="r"><span title="Hesaba giren kişi: istasyonda çalışan ve nöbet tutabilen. Dışarıda (geçici görevde) olanların hedefi 0 sayılır, kapasiteye ve ihtiyaca girmez.">Kişi (nöbet tutan)</span><b>${nobetTutan}${disarida ? ` <span class="ap-note">+ ${disarida} dışarıda</span>` : ''}${nobetsiz ? ` <span class="ap-note">+ ${nobetsiz} nöbet tutmaz</span>` : ''}${aile ? ` <span class="ap-note" title="Aile hekimliğine geçen personel listede görünür ama hiçbir hesaba girmez; kendi isteği olmadan geri çağrılmaz">+ ${aile} aile hekimliğinde</span>` : ''}</b></div>
-        <div class="ap-yh" title="${kp && kp.kaynak === 'liste' ? 'Oluşturulan nöbet listesine göre' : kp && kp.listeEski ? 'Nöbet listesi plandan eski; bugünkü plana göre (tahmini)' : 'Kişilerin nöbet sayıları ve branş yeteneklerine göre (tahmini)'}">Nöbet branşları — dolu gün / gereken gün</div>${kp && kp.listeEski ? `<div class="ap-note" style="color:#b45309;margin:2px 0 4px" title="Nöbet listesi plan değişmeden önce oluşturulmuş: ${kp.listeEski} kişinin listedeki nöbet sayısı bugünkü planından farklı. Branş günleri bugünkü plana göre tahmin edildi.">⚠ Nöbet listesi plandan eski — yeniden oluşturun</div>` : ''}${yuvaSatir}
+        <div class="ap-yh" title="${kp && kp.kaynak === 'liste' ? 'Oluşturulan nöbet listesine göre' : kp && kp.listeEski ? 'Nöbet listesi plandan eski; bugünkü plana göre (tahmini)' : 'Kişilerin nöbet sayıları ve branş yeteneklerine göre (tahmini)'}">Nöbet branşları — dolu gün / gereken gün</div>${kp && kp.listeEski ? `<div class="ap-note" style="color:#b45309;margin:2px 0 4px" title="${kp.listeEski === 'elle' ? 'Plan değişti ama nöbet listesi elle düzenlendiği için kendiliğinden güncellenmedi. Nöbet listesi sayfasından «Otomatik oluştur» ile yeniden oluşturun.' : kp.listeEski === 'guncelleniyor' ? 'Plan değişti; nöbet listesi arka planda plana göre yeniden oluşturuluyor.' : 'Plan değişti; listeyi düzenleme yetkisi olan biri sayfayı açınca liste kendiliğinden güncellenir.'} Branş günleri bugünkü plana göre tahmin edildi.">${kp.listeEski === 'elle' ? '⚠ Liste elle düzenlenmiş, plandan farklı — yeniden oluşturun' : kp.listeEski === 'guncelleniyor' ? '⟳ Nöbet listesi plana göre güncelleniyor…' : '⚠ Nöbet listesi plandan eski'}</div>` : ''}${yuvaSatir}
         ${gelen}${cikan}${net}${Math.abs(plFark) > 0.01 ? `<div class="ap-note" style="margin-top:6px" title="Elle girilen ya da sabitlenen (🔒) sayılar ya da nöbet branşı kısıtı yüzünden">Planlanan toplam, olması gerekenden ${fmt(Math.abs(plFark))} nöbet ${plFark < 0 ? 'eksik' : 'fazla'}</div>` : ''}</div>`;
   }
 
@@ -2968,10 +2995,32 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   // Liste oluşturulmuşsa listedeki gerçek boşluklar, yoksa kişilerin nöbet adetlerinden tahmin (kaynak: 'liste' | 'tahmin'); 0,5 gün = 12 saatlik vardiya
   // Sürüm 13.78 (HUSER 13.77.3): liste plandan eskiyse (bir kişinin listedeki nöbeti planından en az 1 nöbet farklı ya da plandaki kişi listede yok)
   // Pano eski listeyi değil bugünkü planın tahminini gösterir ve listenin yeniden oluşturulması gerektiğini söyler
-  function n2ListeEski(b) { try { const D = n2Deneti(b); return D.d.ihlal.filter(i => i.tur === 'adet' && Math.abs(i.fark || 0) >= 0.9).length; } catch (e) { return 0; } }
+  // Sürüm 13.78 (HUSER 13.78): nöbet listesi plana bağlı — listenin oluşturulduğu girdinin (kişiler, planlanan nöbet, izin, istek, kural) imzası saklanır.
+  // Plan değişince elle düzenlenmemiş liste arka planda kendiliğinden yeniden oluşturulur; elle düzenlenmişse ezilmez, uyarı çıkar.
+  function n2Imza(b) { const G = n2Girdi(b), s = JSON.stringify([G.girdi.kisiler.map(k => [k.id, k.grup, Math.round((k.planlanan || 0) * 1000), k.gunduz ? 1 : 0, k.izin || [], k.istek || []]), G.kural, G.girdi.tatil, G.girdi.attEs]);
+    let h = 5381; for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; return h.toString(36) + s.length.toString(36); }
+  // imzası olmayan eski listeler: bir kişinin listedeki nöbeti planından en az 0,25 farklıysa eski
+  function n2ListeEski(b) { try { const D = n2Deneti(b); return D.d.ihlal.filter(i => i.tur === 'adet' && Math.abs(i.fark || 0) >= 0.25).length; } catch (e) { return 0; } }
+  // null: liste yok · 'guncel' · 'eski' (kendiliğinden güncellenir) · 'elle' (elle düzenlenmiş, kullanıcı yeniden oluşturmalı)
+  function n2ListeDurum(b) { const dp = ((S.plan && S.plan.nobet) || {})[b.ad]; if (!dp || !dp.liste) return null;
+    const eski = dp.imza ? dp.imza !== n2Imza(b) : n2ListeEski(b) > 0; return !eski ? 'guncel' : dp.elle ? 'elle' : 'eski'; }
+  const n2Oto = {kuyruk: [], calis: false};
+  function n2OtoPlanla(b) { if (!n2Duz() || (S.n2 && S.n2.calisiyor) || n2Oto.kuyruk.includes(b.ad)) return; n2Oto.kuyruk.push(b.ad); setTimeout(n2OtoCalis, 60); }
+  async function n2OtoCalis() {
+    if (n2Oto.calis) return; n2Oto.calis = true;
+    try { while (n2Oto.kuyruk.length) {
+      const ad = n2Oto.kuyruk.shift(), b = S.plan && S.plan.birimler.find(x => x.ad === ad);
+      if (!b || b.ekipOf || !n2Duz() || n2ListeDurum(b) !== 'eski') continue;
+      const imza = n2Imza(b), G = n2Girdi(b);
+      const r = await NC.uretAsync(G.girdi, {kural: G.kural, sureMs: 1500, deneme: 5, zorlaMs: 4000, seed: (Date.now() % 100000) + 1}, () => {});
+      if (!S.plan || !n2Duz() || n2Imza(b) !== imza || n2ListeDurum(b) !== 'eski') continue;      // bu sırada plan yine değiştiyse sonraki çizimde yeniden sıraya girer
+      const dp = n2Depo(ad); dp.liste = r.liste; dp.imza = imza; dp.elle = false; dp.damga = damgaYeni(); S.n2.oneri = null;
+      logla('Modül 2: liste plana göre kendiliğinden güncellendi', `${ad}${r.bos ? ` · ${r.bos} boş` : ''}`); kaydet(); render();
+    } } catch (e) { console.warn('otomatik liste', e); } finally { n2Oto.calis = false; }
+  }
   function n2BosTahmin(b) { try { if (!S.plan || b.ekipOf) return null; const dp = (S.plan.nobet || {})[b.ad];
-    const eski = dp && dp.liste ? n2ListeEski(b) : 0;
-    if (eski) { const G = n2Girdi(b); return {...NC.kapasiteAnalizi(G.girdi, G.kural), kaynak: 'tahmin', listeEski: eski}; }
+    const durum = n2ListeDurum(b);
+    if (durum === 'eski' || durum === 'elle') { if (durum === 'eski') n2OtoPlanla(b); const G = n2Girdi(b); return {...NC.kapasiteAnalizi(G.girdi, G.kural), kaynak: 'tahmin', listeEski: durum === 'elle' ? 'elle' : n2Duz() ? 'guncelleniyor' : 'eski'}; }
     if (dp && dp.liste) { const o = n2Bosluk(dp.liste, NC.gunSayisi(S.y, S.m)), bos = {}; if (o.es) bos.es = o.es; if (o.ysp) bos.ysp = o.ysp; if (o.sur || o.surYari) bos.sur = o.sur + o.surYari / 2; return {kaynak: 'liste', bos, toplam: o.es + o.ysp + o.sur + o.surYari / 2}; }
     const G = n2Girdi(b); return {...NC.kapasiteAnalizi(G.girdi, G.kural), kaynak: 'tahmin'}; } catch (e) { console.warn('boş tahmini', e); return null; } }
   const n2Deneti = (b) => { const G = n2Girdi(b), dp = n2Depo(b.ad), H = NC.hazirla(G.girdi, G.kural), L = dp.liste || NC.bos(H.N); return {G, H, L, d: NC.denetle(L, H)}; };
@@ -3145,7 +3194,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
       const bl = L[gun].bol && L[gun].bol[tip], ilk = bl ? 24 - bl.saat : 24;
       // bölünmüş nöbet: üstteki kişi 09:00'dan, alttaki kişi devamını tutar. Sürücü 12 saatiyle birleşen parça (12 + 12 = 24 saat) ayrıca belirtilir.
       const kombi = bl && bl.saat === 12 && (tip === 'es' || tip === 'ysp') && ((L[gun].surA != null && L[gun].surA === id) || (L[gun].surG != null && L[gun].surG === bl.id));
-      const bolHtml = bl ? `<div class="ap-note n2bol" title="${kombi ? 'Bu kişi aynı gün sürücünün diğer 12 saatini de tutar (toplam 24 saat).' : 'Nöbet iki kişi arasında bölünür; saatine göre kısmi nöbet sayılır.'}">${saatYaz(ilk)}–09:00 <b>${esc(n2Ad(G, bl.id))}</b>${kombi ? ' (sürücüyle birleşik)' : ''} <select class="ap-sel" data-n2="bol" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'} aria-label="Bölme">${[...[4, 8, 12, 16, 20].map(v => [v, `${24 - v} + ${v} saat`]), ...(![4, 8, 12, 16, 20].includes(+bl.saat) ? [[bl.saat, `${24 - bl.saat} + ${bl.saat} saat`]] : []), ['', 'bölmeyi kaldır']].map(([v, t]) => `<option value="${v}" ${String(v) === String(bl.saat) ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : '';
+      const bolHtml = bl ? `<div class="ap-note n2bol" title="${kombi ? 'Bu kişi aynı gün sürücünün diğer 12 saatini de tutar (toplam 24 saat).' : 'Nöbet iki kişi arasında bölünür; saatine göre kısmi nöbet sayılır.'}">${saatYaz(ilk)}–09:00 <b>${esc(n2Ad(G, bl.id))}</b>${kombi ? ' (sürücüyle birleşik)' : ''} <select class="ap-sel" data-n2="bol" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'} aria-label="Bölme">${[...Array.from({length: 23}, (_, i) => i + 1).map(v => [v, `${24 - v} + ${v} saat`]), ...(!(+bl.saat >= 1 && +bl.saat <= 23 && Number.isInteger(+bl.saat)) ? [[bl.saat, `${24 - bl.saat} + ${bl.saat} saat`]] : []), ['', 'bölmeyi kaldır']].map(([v, t]) => `<option value="${v}" ${String(v) === String(bl.saat) ? 'selected' : ''}>${t}</option>`).join('')}</select></div>` : '';
       const sur24Var = tip === 'sur' && (L[gun].surG != null || L[gun].surA != null), yariBos = (tip === 'surG' || tip === 'surA') && id == null && L[gun].sur == null && L[gun][tip === 'surG' ? 'surA' : 'surG'] != null;
       const bosYazi = (e === 'Boş' && !sur24Var) || yariBos ? '— BOŞ —' : ''; if (yariBos && !e) e = 'Boş: sürücünün bu 12 saati yazılmadı';
       return `<td class="${e && !sur24Var ? 'n2e' : ''}" title="${esc(e)}">${bl ? `<span class="ap-note">09:00–${saatYaz(ilk)}</span> ` : ''}<select class="ap-sel n2s" data-n2="hucre" data-g="${gun}" data-t="${tip}" ${duz ? '' : 'disabled'} aria-label="${gun}. gün ${tip}">${secenek(yuva, tip, id, bosYazi)}</select>${bolHtml}</td>`; };
@@ -3173,7 +3222,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
       <button class="ap-btn" data-act="n2-excel" ${dp.liste ? '' : 'disabled'}>İndir ▾</button>
       <span class="ap-sp"></span><button class="ap-btn ${kisiGoruntu ? '' : 'pri'}" data-act="n2-gorunum" data-v="yuva">Gün görünümü</button><button class="ap-btn ${kisiGoruntu ? 'pri' : ''}" data-act="n2-gorunum" data-v="kisi">Kişi görünümü</button></div>
       ${kap.toplam > 0 ? `<div class="ap-ek ap-ek-c" style="margin-top:8px"><b>Kadro yetmiyor${dp.liste ? '' : `: yaklaşık ${fmt(kap.toplam)} nöbet boş kalacak (${Object.entries(kap.bos).map(([k, n]) => `${NC.YUVA_AD[k]} ${fmt(n)} gün`).join(', ')})`}.</b> Kimseye mesaisinden / azami nöbetinden fazla nöbet yazılmaz; boş nöbetler listede <b>— BOŞ —</b> olarak kalır. Planlamadan personel isteyin. (Ekip şefi: doktor / AABT · sürücü: işçi ya da sürücülüğü doğrulanmış AABT / ATT.)</div>` : ''}
-      <div id="ap-n2-ilerleme" style="margin-top:8px">${dp.liste ? n2DurumYazi(d, L, N) : '<span class="ap-note">Henüz liste yok. Önce istek takvimini doldurun, sonra <b>Otomatik nöbet listesi oluştur</b> düğmesine basın.</span>'}</div></div>
+      <div id="ap-n2-ilerleme" style="margin-top:8px">${(() => { const ld = n2ListeDurum(b); if (ld === 'eski') n2OtoPlanla(b); return ld === 'elle' ? '<div class="ap-note" style="color:#b45309;margin-bottom:4px">⚠ Plan değişti; bu liste elle düzenlendiği için kendiliğinden güncellenmedi. Plana uydurmak için <b>Otomatik nöbet listesi oluştur</b>a basın (elle değişiklikler gider).</div>' : ld === 'eski' ? `<div class="ap-note" style="margin-bottom:4px">${n2Duz() ? '⟳ Plan değişti; liste plana göre yeniden oluşturuluyor…' : '⚠ Plan değişti; listeyi düzenleme yetkisi olan biri açınca kendiliğinden güncellenir.'}</div>` : ''; })()}${dp.liste ? n2DurumYazi(d, L, N) : '<span class="ap-note">Henüz liste yok. Önce istek takvimini doldurun, sonra <b>Otomatik nöbet listesi oluştur</b> düğmesine basın.</span>'}</div></div>
       <div class="ap-card">${kisiGoruntu ? kisiTablo() : `<div class="ap-tw ap-tw-kutu"><table class="ap-t n2l"><thead><tr><th>Gün</th><th></th><th>Ekip şefi</th><th>YSP</th><th>Sürücü (24 saat)</th>${ks.some(k => k.grup === 'isci') ? '<th>Sürücü gündüz<br><span class="ap-note">09:00–21:00</span></th><th>Sürücü gece<br><span class="ap-note">21:00–09:00</span></th>' : ''}</tr></thead><tbody>${sat}</tbody></table></div>`}</div>`;
     return lNav + (la === 'kisi' ? lKisi : lListe);
   }
@@ -3318,13 +3367,13 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         if (!n2Duz()) { toast('Düzenleme yetkiniz yok / ay kilitli.'); break; }
         S.n2.calisiyor = true; render(); await new Promise(r => setTimeout(r, 40));
         const ilerle = x => { const el = root.querySelector('#ap-n2-ilerleme'); if (el) el.innerHTML = `<div class="ap-note">Liste oluşturuluyor… %${Math.round(x.oran * 100)} (${x.deneme}. deneme)</div><div style="height:6px;background:var(--ap-line);margin-top:4px"><div style="height:6px;width:${Math.round(x.oran * 100)}%;background:var(--ap-pri, #0055A4);transition:width .2s"></div></div>`; };
-        try { const G = n2Girdi(b), r = await NC.uretAsync(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 8000, seed: (Date.now() % 100000) + 1}, ilerle); mut2(() => { dp.liste = r.liste; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.bos ? ` · ${r.bos} boş` : ''}`);
+        try { const G = n2Girdi(b), imza = n2Imza(b), r = await NC.uretAsync(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 8000, seed: (Date.now() % 100000) + 1}, ilerle); mut2(() => { dp.liste = r.liste; dp.imza = imza; dp.elle = false; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.bos ? ` · ${r.bos} boş` : ''}`);
           toast([r.bos ? `${r.bos} nöbet boş kaldı (kadro yetmiyor; personel isteyin).` : 'Tüm nöbetler dolu.', r.sert ? `${r.sert} kural ihlali kaldı; Denetim ve öneriler sekmesine bakın.` : 'Kural ihlali yok.'].join(' ')); }
         finally { S.n2.calisiyor = false; }
         break;
       }
-      case 'n2-liste-temizle': if ((await onay('Liste silinsin mi?'))) mut2(() => { n2Depo(b.ad).liste = null; }, 'Modül 2: liste temizlendi', b.ad); break;
-      case 'n2-uygula': { const [i, j] = v.split(':').map(Number), s = S.n2.oneri.oneriler[i].secenekler[j], dp = n2Depo(b.ad); mut2(() => { dp.liste[s.gun][s.yuva] = s.yeni; }, 'Modül 2: öneri uygulandı', `${s.gun}. gün ${s.yuva} → ${s.yeniAd}`); break; }
+      case 'n2-liste-temizle': if ((await onay('Liste silinsin mi?'))) mut2(() => { const d0 = n2Depo(b.ad); d0.liste = null; d0.imza = null; d0.elle = false; }, 'Modül 2: liste temizlendi', b.ad); break;
+      case 'n2-uygula': { const [i, j] = v.split(':').map(Number), s = S.n2.oneri.oneriler[i].secenekler[j], dp = n2Depo(b.ad); mut2(() => { dp.liste[s.gun][s.yuva] = s.yeni; dp.elle = true; }, 'Modül 2: öneri uygulandı', `${s.gun}. gün ${s.yuva} → ${s.yeniAd}`); break; }
       case 'n2-excel': n2Excel(b); return true;
       case 'arsiv-yaz': {
         if (!S.plan) break; const rec = ayMetrik(S.plan, S.y, S.m); await arsivYaz(rec);
@@ -3418,8 +3467,8 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     if (n === 'ist') { S.n2.ist = t.value; S.n2.oneri = null; return true; }
     if (n === 'kural' && S.rol === 'istasyon') { toast('Nöbet listesi kuralları planlama birimince belirlenir.'); return true; }
     if (n === 'kural') { const dp = n2Depo(b.ad), k = t.dataset.k; mut2(() => { dp.kural = {...dp.kural, [k]: t.type === 'checkbox' ? t.checked : Math.max(0, Math.round(sayi(t.value))) }; }, 'Modül 2: kural', `${k}`); return true; }
-    if (n === 'hucre') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { dp.liste = dp.liste || NC.bos(NC.gunSayisi(S.y, S.m)); dp.liste[g][tip] = t.value === '' ? null : t.value; if (dp.liste[g].bol && dp.liste[g].bol[tip] && (t.value === '' || dp.liste[g].bol[tip].id === t.value)) { const B = {...dp.liste[g].bol}; delete B[tip]; dp.liste[g].bol = B; } }, 'Modül 2: elle değişiklik', `${g}. gün ${tip}`); return true; }
-    if (n === 'bol') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { const B = {...(dp.liste[g].bol || {})}; if (t.value === '') delete B[tip]; else B[tip] = {...B[tip], saat: +t.value}; dp.liste[g].bol = B; }, 'Modül 2: bölünmüş nöbet', `${g}. gün ${tip} ${t.value || 'kaldırıldı'}`); return true; }
+    if (n === 'hucre') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { dp.liste = dp.liste || NC.bos(NC.gunSayisi(S.y, S.m)); dp.elle = true; dp.liste[g][tip] = t.value === '' ? null : t.value; if (dp.liste[g].bol && dp.liste[g].bol[tip] && (t.value === '' || dp.liste[g].bol[tip].id === t.value)) { const B = {...dp.liste[g].bol}; delete B[tip]; dp.liste[g].bol = B; } }, 'Modül 2: elle değişiklik', `${g}. gün ${tip}`); return true; }
+    if (n === 'bol') { const dp = n2Depo(b.ad), g = +t.dataset.g, tip = t.dataset.t; mut2(() => { dp.elle = true; const B = {...(dp.liste[g].bol || {})}; if (t.value === '') delete B[tip]; else B[tip] = {...B[tip], saat: +t.value}; dp.liste[g].bol = B; }, 'Modül 2: bölünmüş nöbet', `${g}. gün ${tip} ${t.value || 'kaldırıldı'}`); return true; }
     return false;
   }
 

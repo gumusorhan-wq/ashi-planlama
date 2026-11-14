@@ -167,7 +167,7 @@ const APCore = (() => {
   }
   // adim: dağıtım kesinliği. İşçi 0,5 (12 saatlik nöbet); memur/doktor 0,01 (tam oran; yuvarlamayı kullanıcı yapar)
   // Sürüm 13.71: nöbet sayısını 8 saatlik parçaya (1/3) oturtur; 7,67 / 7,66 / 7,666… → 7⅔
-  const ucte = v => (Math.abs(v * 3 - Math.round(v * 3)) < 0.06 ? Math.round(v * 3) / 3 : Math.round(v * 6) / 6);      // üçte bir (8 sa); yarım (12 sa) korunur
+  const ucte = v => (Math.abs(v * 3 - Math.round(v * 3)) < 0.06 ? Math.round(v * 3) / 3 : Math.abs(v * 6 - Math.round(v * 6)) < 0.06 ? Math.round(v * 6) / 6 : Math.round(v * 24) / 24);      // Sürüm 13.78: saatlik değer (1 sa = 1/24) korunur      // üçte bir (8 sa); yarım (12 sa) korunur
   function dagitSinirli(havuz, hedefler, azamiler, adim) {
     adim = adim || ADIM;
     const toplam = hedefler.reduce((a, b) => a + b, 0);
@@ -361,19 +361,19 @@ const APCore = (() => {
     }
     // Sürüm 13.70: grup paylarının yuvarlanmasından boşta kalan parçalar (ör. 0,33 = 8 sa) azamiyi aşmadan, gerçekten açık bir nöbet branşını dolduran kişiye verilir.
     // Önce tam sayıya tamamlayan artış (7,67 → 8), yoksa geçerli bir parça (8 sa / 12 sa); her turda fazlası en az olan kişi
-    const gecerli = v => Math.abs(v * 3 - Math.round(v * 3)) < 1e-6 || Math.abs(v * 2 - Math.round(v * 2)) < 1e-6;
+    const gecerli = v => Math.abs(v * 24 - Math.round(v * 24)) < 1e-4;      // Sürüm 13.78 (HUSER 13.77.6): her tam saat geçerli (nöbet listesi saat saat böler: 5 + 19, 7 + 17)
     const acikNe = () => { const sup = {}; GRUPLAR.forEach(g => { sup[g] = kilitSup[g] + ser(g).reduce((x, s2) => x + (sonuc.get(s2.k.id) || 0), 0); }); const r = akis(sup, {es: D3, ysp: D3, sur: D3}, ae).rem; return r.es + r.ysp + r.sur; };
     // eşitlikte önce sürücü olabilen ATT / AABT (eski fazla nöbet önceliği), sonra liste sırası
     const ONC = {sy: 0, ka: 1, ms: 2, ke: 3, dok: 4, ysp: 5};
     const adaylar = GRUPLAR.filter(g => g !== 'isci').flatMap(g => ser(g).map(s2 => ({s2, o: ONC[g] ?? 9}))).map((x, n) => ({...x, n}));
     for (let tur = 0; tur < 1000; tur++) {
-      const a0 = acikNe(); if (a0 < 1 / 6 - 0.011) break;
+      const a0 = acikNe(), aH = Math.round(a0 * 24) / 24; if (aH < 1 / 24 - 1e-6) break;
       const sira = adaylar.map(a => ({s2: a.s2, o: a.o, n: a.n, v: sonuc.get(a.s2.k.id) || 0})).filter(x => x.v + 1e-6 < x.s2.azami)
         .sort((x, y) => (Math.round((x.v - x.s2.hedef) * 6) - Math.round((y.v - y.s2.hedef) * 6)) || (x.o - y.o) || (x.n - y.n));
       let oldu = false;
       for (const tamMi of [true, false]) {
         for (const x of sira) {
-          const adimlar = tamMi ? [Math.floor(x.v + 1e-6) + 1 - x.v] : [1 / 3, 0.5, 2 / 3, 1 / 6, 5 / 6];
+          const adimlar = tamMi ? [Math.floor(x.v + 1e-6) + 1 - x.v] : [1 / 3, 0.5, 2 / 3, 1 / 6, 5 / 6, aH];      // aH: kalan açık saat cinsinden (ör. 4 sa)
           for (const st of adimlar) {
             const nv = x.v + st; if (st > a0 + 0.011 || nv > x.s2.azami + 1e-6 || !gecerli(nv)) continue;
             sonuc.set(x.s2.k.id, ucte(nv));

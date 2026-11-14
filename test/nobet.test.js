@@ -110,3 +110,14 @@ console.log('nöbet çekirdek testleri geçti');
   assert.ok(top <= plan + 1 / 3 + 1e-6, `liste planın üstüne çıkmamalı: ${top} / ${plan.toFixed(2)}`);
   console.log('azami bütçe testi geçti', top, '/', plan.toFixed(2));
 }
+// Sürüm 13.78 (HUSER 13.77.6): saatlik küsurat (8 + 4 sa = 8,17; 7 + 17 sa) nöbet listesinde saat saat bölünür; boş yuva kalmaz, kimse planından 1 saatten fazla sapmaz
+{ const mk = (id, grup, pl, az) => ({id, ad: 'K' + id, grup, planlanan: pl, plan: pl, ust: Math.floor(az + 1e-9), ustYumusak: Math.ceil(az - 1e-9), azamiF: az, izin: [], istek: []});
+  const ks = [mk(1, 'ka', 8 + 4 / 24, 9), mk(2, 'ke', 8, 9), mk(3, 'ke', 8, 9), mk(4, 'ke', 8, 9), mk(5, 'ke', 8, 9), mk(6, 'ka', 7 + 17 / 24, 9), mk(7, 'ke', 8, 9),
+    mk(8, 'ysp', 8, 9), mk(9, 'ysp', 7 + 3 / 24, 9), mk(10, 'sy', 8, 9), mk(11, 'sy', 8, 9), mk(12, 'sy', 6, 9)];
+  assert.ok(Math.abs(ks.reduce((a, k) => a + k.planlanan, 0) - 93) < 1e-9);
+  N.adetHazirla(ks, 31); const r = N.uret({y: 2026, m: 12, kisiler: ks, attEs: true}, {sureMs: 2500, deneme: 6, seed: 3});
+  assert.strictEqual(r.bos, 0, 'saatlik küsuratta boş yuva kalmamalı');
+  const saat = new Map(ks.map(k => [k.id, 0])); r.liste.forEach((L, d) => { if (!d) return; ['es', 'ysp', 'sur'].forEach(t => { if (L[t] != null) saat.set(L[t], saat.get(L[t]) + (L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); Object.values(L.bol || {}).forEach(b => saat.set(b.id, saat.get(b.id) + b.saat)); });
+  ks.forEach(k => assert.ok(Math.abs(saat.get(k.id) - k.planlanan * 24) <= 1.01, `K${k.id}: planı ${(k.planlanan * 24).toFixed(0)} sa, listede ${saat.get(k.id)} sa`));
+  console.log('saatlik bölme testi geçti');
+}
