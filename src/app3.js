@@ -824,7 +824,46 @@
     S.plan.birimler.filter(b => b.tur === 'istasyon').sort((a, b) => sira(a) - sira(b) || trCollator.compare(C.ilceAdi(a.ad), C.ilceAdi(b.ad)) || no(a) - no(b) || trCollator.compare(a.ad, b.ad)).forEach(b => ekle(b.ad, xlIstasyonSayfa(b)));
     return wb;
   }
-  const xlsxIndir = (wb, ad) => indir(new Blob([XLSX.write(wb, {bookType: 'xlsx', type: 'array'})], {type: 'application/octet-stream'}), ad);
+  // Sürüm 13.77 (HUSER): İndir ▾ menüsünde PDF seçilince aynı Excel kitabı ortak HUSER PDF ile basılır (/moduller/ortak/huser-pdf.js)
+  let pdfIstek = 0, pdfSoz = null;
+  const pdfYukle = () => {
+    if (window.HuserPdf) return Promise.resolve();
+    if (!pdfSoz) pdfSoz = new Promise((ok, red) => {
+      const sc = document.createElement('script'); sc.src = '/moduller/ortak/huser-pdf.js'; sc.async = true;
+      sc.onload = () => window.HuserPdf ? ok() : red(new Error('PDF kütüphanesi yüklenemedi.'));
+      sc.onerror = () => { pdfSoz = null; red(new Error('PDF kütüphanesi yüklenemedi (yalnız HUSER içinde çalışır).')); };
+      document.head.appendChild(sc);
+    });
+    return pdfSoz;
+  };
+  const xlsxIndir = (wb, ad) => {
+    if (pdfIstek && Date.now() - pdfIstek < 60000) {
+      pdfIstek = 0;
+      pdfYukle().then(() => window.HuserPdf.kitaptan(wb, ad, {modul: 'HUSER Planlama', XLSX})).catch(e => alert('PDF hazırlanamadı: ' + e.message));
+      return;
+    }
+    indir(new Blob([XLSX.write(wb, {bookType: 'xlsx', type: 'array'})], {type: 'application/octet-stream'}), ad);
+  };
+  const INDIR_ACT = new Set(['excel-toplu', 'excel-ist', 'gorev-excel', 'gorev-tekay-excel', 'takip-excel', 'arsiv-excel', 'n2-excel']);
+  let indirGec = false;
+  const indirMenuKapat = () => { const m = document.getElementById('apIndirMenu'); if (m) m.remove(); };
+  const indirMenu = (b) => {
+    const acik = document.getElementById('apIndirMenu'); indirMenuKapat(); if (acik && acik._b === b) return;
+    const r = b.getBoundingClientRect(), m = document.createElement('div');
+    m.id = 'apIndirMenu'; m.className = 'ap-im'; m._b = b; m.setAttribute('role', 'menu');
+    m.innerHTML = '<button type="button" role="menuitem" data-k="pdf">📄 PDF</button><button type="button" role="menuitem" data-k="excel">📊 Excel</button>';
+    document.body.appendChild(m);
+    const w = m.offsetWidth, x = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8);
+    m.style.left = x + 'px'; m.style.top = (r.bottom + 4 + m.offsetHeight > window.innerHeight ? Math.max(8, r.top - m.offsetHeight - 4) : r.bottom + 4) + 'px';
+    m.querySelectorAll('button').forEach(x2 => x2.addEventListener('click', e => {
+      e.stopPropagation(); indirMenuKapat();
+      if (x2.dataset.k === 'pdf') { pdfIstek = Date.now(); pdfYukle().catch(() => {}); } else pdfIstek = 0;
+      indirGec = true; try { b.click(); } finally { indirGec = false; }
+    }));
+  };
+  document.addEventListener('click', e => { const m = document.getElementById('apIndirMenu'); if (m && !m.contains(e.target) && !(m._b && m._b.contains(e.target))) indirMenuKapat(); }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') indirMenuKapat(); });
+  window.addEventListener('scroll', indirMenuKapat, true);
 
   function pngCiz(b) {
     const satirlar = birimSatirlari(b), tah = false, idB = b.tur === 'bashekimlik' || b.tur === 'kkm';      // istasyona giden çıktıda nöbet sayıları gösterilmez
@@ -1082,6 +1121,12 @@
     });
   }
 
+  // İndir düğmeleri önce PDF / Excel menüsünü açar; seçimden sonra aynı düğme yeniden tıklanır (indirGec)
+  root.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-act]');
+    if (!t || indirGec || !INDIR_ACT.has(t.dataset.act) || t.disabled) return;
+    e.preventDefault(); e.stopImmediatePropagation(); indirMenu(t);
+  }, true);
   root.addEventListener('click', async e => {
     const t = e.target.closest('[data-act]'); if (!t) return;
     const a = t.dataset.act, v = t.dataset.v;

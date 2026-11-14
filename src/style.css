@@ -336,3 +336,6 @@ button.n2s{width:100%;min-width:130px;padding:2px 4px;font-size:12.5px}
 .ap-ist.siki td .ap-note{font-size:10px;line-height:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 /* Sürüm 13.63: o ay plan yokken plana bağlı menü bölümleri soluk */
 .ap-yit.ap-ysoluk,.ap-yit.ap-ysoluk:hover{opacity:.45;cursor:not-allowed;background:none;color:#64748b}
+
+/* Sürüm 13.77 (HUSER): İndir ▾ menüsü (PDF / Excel) */
+.ap-im{position:fixed;z-index:2147483000;background:#fff;border:1px solid #cbd5e1;box-shadow:0 10px 24px rgba(15,23,42,.18);min-width:150px;padding:4px 0}.ap-im button{display:block;width:100%;border:0;background:none;padding:8px 14px;font:inherit;font-size:13.5px;font-weight:600;color:#0f172a;text-align:left;cursor:pointer}.ap-im button:hover,.ap-im button:focus{background:#eff6ff;color:#0055a4;outline:none}
