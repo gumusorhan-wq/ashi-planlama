@@ -386,6 +386,20 @@ const APCore = (() => {
       }
       // Sürüm 13.78 (HUSER 13.77.4): kalan açık geçerli parçadan küçükse (ör. 0,17 = 4 sa; 7,67 + 0,17 = 7,83 geçersiz) en küçük geçerli artışla kapatılır
       // (7,67 → 8; en çok 4 saat fazla yazılır) — eskiden "azamiyle kapanır" denip Yeniden hesapla açığı dağıtmıyordu
+      // önce tam kapatan çift: biri artar, fazlası olan biri (hedefin altına inmeden) azalır (ör. 8 → 8,5 ve 9 → 8,67: +1/6, toplam tam 93)
+      if (!oldu && a0 < 1 / 3 + 0.011) {
+        const tum = adaylar.map(a => ({s2: a.s2, v: sonuc.get(a.s2.k.id) || 0}));
+        dis: for (const x of sira) for (const ar of [1 / 2, 1 / 3, 1 / 6, 2 / 3, 5 / 6]) {
+          const nx = x.v + ar; if (nx > x.s2.azami + 1e-6 || !gecerli(nx)) continue;
+          const az = ar - Math.round(a0 * 6) / 6; if (az < 1 / 6 - 0.011) continue;      // açık 0,17 gibi yuvarlanmış gelir: 4 saatlik parçaya çevrilir
+          for (const y of tum.slice().sort((p, q) => (q.v - q.s2.hedef) - (p.v - p.s2.hedef))) {
+            if (y.s2 === x.s2) continue; const ny = y.v - az; if (ny < y.s2.hedef - 0.01 || !gecerli(ny)) continue;
+            sonuc.set(x.s2.k.id, ucte(nx)); sonuc.set(y.s2.k.id, ucte(ny));
+            if (acikNe() < 0.011) { oldu = true; break dis; }
+            sonuc.set(x.s2.k.id, x.v); sonuc.set(y.s2.k.id, y.v);
+          }
+        }
+      }
       if (!oldu && a0 < 1 / 3 + 0.011) {
         for (const x of sira) {
           for (const st of [1 / 6, 1 / 3]) {

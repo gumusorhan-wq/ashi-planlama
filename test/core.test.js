@@ -196,6 +196,6 @@ console.log('çekirdek testleri geçti');
 { const kk = Array.from({length: 12}, (_, i) => ({id: 'z' + i, sinif: 'memur', durum: '', izin: [], unvan: i < 5 ? 'Sağlık Teknikeri' : 'Sağlık Memuru', rolSay: i < 5 ? {es: 30, ysp: 30} : i < 8 ? {ysp: 30} : {ysp: 20, sur: 20}}));
   const h = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 9.5}, 3), kil = new Map([['z0', 6.5]]), o = C.oneri(h, kil);
   const top = [...o.values()].reduce((a, b) => a + b, 0) + 6.5;
-  const ih = h.ihtiyac; assert.ok(top >= ih - 0.011, `açık kalmamalı: ${top.toFixed(2)} / ${ih}`); assert.ok(top <= ih + 1 / 6 + 0.011, `en çok 4 saat fazla: ${top.toFixed(2)}`);
+  const ih = h.ihtiyac; assert.ok(top >= ih - 0.011, `açık kalmamalı: ${top.toFixed(2)} / ${ih}`); assert.ok(top <= ih + 0.011, `fazla yazılmamalı (çift ayarla tam kapanır): ${top.toFixed(2)}`);
   console.log('küçük açık testi geçti', top.toFixed(2), '/', ih);
 }
