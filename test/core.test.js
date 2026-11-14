@@ -181,3 +181,14 @@ console.log('çekirdek testleri geçti');
 { const kk = Array.from({length: 9}, (_, i) => ({id: 'f' + i, sinif: 'memur', durum: '', izin: [], unvan: 'Sağlık Teknikeri', rolSay: {es: 30, ysp: 40, sur: 30}}));
   const hf = C.istasyonHesap(kk, 2026, 12, {}, C.DURUM_VARSAYILAN, {isciDusulen: 11, azamiMemur: 9}, 3), of = C.oneri(hf), v = kk.map(k => of.get(k.id));
   assert.ok(!(v.some(x => x < 8 - 1e-6) && v.some(x => x > 8 + 1e-6)), v.join(' ')); }
+// Sürüm 13.78 (HUSER 13.77.2): düşüm tek kişiden — işçili istasyonda 8 saatlik düşüm iki kişiye 4'er saat (7,5 + 7,5) bölünmez, tek kişide toplanır (7,67 + 7,33)
+{ const ks = []; let n = 0;
+  const ab = (izin, rs) => ks.push({id: 'a' + (++n), sinif: 'memur', durum: izin ? 'YILLIK İZİN' : '', izin: izin ? [{gun: izin, tur: 'YILLIK İZİN'}] : [], unvan: 'Sağlık Teknikeri', rolSay: rs || {es: 30, ysp: 30}});
+  const att = (izin, rs) => ks.push({id: 't' + (++n), sinif: 'memur', durum: izin ? 'YILLIK İZİN' : '', izin: izin ? [{gun: izin, tur: 'YILLIK İZİN'}] : [], unvan: 'Sağlık Memuru', rolSay: rs || {ysp: 20, sur: 20}});
+  ab(10); ab(0); ab(0); ab(0); ab(4); att(0, {ysp: 30}); att(18); att(6); att(0); att(0); att(0);
+  ks.push({id: 'i1', sinif: 'isci', durum: '', izin: []}, {id: 'i2', sinif: 'isci', durum: '', izin: []});
+  const h = C.istasyonHesap(ks, 2026, 12, {}, D, {azamiMemur: 8}, 3), kil = new Map([['a5', 7], ['t7', 4], ['t8', 17 / 3]]), o = C.oneri(h, kil);
+  const alt = h.satir.filter(s => !kil.has(s.k.id) && o.has(s.k.id) && o.get(s.k.id) < s.hedef - 0.01);
+  assert.strictEqual(alt.length, 1, 'düşüm tek kişiden olmalı: ' + alt.map(s => s.k.id + '=' + o.get(s.k.id)).join(', '));
+  console.log('tek kişiden düşüm testi geçti');
+}

@@ -741,6 +741,15 @@ const APCore = (() => {
       }
       if (!oldu) break;
     }
+    // Sürüm 13.78 (HUSER 13.77.1): düşüm tek kişiden — aynı grupta (aynı nöbet branşları) hedefinin altına inen birden çok kişi varsa toplam düşüm
+    // listede en alttaki kişide toplanır (ör. 7,5 + 7,5 yerine 7,67 + 7,33); grup toplamı, nöbet branşları ve geçerli parça (8 / 12 saat katı) korunur
+    GRUPLAR.filter(g => g !== 'isci').forEach(g => {
+      const alt = ser(g).filter(s2 => sonuc.has(s2.k.id) && sonuc.get(s2.k.id) < s2.hedef - 0.01);
+      if (alt.length < 2) return;
+      const kesinti = alt.reduce((x, s2) => x + (ucte(s2.hedef) - sonuc.get(s2.k.id)), 0), son = alt[alt.length - 1], nv = ucte(ucte(son.hedef) - kesinti);
+      if (nv < -1e-6 || !gecerli(nv)) return;
+      alt.forEach(s2 => sonuc.set(s2.k.id, ucte(s2.hedef))); sonuc.set(son.k.id, Math.max(0, nv));
+    });
     return sonuc;
   }
   // Kadro tipi: AABT (sağlık teknikeri) ve ATT (sağlık memuru / teknisyeni). Unvanda açıkça yazıyorsa o esas alınır.
