@@ -252,15 +252,17 @@ const NobetCore = (() => {
     const dz = isciDuzen(P.map(p => p.isci ? p.hedefYarim : 0), N);
     // nöbet listesiyle aynı model: işçi vardiyaları işçilerce tutulur; geri kalan her gün ekip şefi + YSP ve iki işçili gün dışında sürücünün 24 saatlik birimi
     // (tek işçili günde 12 saat sürücü + 12 saat başka branş, birleşik görev). Kadro yeterliyse birleşik görev fazlalığı kesirle geri alınır.
-    const need = {es: N, ysp: N, sur: N - dz.D2 - dz.D1, surM: dz.D1}, tipler = Object.keys(need), V = 2 + m + tipler.length, cap = Array.from({length: V}, () => new Array(V).fill(0));
-    M.forEach((p, i) => { cap[0][2 + i] = p.hedef24; tipler.forEach((t, k) => { if (t === 'es' && attMi(p)) return; if (p.yet.includes(t === 'surM' ? 'sur' : t)) cap[2 + i][2 + m + k] = 999; }); });
+    // Sürüm 13.78 (HUSER 13.77.1): hesap 12 saatlik birimle — işçili günde sürücünün boş 12 saati yarım nöbettir (nöbet listesi de 0,5 sayar);
+    // eskiden tam nöbet sayıldığı için işçili istasyonda olmayan açık (ör. YSP 7 gün) görünüyordu
+    const need = {es: 2 * N, ysp: 2 * N, sur: 2 * (N - dz.D2 - dz.D1), surM: dz.D1}, tipler = Object.keys(need), V = 2 + m + tipler.length, cap = Array.from({length: V}, () => new Array(V).fill(0));
+    M.forEach((p, i) => { cap[0][2 + i] = 2 * p.hedef24; tipler.forEach((t, k) => { if (t === 'es' && attMi(p)) return; if (p.yet.includes(t === 'surM' ? 'sur' : t)) cap[2 + i][2 + m + k] = 999; }); });
     // nöbet listesiyle aynı öncelik: sürücü → ekip şefi → YSP; ATT ekip şefine en son
     for (const faz of [['sur', 'surM'], ['es'], ['attEs'], ['ysp']]) { faz.forEach(t => { if (t === 'attEs') { M.forEach((p, i) => { if (attMi(p) && p.yet.includes('es')) cap[2 + i][2 + m + tipler.indexOf('es')] = 999; }); return; } cap[2 + m + tipler.indexOf(t)][1] = need[t]; });
   for (;;) { const par = new Array(V).fill(-1); par[0] = 0; const q = [0]; while (q.length && par[1] < 0) { const u = q.shift(); for (let w = 0; w < V; w++) if (par[w] < 0 && cap[u][w] > 0) { par[w] = u; q.push(w); } } if (par[1] < 0) break; let f = 1e9; for (let w = 1; w !== 0; w = par[w]) f = Math.min(f, cap[par[w]][w]); for (let w = 1; w !== 0; w = par[w]) { cap[par[w]][w] -= f; cap[w][par[w]] += f; } } }
     // bos: gün (nöbet) cinsinden; sürücüde işçili günün boş 12 saati yarım gün sayılır (bosYari: boş 12 saatlik vardiya sayısı). gunSay: boş kalan gün-branş sayısı
     const b = {}; tipler.forEach((t, k) => { b[t] = cap[2 + m + k][1]; });
-    const bos = {}; if (b.es) bos.es = b.es; if (b.ysp) bos.ysp = b.ysp; if (b.sur || b.surM) bos.sur = b.sur + b.surM / 2;
-    return {toplam: b.es + b.ysp + b.sur + b.surM / 2, gunSay: b.es + b.ysp + b.sur + b.surM, bos, surTam: b.sur, surYari: b.surM, isciGun: dz.D1 + dz.D2, isciCift: dz.D2, kombi: dz.D1};
+    const g = x => Math.ceil(x / 2 - 1e-9), bos = {}; if (b.es) bos.es = b.es / 2; if (b.ysp) bos.ysp = b.ysp / 2; if (b.sur || b.surM) bos.sur = (b.sur + b.surM) / 2;
+    return {toplam: (b.es + b.ysp + b.sur + b.surM) / 2, gunSay: g(b.es) + g(b.ysp) + g(b.sur) + b.surM, bos, surTam: b.sur / 2, surYari: b.surM, isciGun: dz.D1 + dz.D2, isciCift: dz.D2, kombi: dz.D1};
   }
 
   // Kural ihlalleri: boş yuva, yetenek dışı, izinli kişiye nöbet, aynı gün çift görev, dinlenme, izin öncesi boşluk, gün aşırı sürücü, 3 gece, azami aralık. Bunlar kalmamalıdır (istek ve nöbet sayısı farkı tercihtir; hafta sonu dengesi de kural gibi zorlanır).

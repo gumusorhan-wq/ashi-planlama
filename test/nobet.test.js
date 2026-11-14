@@ -84,3 +84,10 @@ console.log('nöbet çekirdek testleri geçti');
   ks.forEach(k => assert.ok(saat.get(k.id) <= k.azamiF * 24 + 4.1, `K${k.id} azamiyi aşmamalı (${saat.get(k.id) / 24} / ${k.azamiF})`));
   console.log('kesirli hedef testi geçti (bölünen', r.kesir + ')');
 }
+// Sürüm 13.78 (HUSER 13.77.1): işçili istasyonda kapasite tahmini 12 saatlik birimle — işçili günün boş 12 saati yarım nöbettir; eskiden YSP 7 gün eksik görünüyordu
+{ const mk = (id, grup, pl, az) => ({id, ad: 'K' + id, grup, planlanan: pl, plan: pl, ust: grup === 'isci' ? null : Math.floor(az + 1e-9), ustYumusak: grup === 'isci' ? null : Math.ceil(az - 1e-9), azamiF: az, izin: [], istek: []});
+  const ks = [mk(1, 'ke', 9, 9), mk(2, 'ke', 9, 9), mk(3, 'ke', 9, 9), mk(4, 'ka', 9, 9), mk(5, 'ka', 9, 9), mk(6, 'ka', 9, 9), mk(7, 'sy', 9, 9), mk(8, 'sy', 9, 9), mk(9, 'sy', 6, 22 / 3), mk(10, 'sy', 6, 22 / 3), mk(11, 'isci', 9, 9)];
+  N.adetHazirla(ks, 31); const kap = N.kapasiteAnalizi({y: 2026, m: 12, kisiler: ks, attEs: true});
+  assert.strictEqual(kap.toplam, 0, 'işçili istasyonda sahte açık görünmemeli: ' + JSON.stringify(kap.bos));
+  console.log('işçili kapasite testi geçti');
+}
