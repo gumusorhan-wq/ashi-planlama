@@ -91,3 +91,14 @@ console.log('nöbet çekirdek testleri geçti');
   assert.strictEqual(kap.toplam, 0, 'işçili istasyonda sahte açık görünmemeli: ' + JSON.stringify(kap.bos));
   console.log('işçili kapasite testi geçti');
 }
+// Sürüm 13.78 (HUSER 13.77.2): sürücü olabilen 4 kişinin buçuklu hedefleri (8,5 + 5,5 + 8,5 + 8,5 = 31): bir üste çıkan sürücü olmalı, fazlası sürücü yuvasında bölünmeli
+{ const mk = (id, grup, pl, az) => ({id, ad: 'K' + id, grup, planlanan: pl, plan: pl, ust: Math.floor(az + 1e-9), ustYumusak: Math.ceil(az - 1e-9), azamiF: az, izin: [], istek: []});
+  const ks = [mk(1, 'ka', 8.5, 8.5), mk(2, 'ke', 25 / 3, 8.5), mk(3, 'ke', 25 / 3, 8.5), mk(4, 'ke', 25 / 3, 8.5), mk(5, 'ke', 25 / 3, 8.5), mk(6, 'ka', 5.5, 5.5), mk(7, 'ke', 7, 43 / 6), mk(8, 'ke', 16 / 3, 5.5),
+    mk(9, 'ysp', 25 / 3, 8.5), mk(10, 'ysp', 8, 8.5), mk(11, 'sy', 8.5, 8.5), mk(12, 'sy', 8.5, 8.5)];
+  N.adetHazirla(ks, 31); const g = {y: 2026, m: 12, kisiler: ks, attEs: true};
+  assert.strictEqual(N.kapasiteAnalizi(g).toplam, 0, 'tahminde sürücü açığı olmamalı');
+  const r = N.uret(g, {sureMs: 2500, deneme: 6, seed: 7}); assert.strictEqual(r.bos, 0, 'sürücü günü boş kalmamalı');
+  const saat = new Map(ks.map(k => [k.id, 0])); r.liste.forEach((L, d) => { if (!d) return; ['es', 'ysp', 'sur'].forEach(t => { if (L[t] != null) saat.set(L[t], saat.get(L[t]) + (L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); Object.values(L.bol || {}).forEach(b => saat.set(b.id, saat.get(b.id) + b.saat)); });
+  ks.forEach(k => assert.ok(saat.get(k.id) <= k.azamiF * 24 + 4.1, `K${k.id} azamiyi aşmamalı (${saat.get(k.id) / 24})`));
+  console.log('sürücü buçuk testi geçti');
+}

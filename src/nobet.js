@@ -360,9 +360,14 @@ const NobetCore = (() => {
     let sert = sertSay(denetle(liste, H).ihlal), bolunen = 0, deneme = 0; const t0 = Date.now();      // deneme ve süre sınırı: büyük / eksik kadroda tarayıcıyı bekletmesin
     for (let tur = 0; tur < 200; tur++) {
       const sa = saat(), fark = p => p.plan == null || p.isci ? 0 : sa.get(p.id) - p.plan * 24;      // saat cinsinden: + fazla, − eksik
-      const eksik = P.filter(p => fark(p) <= -4).sort((a, b) => fark(a) - fark(b)), fazla = P.filter(p => fark(p) >= 4).sort((a, b) => fark(b) - fark(a));
+      const eksik = P.filter(p => fark(p) <= -4).sort((a, b) => fark(a) - fark(b));
+      // Sürüm 13.78 (HUSER 13.77.2): önce en az seçeneği olan fazla (ör. yalnız sürücü yuvası tutan): o yuvayı tutabilen eksik kişi azdır;
+      // esnek fazlalar (ekip şefi / YSP) sona kalır. Böylece sürücünün fazlası sürücü olamayana gitmez, sürücü azamiyi aşmaz.
+      const tuttugu = A => { const t = new Set(); for (let d = 1; d <= N; d++) yuvalar.forEach(y => { if (liste[d][y] === A.id) t.add(y); }); return t; };
+      const esnek = A => { const t = tuttugu(A); return eksik.filter(B => B.id !== A.id && [...t].some(y => B.yet.includes(y))).length; };
+      const fazla = P.filter(p => fark(p) >= 4).map(p => ({p, e: esnek(p)})).sort((a, b) => a.e - b.e || fark(b.p) - fark(a.p)).map(x => x.p);
       let yapildi = false;
-      for (const B of eksik) { for (const A of fazla) {
+      for (const A of fazla) { for (const B of eksik) {
         const s0 = Math.round(Math.min(-fark(B), fark(A)) / 4) * 4, sa1 = Math.max(4, Math.min(20, s0));
         for (let d = 1; d <= N && !yapildi; d++) {
           const L = liste[d]; if (B.izin.has(d)) continue;
@@ -459,7 +464,14 @@ const NobetCore = (() => {
     // önce azamiye en çok payı kalan (azami − planlanan büyük), sonra kesri büyük olan: bölünmüş nöbetle geri alınırken azami aşılmaz
     const pay = k => (k.azamiF == null ? 0 : k.azamiF - (k.planlanan || 0));
     const siralaY = L => L.sort((a, b) => pay(b) - pay(a) || b.kesir - a.kesir || (b.planlanan || 0) - (a.planlanan || 0));
-    while (fark > 0) { const L = diger.filter(k => k.adet < ustY(k)); const aday = siralaY(L.filter(k => !dolu(k)))[0] || siralaY(L)[0]; if (!aday) break; aday.adet++; aday.kesir -= 1; fark--; }
+    // açık kalan nöbet branşını dolduran kişi seçilir (ör. sürücü açıksa sürücü olabilen): her adayın +1'i kapasite tahminiyle denenir
+    const acik = () => { try { return kapasiteAnalizi({gun, kisiler}).toplam; } catch (e) { return 0; } };
+    while (fark > 0) {
+      const L = diger.filter(k => k.adet < ustY(k)); if (!L.length) break;
+      const a0 = acik(); let en = null, enA = a0 - 1e-9;
+      for (const k of [...siralaY(L.filter(x => !dolu(x))), ...siralaY(L.filter(dolu))]) { k.adet++; const a = acik(); k.adet--; if (a < enA) { enA = a; en = k; } }
+      const aday = en || siralaY(L.filter(k => !dolu(k)))[0] || siralaY(L)[0]; aday.adet++; aday.kesir -= 1; fark--;
+    }
     while (fark < 0) { const L = diger.filter(k => k.adet > 0), tasan = L.filter(k => tekGrup[k.grup] && grupTop(k.grup) > gun); const aday = (tasan.length ? tasan : L).sort((a, b) => (a.kesir) - (b.kesir) || b.adet - a.adet)[0]; if (!aday) break; aday.adet--; aday.kesir += 1; fark++; }
     return {gerek, gunIsci: dz.D1 + dz.D2, isciCift: dz.D2, kombi: dz.D1, kalanFark: fark};
   }
