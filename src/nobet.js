@@ -451,6 +451,13 @@ const NobetCore = (() => {
     const sirala = L => L.sort((a, b) => b.kesir - a.kesir || (b.planlanan || 0) - (a.planlanan || 0));
     const ustu = k => k.ust == null ? 99 : k.ust;
     while (fark > 0) { const L = diger.filter(k => k.adet < ustu(k)); const aday = sirala(L.filter(k => !dolu(k)))[0] || sirala(L)[0]; if (!aday) break; aday.adet++; aday.kesir -= 1; fark--; }
+    // Sürüm 13.78: azaminin tam kısmında (8,5 → 8) durulduğu için hâlâ açık kalıyorsa, kesirli azamisi olan kişiler bir üst tam sayıya (9) çıkabilir;
+    // fazlası kesirDengele ile aşağı kalan kişilerle bölünmüş nöbete (12/12, 8/16) döner. Böylece kesirli hedefler yüzünden gün boş kalmaz.
+    const ustY = k => k.ustYumusak == null ? ustu(k) : Math.max(ustu(k), k.ustYumusak);
+    // önce azamiye en çok payı kalan (azami − planlanan büyük), sonra kesri büyük olan: bölünmüş nöbetle geri alınırken azami aşılmaz
+    const pay = k => (k.azamiF == null ? 0 : k.azamiF - (k.planlanan || 0));
+    const siralaY = L => L.sort((a, b) => pay(b) - pay(a) || b.kesir - a.kesir || (b.planlanan || 0) - (a.planlanan || 0));
+    while (fark > 0) { const L = diger.filter(k => k.adet < ustY(k)); const aday = siralaY(L.filter(k => !dolu(k)))[0] || siralaY(L)[0]; if (!aday) break; aday.adet++; aday.kesir -= 1; fark--; }
     while (fark < 0) { const L = diger.filter(k => k.adet > 0), tasan = L.filter(k => tekGrup[k.grup] && grupTop(k.grup) > gun); const aday = (tasan.length ? tasan : L).sort((a, b) => (a.kesir) - (b.kesir) || b.adet - a.adet)[0]; if (!aday) break; aday.adet--; aday.kesir += 1; fark++; }
     return {gerek, gunIsci: dz.D1 + dz.D2, isciCift: dz.D2, kombi: dz.D1, kalanFark: fark};
   }

@@ -72,3 +72,15 @@ assert.ok(!N.YETENEK.ke.includes('sur'));
   for (let d = 1; d <= 31; d++) { const L = r.liste[d]; Object.entries(L.bol || {}).forEach(([y, b]) => { if (L[y] === 12) { parca++; assert.strictEqual(b.saat, 16); assert.ok(!H.ozel[d], d + '. gün hafta sonu'); } }); }
   assert.ok(parca >= 20, 'muaf parça sayısı ' + parca); }
 console.log('nöbet çekirdek testleri geçti');
+// Sürüm 13.78 (HUSER 13.77.1): kesirli hedefler ve 8,5 azami — tam kısımda (8) durulunca 4 yuva boş kalıyordu; bir üst tam sayıya çıkılıp
+// fazlası bölünmüş nöbetle geri alınır: boş yuva kalmaz, kimse azamisini aşmaz
+{ const mk = (id, grup, pl, az) => ({id, ad: 'K' + id, grup, planlanan: pl, plan: pl, ust: Math.floor(az + 1e-9), ustYumusak: Math.ceil(az - 1e-9), azamiF: az, izin: [], istek: []});
+  const ks = [mk(1, 'ka', 8.5, 8.5), mk(2, 'ka', 25 / 3, 8.5), mk(3, 'ka', 25 / 3, 8.5), mk(4, 'ka', 25 / 3, 8.5), mk(5, 'ka', 25 / 3, 8.5), mk(6, 'ka', 5.5, 5.5), mk(7, 'ka', 7, 43 / 6), mk(8, 'ka', 16 / 3, 5.5),
+    mk(9, 'ysp', 25 / 3, 8.5), mk(10, 'ysp', 8, 8.5), mk(11, 'sy', 8.5, 8.5), mk(12, 'sy', 8.5, 8.5)];
+  N.adetHazirla(ks, 31); assert.strictEqual(ks.reduce((a, k) => a + k.adet, 0), 93, 'adet toplamı 93 olmalı');
+  const r = N.uret({y: 2026, m: 12, kisiler: ks}, {sureMs: 2500, deneme: 6, seed: 7});
+  assert.strictEqual(r.bos, 0, 'kesirli hedeflerde boş yuva kalmamalı');
+  const saat = new Map(ks.map(k => [k.id, 0])); r.liste.forEach((L, d) => { if (!d) return; ['es', 'ysp', 'sur'].forEach(t => { if (L[t] != null) saat.set(L[t], saat.get(L[t]) + (L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); Object.values(L.bol || {}).forEach(b => saat.set(b.id, saat.get(b.id) + b.saat)); });
+  ks.forEach(k => assert.ok(saat.get(k.id) <= k.azamiF * 24 + 4.1, `K${k.id} azamiyi aşmamalı (${saat.get(k.id) / 24} / ${k.azamiF})`));
+  console.log('kesirli hedef testi geçti (bölünen', r.kesir + ')');
+}
