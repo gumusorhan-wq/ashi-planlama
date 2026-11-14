@@ -102,3 +102,11 @@ console.log('nöbet çekirdek testleri geçti');
   ks.forEach(k => assert.ok(saat.get(k.id) <= k.azamiF * 24 + 4.1, `K${k.id} azamiyi aşmamalı (${saat.get(k.id) / 24})`));
   console.log('sürücü buçuk testi geçti');
 }
+// Sürüm 13.78 (HUSER 13.77.4): azami = hedef (7,67) iken liste yukarı tamamlayıp herkese 8 yazmamalı — azamilerin toplamı aşılmaz (Pano ile Modül 1 aynı açığı gösterir)
+{ const mk = (id, grup, pl, az) => ({id, ad: 'K' + id, grup, planlanan: pl, plan: pl, ust: Math.floor(az + 1e-9), ustYumusak: Math.ceil(az - 1e-9), azamiF: az, izin: [], istek: []});
+  const ks = [mk(1, 'ka', 23 / 3, 23 / 3), mk(2, 'ke', 23 / 3, 23 / 3), mk(3, 'ke', 23 / 3, 23 / 3), mk(4, 'ke', 23 / 3, 23 / 3), mk(5, 'ka', 23 / 3, 23 / 3),
+    mk(6, 'ysp', 23 / 3, 23 / 3), mk(7, 'ysp', 23 / 3, 23 / 3), mk(8, 'ysp', 23 / 3, 23 / 3), mk(9, 'sy', 23 / 3, 23 / 3), mk(10, 'sy', 23 / 3, 23 / 3), mk(11, 'sy', 23 / 3, 23 / 3), mk(12, 'sy', 3.83, 3.83)];
+  const plan = ks.reduce((a, k) => a + k.planlanan, 0); N.adetHazirla(ks, 31); const top = ks.reduce((a, k) => a + k.adet, 0);
+  assert.ok(top <= plan + 1 / 3 + 1e-6, `liste planın üstüne çıkmamalı: ${top} / ${plan.toFixed(2)}`);
+  console.log('azami bütçe testi geçti', top, '/', plan.toFixed(2));
+}

@@ -384,6 +384,19 @@ const APCore = (() => {
         }
         if (oldu) break;
       }
+      // Sürüm 13.78 (HUSER 13.77.4): kalan açık geçerli parçadan küçükse (ör. 0,17 = 4 sa; 7,67 + 0,17 = 7,83 geçersiz) en küçük geçerli artışla kapatılır
+      // (7,67 → 8; en çok 4 saat fazla yazılır) — eskiden "azamiyle kapanır" denip Yeniden hesapla açığı dağıtmıyordu
+      if (!oldu && a0 < 1 / 3 + 0.011) {
+        for (const x of sira) {
+          for (const st of [1 / 6, 1 / 3]) {
+            const nv = x.v + st; if (nv > x.s2.azami + 1e-6 || !gecerli(nv)) continue;
+            sonuc.set(x.s2.k.id, ucte(nv));
+            if (acikNe() < 0.011) { oldu = true; break; }
+            sonuc.set(x.s2.k.id, x.v);
+          }
+          if (oldu) break;
+        }
+      }
       if (!oldu) break;
     }
     // Sürüm 13.78 (HUSER 13.77.1): düşüm tek kişiden — aynı grupta (aynı nöbet branşları) hedefinin altına inen birden çok kişi varsa toplam düşüm

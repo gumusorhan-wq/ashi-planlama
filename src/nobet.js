@@ -466,7 +466,11 @@ const NobetCore = (() => {
     const siralaY = L => L.sort((a, b) => pay(b) - pay(a) || b.kesir - a.kesir || (b.planlanan || 0) - (a.planlanan || 0));
     // açık kalan nöbet branşını dolduran kişi seçilir (ör. sürücü açıksa sürücü olabilen): her adayın +1'i kapasite tahminiyle denenir
     const acik = () => { try { return kapasiteAnalizi({gun, kisiler}).toplam; } catch (e) { return 0; } };
-    while (fark > 0) {
+    // Sürüm 13.78 (HUSER 13.77.4): yukarı tamamlama azamilerin toplamını aşmaz (en çok 8 saat tolerans); aşarsa liste Modül 1'in gösterdiğinden
+    // fazla nöbet yazıyor, Pano ile istasyon sayfası çelişiyordu (ör. azami = hedef 7,67 iken herkes 8 → YSP 30/31, Modül 1'de 27,17/31)
+    const butce = diger.some(k => k.azamiF == null) ? Infinity : diger.reduce((x, k) => x + Math.max(k.azamiF, k.planlanan || 0), 0) + 1 / 3 + 1e-6;
+    const adetTop = () => diger.reduce((x, k) => x + k.adet, 0);
+    while (fark > 0 && adetTop() + 1 <= butce) {
       const L = diger.filter(k => k.adet < ustY(k)); if (!L.length) break;
       const a0 = acik(); let en = null, enA = a0 - 1e-9;
       for (const k of [...siralaY(L.filter(x => !dolu(x))), ...siralaY(L.filter(dolu))]) { k.adet++; const a = acik(); k.adet--; if (a < enA) { enA = a; en = k; } }
