@@ -15,7 +15,7 @@ const ListeIyilestir = (() => {
   const NC = typeof NobetCore !== 'undefined' ? NobetCore : require('./nobet.js');
   const rng = seed => { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; };
   const C = {bos: 20000, uygun: 60000, cakisma: 60000, izin: 60000, dinlenme: 60000, eksikSaat: 2000, fazlaSaat: 3, planSapma: 2, bolme: 60, esBolme: 150, surBolme: 3000, garipParca: 800,
-    denge: 60, bolUst: 500, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 200, yariTek: 900};
+    denge: 60, bolUst: 500, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 200, aabtYsp: 5000, yariGA: 300, yariTek: 900};
   const PARCA = [8, 12, 16, 8, 12, 16, 4, 20];      // 4 / 20 yalnız zorda kalınca (ceza)
 
   function* iyilestirAdim(girdi, liste0, secenek) {
@@ -94,11 +94,15 @@ const ListeIyilestir = (() => {
       if (K.surGunAsiri) { const s24 = new Set(); gorev[i].forEach(s => { const y = Y[s]; if (y.t === 'sur' && y.b < 0) s24.add(y.d); }); (p.onc.s24 || []).forEach(d => s24.add(d)); s24.forEach(d => { if (s24.has(d + 2) && s24.has(d + 4)) c += C.surGunAsiri; }); }
       // saat: planın altı ağır, üstü hafif
       if (enAzSaat[i] != null) { const f = saat - enAzSaat[i]; if (f < -3) c += C.eksikSaat * (-f); c += C.planSapma * Math.abs(saat - hedefSaat[i]); }
+      // tek işçili günlerin memur sürücü yarıları: kişi başına gündüz (09–21) ve gece (21–09) sayısı dengeli (kullanıcı 15.11)
+      { let gG = 0, gA = 0; gorev[i].forEach(s => { const y = Y[s]; if (y.t === 'M') { if (y.yari === 'G') gG++; else gA++; } }); const f = Math.abs(gG - gA); if (f > 1) c += C.yariGA * (f - 1); }
       // hafta sonu / tatil dengesi
       if (H.ozelSay > 0 && gunler.length >= 2) { const pl = gunler.filter(d => d >= 1), oz = pl.filter(d => H.ozel[d]).length, dev = Math.abs(oz - pl.length * H.ozelOran); if (dev > 1) c += Math.round(30 * (dev - 1)); }
       return c;
     }
-    const yuvaMaliyet = y => { if (y.a < 0) return C.bos; if (y.b < 0) return 0; let c = C.bolme; if (y.t === 'es') c += C.esBolme; if (y.t === 'sur') c += C.surBolme; const h = Math.min(y.h, 24 - y.h); if (h !== 8 && h !== 12) c += C.garipParca; return c; };
+    // AABT öncelikli ekip şefi (kullanıcı 15.11): AABT bütün nöbetlerini ekip şefi tutar, YSP'ye (ATT nöbetine) girmez; boş kalan ekip şefini ATT tamamlar
+    const aabtYsp = y => y.t === 'ysp' ? ((y.a >= 0 && (P[y.a].grup === 'ke' || P[y.a].grup === 'ka')) ? 1 : 0) + ((y.b >= 0 && (P[y.b].grup === 'ke' || P[y.b].grup === 'ka')) ? 1 : 0) : 0;
+    const yuvaMaliyet = y => { if (y.a < 0) return C.bos; let c = C.aabtYsp * aabtYsp(y); if (y.b < 0) return c; c += C.bolme; if (y.t === 'es') c += C.esBolme; if (y.t === 'sur') c += C.surBolme; const h = Math.min(y.h, 24 - y.h); if (h !== 8 && h !== 12) c += C.garipParca; return c; };
     // gün maliyeti: AABT nöbetteyken ATT ekip şefi tutamaz (kullanıcı, 15.11)
     const aabt = i => i >= 0 && (P[i].grup === 'ke' || P[i].grup === 'ka'), att = i => i >= 0 && (P[i].grup === 'ysp' || P[i].grup === 'sy');
     const gunMaliyet = d => { const ys = gunY[d].map(s => Y[s]), es = ys.find(y => y.t === 'es'); if (!es) return 0;
