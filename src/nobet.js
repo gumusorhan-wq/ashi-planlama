@@ -367,11 +367,11 @@ const NobetCore = (() => {
       const esnek = A => { const t = tuttugu(A); return eksik.filter(B => B.id !== A.id && [...t].some(y => B.yet.includes(y))).length; };
       const fazla = P.filter(p => fark(p) >= 0.9).map(p => ({p, e: esnek(p)})).sort((a, b) => a.e - b.e || fark(b.p) - fark(a.p)).map(x => x.p);
       // A'nın bir nöbetinin sa1 saatini B'ye verir (B o gün boşsa, yuvayı tutabiliyorsa ve sert ihlal artmıyorsa)
-      const tas = (A, B, sa1) => {
+      const tas = (A, B, sa1, attEs) => {
         for (let d = 1; d <= N; d++) {
           const L = liste[d]; if (B.izin.has(d)) continue;
           if (['es', 'ysp', 'sur', 'surG', 'surA'].some(t => L[t] === B.id) || Object.values(L.bol || {}).some(b => b && b.id === B.id)) continue;
-          for (const y of yuvalar) { if (L[y] !== A.id || (L.bol && L.bol[y]) || !B.yet.includes(y) || (y === 'es' && attMi(B) && !attMi(A))) continue;
+          for (const y of yuvalar) { if (L[y] !== A.id || (L.bol && L.bol[y]) || !B.yet.includes(y) || (y === 'es' && !attEs && attMi(B) && !attMi(A))) continue;
             if (++deneme > 6000 || (deneme % 50 === 0 && Date.now() - t0 > 2000)) return null;
             // kısa parça hep önce: nöbet sahibi (ilk parça, 09:00'dan) kısa süreli olan, ikinci kişi uzun parçayı alır (8 sa → 16 sa)
             const kisaB = sa1 < 12; if (kisaB) L[y] = B.id;
@@ -395,6 +395,12 @@ const NobetCore = (() => {
           const tC = tuttugu(C); if (![...tC].some(y => B.yet.includes(y))) continue;
           const x = tas(A, C, sa1); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
         if (yapildi) break; }
+        if (yapildi) break; }
+      // Sürüm 13.78.1: AABT'lerin planı ekip şefi günlerini karşılamıyorsa (ör. 4 × 7,67 = 30,67 < 31) fazlası olan AABT'nin ekip şefi
+      // nöbetinin bir kısmı ATT'ye verilir ("ATT ekip şefine yalnız AABT yetmezse"); önce yukarıdaki iki yol denenir
+      if (!yapildi) for (const A of fazla) { if (attMi(A)) continue; for (const B of eksik) { if (!attMi(B)) continue;
+        const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));
+        const x = tas(A, B, sa1, true); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
         if (yapildi) break; }
       if (!yapildi) break;
     }
