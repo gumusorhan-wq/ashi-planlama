@@ -14,8 +14,8 @@
 const ListeIyilestir = (() => {
   const NC = typeof NobetCore !== 'undefined' ? NobetCore : require('./nobet.js');
   const rng = seed => { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; };
-  const C = {bos: 20000, uygun: 60000, cakisma: 60000, izin: 60000, dinlenme: 60000, eksikSaat: 2000, fazlaSaat: 3, bolme: 60, esBolme: 150, surBolme: 3000, garipParca: 800,
-    denge: 60, bolUst: 500, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 60, yariTek: 900};
+  const C = {bos: 20000, uygun: 60000, cakisma: 60000, izin: 60000, dinlenme: 60000, eksikSaat: 2000, fazlaSaat: 3, planSapma: 2, bolme: 60, esBolme: 150, surBolme: 3000, garipParca: 800,
+    denge: 60, bolUst: 500, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 200, yariTek: 900};
   const PARCA = [8, 12, 16, 8, 12, 16, 4, 20];      // 4 / 20 yalnız zorda kalınca (ceza)
 
   function* iyilestirAdim(girdi, liste0, secenek) {
@@ -58,7 +58,11 @@ const ListeIyilestir = (() => {
     const surucu = memur.filter(i => uygun(i, 'M')); const yariSay = new Int32Array(m); Y.forEach(y => { if (y.t === 'M' && y.a >= 0) yariSay[y.a]++; });
     const yariHesap = () => { if (surucu.length < 2) return 0; let s2 = 0; surucu.forEach(i => { s2 += yariSay[i] * yariSay[i] * C.yariDenge + (yariSay[i] % 2 ? C.yariTek : 0); }); return s2; };      // tek sayıda yarı 4 saatlik artık bırakır (7,67 hedefte)
     // --- kişi maliyeti
+    // en az: mesai hedefi (enAz); Modül 1 kişiyi bunun altına planladıysa (fazla personel, kesinleştirmede onaylı) planlanan. Planlananın üstü serbest:
+    // kişi başı sayı istasyonun işi (kullanıcı 15.11) — planlanandan sapma yalnız hafif ceza, bölme gerektirmez
+    const kayit = new Map((girdi.kisiler || []).map(k => [k.id, k]));
     const hedefSaat = P.map(p => p.plan != null ? Math.round(p.plan * 24) : null);
+    const enAzSaat = P.map((p, i) => { if (p.plan == null) return null; const k = kayit.get(p.id) || {}, e = k.enAz != null && k.enAz !== '' ? +k.enAz : p.plan; return Math.round(Math.min(p.plan, e) * 24); });
     function kisiMaliyet(i) {
       const p = P[i]; if (p.isci) return 0; let c = 0, saat = 0;
       const gun = new Map();      // d -> {bas, bit}: saat 0 = 09:00; bit 24 = ertesi gün 09:00
@@ -89,7 +93,7 @@ const ListeIyilestir = (() => {
       // sürücü gün aşırı üç 24 saat
       if (K.surGunAsiri) { const s24 = new Set(); gorev[i].forEach(s => { const y = Y[s]; if (y.t === 'sur' && y.b < 0) s24.add(y.d); }); (p.onc.s24 || []).forEach(d => s24.add(d)); s24.forEach(d => { if (s24.has(d + 2) && s24.has(d + 4)) c += C.surGunAsiri; }); }
       // saat: planın altı ağır, üstü hafif
-      if (hedefSaat[i] != null) { const f = saat - hedefSaat[i]; if (f < -3) c += C.eksikSaat * (-f); else if (f > 0) c += C.fazlaSaat * f; }
+      if (enAzSaat[i] != null) { const f = saat - enAzSaat[i]; if (f < -3) c += C.eksikSaat * (-f); c += C.planSapma * Math.abs(saat - hedefSaat[i]); }
       // hafta sonu / tatil dengesi
       if (H.ozelSay > 0 && gunler.length >= 2) { const pl = gunler.filter(d => d >= 1), oz = pl.filter(d => H.ozel[d]).length, dev = Math.abs(oz - pl.length * H.ozelOran); if (dev > 1) c += Math.round(30 * (dev - 1)); }
       return c;
