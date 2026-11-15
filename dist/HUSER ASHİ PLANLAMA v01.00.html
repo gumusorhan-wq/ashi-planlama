@@ -1441,7 +1441,7 @@ const ListeIyilestir = (() => {
   const NC = typeof NobetCore !== 'undefined' ? NobetCore : require('./nobet.js');
   const rng = seed => { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; };
   const C = {bos: 20000, uygun: 60000, cakisma: 60000, izin: 60000, dinlenme: 60000, eksikSaat: 2000, fazlaSaat: 3, planSapma: 2, bolme: 60, esBolme: 150, surBolme: 3000, garipParca: 800,
-    denge: 60, bolUst: 500, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 200, yariTek: 900};
+    denge: 60, bolUst: 500, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 200, aabtYsp: 5000, yariGA: 300, yariTek: 900};
   const PARCA = [8, 12, 16, 8, 12, 16, 4, 20];      // 4 / 20 yalnız zorda kalınca (ceza)
 
   function* iyilestirAdim(girdi, liste0, secenek) {
@@ -1520,11 +1520,15 @@ const ListeIyilestir = (() => {
       if (K.surGunAsiri) { const s24 = new Set(); gorev[i].forEach(s => { const y = Y[s]; if (y.t === 'sur' && y.b < 0) s24.add(y.d); }); (p.onc.s24 || []).forEach(d => s24.add(d)); s24.forEach(d => { if (s24.has(d + 2) && s24.has(d + 4)) c += C.surGunAsiri; }); }
       // saat: planın altı ağır, üstü hafif
       if (enAzSaat[i] != null) { const f = saat - enAzSaat[i]; if (f < -3) c += C.eksikSaat * (-f); c += C.planSapma * Math.abs(saat - hedefSaat[i]); }
+      // tek işçili günlerin memur sürücü yarıları: kişi başına gündüz (09–21) ve gece (21–09) sayısı dengeli (kullanıcı 15.11)
+      { let gG = 0, gA = 0; gorev[i].forEach(s => { const y = Y[s]; if (y.t === 'M') { if (y.yari === 'G') gG++; else gA++; } }); const f = Math.abs(gG - gA); if (f > 1) c += C.yariGA * (f - 1); }
       // hafta sonu / tatil dengesi
       if (H.ozelSay > 0 && gunler.length >= 2) { const pl = gunler.filter(d => d >= 1), oz = pl.filter(d => H.ozel[d]).length, dev = Math.abs(oz - pl.length * H.ozelOran); if (dev > 1) c += Math.round(30 * (dev - 1)); }
       return c;
     }
-    const yuvaMaliyet = y => { if (y.a < 0) return C.bos; if (y.b < 0) return 0; let c = C.bolme; if (y.t === 'es') c += C.esBolme; if (y.t === 'sur') c += C.surBolme; const h = Math.min(y.h, 24 - y.h); if (h !== 8 && h !== 12) c += C.garipParca; return c; };
+    // AABT öncelikli ekip şefi (kullanıcı 15.11): AABT bütün nöbetlerini ekip şefi tutar, YSP'ye (ATT nöbetine) girmez; boş kalan ekip şefini ATT tamamlar
+    const aabtYsp = y => y.t === 'ysp' ? ((y.a >= 0 && (P[y.a].grup === 'ke' || P[y.a].grup === 'ka')) ? 1 : 0) + ((y.b >= 0 && (P[y.b].grup === 'ke' || P[y.b].grup === 'ka')) ? 1 : 0) : 0;
+    const yuvaMaliyet = y => { if (y.a < 0) return C.bos; let c = C.aabtYsp * aabtYsp(y); if (y.b < 0) return c; c += C.bolme; if (y.t === 'es') c += C.esBolme; if (y.t === 'sur') c += C.surBolme; const h = Math.min(y.h, 24 - y.h); if (h !== 8 && h !== 12) c += C.garipParca; return c; };
     // gün maliyeti: AABT nöbetteyken ATT ekip şefi tutamaz (kullanıcı, 15.11)
     const aabt = i => i >= 0 && (P[i].grup === 'ke' || P[i].grup === 'ka'), att = i => i >= 0 && (P[i].grup === 'ysp' || P[i].grup === 'sy');
     const gunMaliyet = d => { const ys = gunY[d].map(s => Y[s]), es = ys.find(y => y.t === 'es'); if (!es) return 0;
@@ -1548,10 +1552,35 @@ const ListeIyilestir = (() => {
     const adaylar = (t, d) => { const r = []; for (let i = 0; i < m; i++) if (uygun(i, t) && !P[i].izin.has(d)) r.push(i); return r; };
     const ADAY = {}; ['es', 'ysp', 'sur', 'M'].forEach(t => { ADAY[t] = P.map((_, i) => i).filter(i => uygun(i, t)); });
     const sec = a => a[Math.floor(R() * a.length)];
+    // çok yuvalı hamle: çok yarısı olan sürücünün iki 12 saatlik yarısı az olana, az olanın bir 24 saatlik sürücü günü çok olana (saatler korunur)
+    function genelHamle(sl, fn) {
+      const once = sl.map(k => ({...Y[k]})), kisi = new Set(), gunS = new Set(sl.map(k => Y[k].d));
+      let eskiY = 0; sl.forEach(k => { const y = Y[k]; eskiY += yuvaMaliyet(y); bolEkle(y, -1); if (y.t === 'M' && y.a >= 0) yariSay[y.a]--; coz(k, y.a); coz(k, y.b); kisi.add(y.a); kisi.add(y.b); });
+      fn();
+      let yeniY = 0; sl.forEach(k => { const y = Y[k]; bagla(k, y.a); bagla(k, y.b); bolEkle(y, 1); if (y.t === 'M' && y.a >= 0) yariSay[y.a]++; yeniY += yuvaMaliyet(y); kisi.add(y.a); kisi.add(y.b); });
+      const eskiP = new Map(); kisi.forEach(i => { if (i >= 0) { eskiP.set(i, pc[i]); pc[i] = kisiMaliyet(i); } }); yc += yeniY - eskiY;
+      const eskiD = new Map(); gunS.forEach(d => { eskiD.set(d, dc[d]); dct -= dc[d]; dc[d] = gunMaliyet(d); dct += dc[d]; });
+      const yeniT = toplam(), delta = yeniT - cur, T = 150 * Math.pow(1 / 150, (Date.now() - t0) / o.sureMs);
+      if (delta <= 0 || R() < Math.exp(-delta / T)) { cur = yeniT; if (cur < en) { en = cur; enY = Y.map(q => ({...q})); } return true; }
+      sl.forEach(k => { const y = Y[k]; bolEkle(y, -1); if (y.t === 'M' && y.a >= 0) yariSay[y.a]--; coz(k, y.a); coz(k, y.b); });
+      sl.forEach((k, j) => Object.assign(Y[k], once[j]));
+      sl.forEach(k => { const y = Y[k]; bagla(k, y.a); bagla(k, y.b); bolEkle(y, 1); if (y.t === 'M' && y.a >= 0) yariSay[y.a]++; });
+      eskiP.forEach((v, i) => { pc[i] = v; }); yc -= yeniY - eskiY; eskiD.forEach((v, d) => { dct += v - dc[d]; dc[d] = v; });
+      return false;
+    }
+    function yariTakas() {
+      const sira = surucu.slice().sort((x, y) => yariSay[y] - yariSay[x]), A = sira[0], B = sira[sira.length - 1 - Math.floor(R() * Math.min(2, sira.length - 1))];
+      if (A === B || yariSay[A] - yariSay[B] < 2) return;
+      const mA = [], sB = []; Y.forEach((y, k) => { if (y.sabit) return; if (y.t === 'M' && y.a === A && !P[B].izin.has(y.d)) mA.push(k); if (y.t === 'sur' && y.a === B && y.b < 0 && !P[A].izin.has(y.d)) sB.push(k); });
+      if (mA.length < 2 || !sB.length) return;
+      const k1 = sec(mA); let k2 = sec(mA); if (k2 === k1) k2 = mA.find(k => k !== k1); const k3 = sec(sB);
+      genelHamle([k1, k2, k3], () => { Y[k1].a = B; Y[k2].a = B; Y[k3].a = A; });
+    }
     let it = 0; const sure = o.sureMs, T0 = 150, T1 = 1;
     while (Date.now() - t0 < sure) {
       for (let rep = 0; rep < 300; rep++) {
         it++;
+        if (surucu.length >= 2 && R() < 0.04) { yariTakas(); continue; }
         const s = Math.floor(R() * S), y = Y[s]; if (y.sabit) continue;
         const once = {a: y.a, b: y.b, h: y.h}; const etk = new Set([y.a, y.b]);
         let s2 = -1, y2 = null, once2 = null;

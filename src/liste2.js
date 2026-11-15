@@ -126,10 +126,35 @@ const ListeIyilestir = (() => {
     const adaylar = (t, d) => { const r = []; for (let i = 0; i < m; i++) if (uygun(i, t) && !P[i].izin.has(d)) r.push(i); return r; };
     const ADAY = {}; ['es', 'ysp', 'sur', 'M'].forEach(t => { ADAY[t] = P.map((_, i) => i).filter(i => uygun(i, t)); });
     const sec = a => a[Math.floor(R() * a.length)];
+    // çok yuvalı hamle: çok yarısı olan sürücünün iki 12 saatlik yarısı az olana, az olanın bir 24 saatlik sürücü günü çok olana (saatler korunur)
+    function genelHamle(sl, fn) {
+      const once = sl.map(k => ({...Y[k]})), kisi = new Set(), gunS = new Set(sl.map(k => Y[k].d));
+      let eskiY = 0; sl.forEach(k => { const y = Y[k]; eskiY += yuvaMaliyet(y); bolEkle(y, -1); if (y.t === 'M' && y.a >= 0) yariSay[y.a]--; coz(k, y.a); coz(k, y.b); kisi.add(y.a); kisi.add(y.b); });
+      fn();
+      let yeniY = 0; sl.forEach(k => { const y = Y[k]; bagla(k, y.a); bagla(k, y.b); bolEkle(y, 1); if (y.t === 'M' && y.a >= 0) yariSay[y.a]++; yeniY += yuvaMaliyet(y); kisi.add(y.a); kisi.add(y.b); });
+      const eskiP = new Map(); kisi.forEach(i => { if (i >= 0) { eskiP.set(i, pc[i]); pc[i] = kisiMaliyet(i); } }); yc += yeniY - eskiY;
+      const eskiD = new Map(); gunS.forEach(d => { eskiD.set(d, dc[d]); dct -= dc[d]; dc[d] = gunMaliyet(d); dct += dc[d]; });
+      const yeniT = toplam(), delta = yeniT - cur, T = 150 * Math.pow(1 / 150, (Date.now() - t0) / o.sureMs);
+      if (delta <= 0 || R() < Math.exp(-delta / T)) { cur = yeniT; if (cur < en) { en = cur; enY = Y.map(q => ({...q})); } return true; }
+      sl.forEach(k => { const y = Y[k]; bolEkle(y, -1); if (y.t === 'M' && y.a >= 0) yariSay[y.a]--; coz(k, y.a); coz(k, y.b); });
+      sl.forEach((k, j) => Object.assign(Y[k], once[j]));
+      sl.forEach(k => { const y = Y[k]; bagla(k, y.a); bagla(k, y.b); bolEkle(y, 1); if (y.t === 'M' && y.a >= 0) yariSay[y.a]++; });
+      eskiP.forEach((v, i) => { pc[i] = v; }); yc -= yeniY - eskiY; eskiD.forEach((v, d) => { dct += v - dc[d]; dc[d] = v; });
+      return false;
+    }
+    function yariTakas() {
+      const sira = surucu.slice().sort((x, y) => yariSay[y] - yariSay[x]), A = sira[0], B = sira[sira.length - 1 - Math.floor(R() * Math.min(2, sira.length - 1))];
+      if (A === B || yariSay[A] - yariSay[B] < 2) return;
+      const mA = [], sB = []; Y.forEach((y, k) => { if (y.sabit) return; if (y.t === 'M' && y.a === A && !P[B].izin.has(y.d)) mA.push(k); if (y.t === 'sur' && y.a === B && y.b < 0 && !P[A].izin.has(y.d)) sB.push(k); });
+      if (mA.length < 2 || !sB.length) return;
+      const k1 = sec(mA); let k2 = sec(mA); if (k2 === k1) k2 = mA.find(k => k !== k1); const k3 = sec(sB);
+      genelHamle([k1, k2, k3], () => { Y[k1].a = B; Y[k2].a = B; Y[k3].a = A; });
+    }
     let it = 0; const sure = o.sureMs, T0 = 150, T1 = 1;
     while (Date.now() - t0 < sure) {
       for (let rep = 0; rep < 300; rep++) {
         it++;
+        if (surucu.length >= 2 && R() < 0.04) { yariTakas(); continue; }
         const s = Math.floor(R() * S), y = Y[s]; if (y.sabit) continue;
         const once = {a: y.a, b: y.b, h: y.h}; const etk = new Set([y.a, y.b]);
         let s2 = -1, y2 = null, once2 = null;
