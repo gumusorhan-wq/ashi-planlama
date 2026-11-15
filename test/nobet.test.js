@@ -40,7 +40,7 @@ const on = N.oneriler(L, girdi, null, 10); assert.ok(on.oneriler.length > 0);
   for (let d = 1; d <= 30; d++) { const L = r3.liste[d]; assert.ok(L.sur !== 12 && L.es !== 12 && L.ysp !== 12, d + '. gün işçi 24 saatlik nöbette');
     if (L.surG === 12 || L.surA === 12) { isciVardiya++; assert.ok(!(L.surG === 12 && L.surA === 12), 'işçi aynı gün 24 saat'); const o = L.surG === 12 ? L.surA : L.surG; assert.ok(o != null && H3.byId.get(o).yet.includes('sur'), d + '. gün diğer 12 saat sürücü doğrulanmış kişide olmalı');
       const B = Object.entries(L.bol || {}).find(([y, b]) => b && (b.id === o || L[y] === o)); if (B) kombi++; } }
-  assert.strictEqual(isciVardiya, 16, 'işçi 16 vardiya (12 saat) tutmalı'); assert.ok(kombi >= 8, 'tek işçili günlerde 12+12 birleşik görev: ' + kombi); }      // Sürüm 13.78.1: birleşik görev günü dinlenme kuralında çalışma günü sayılır; art arda birleşik görev artık yazılmaz (eskiden ≥ 14 bekleniyordu)
+  assert.strictEqual(isciVardiya, 16, 'işçi 16 vardiya (12 saat) tutmalı'); }      // Sürüm 13.78.1 (sıralı dağıtım, kullanıcı kararı): tek işçili günün memur yarısı 12 saat; sürücünün kalan saati tam günlerle dolar, 12+12 birleşik görev yalnız planının altında kalan sürücüye (eskiden ≥ 14 birleşik görev bekleniyordu)
 // AABT sürücülüğü doğrulanmamışsa (ke) sürücü olamaz
 assert.ok(!N.YETENEK.ke.includes('sur'));
 // kapasite analizi: yalnız ekip şefi yapamayanlar varsa ekip şefi nöbet branşı boş kalır

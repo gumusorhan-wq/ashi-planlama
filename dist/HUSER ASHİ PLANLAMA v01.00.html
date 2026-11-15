@@ -1079,11 +1079,18 @@ const NobetCore = (() => {
     for (let d = 1; d <= N; d++) { ekle(d, 'es'); ekle(d, 'ysp'); const gt = gunTip[d];
       if (gt === 'cift') { ekle(d, 'surG'); ekle(d, 'surA'); } else if (gt) { ekle(d, gt); ekle(d, 'surM'); isciYari[d] = gt; } else ekle(d, 'sur'); }
     const S = slotD.length, cont = new Int16Array(S).fill(-1), place = P.map(() => []);
-    const sinif = t => (t === 'surG' || t === 'surA') ? 1 : 0, grupT = t => t === 'surM' ? 'sur' : t;
+    // Sürüm 13.78.1 (sıralı dağıtım): tek işçili günün memur sürücü yarısı (surM) 12 saatliktir — kapasite analizindeki gibi yarım birim.
+    // Bu yarılar sürücülere sırayla (eşit sayıda) ayrılır; sürücünün kalan saati tam günlerle dolar (eskiden yarım gün 24 saat sayılıyor, fazlası YSP'den 12/12 bölünerek tamamlanıyordu).
+    const sinif = t => (t === 'surG' || t === 'surA' || t === 'surM') ? 1 : 0, grupT = t => t === 'surM' ? 'sur' : t;
     const tipSlot = {}; ['es', 'ysp', 'sur', 'surM', 'surG', 'surA'].forEach(t => { tipSlot[t] = []; }); for (let s = 0; s < S; s++) tipSlot[slotT[s]].push(s);
     // 1) adetleri nöbet branşlarına dağıt (maksimum akış; her kişi için 24 saatlik ve yarım birimleri ayrı düğüm)
     const tipler = ['es', 'ysp', 'sur', 'surM', 'surG', 'surA'], need = tipler.map(t => tipSlot[t].length);
     const V = 2 + 2 * m + tipler.length, SRC = 0, SNK = 1, cap = Array.from({length: V}, () => new Array(V).fill(0));
+    { const surucu = P.map((p, i) => i).filter(i => !P[i].isci && !P[i].gunduz && P[i].yet.includes('sur') && u24[i] > 0), M = tipSlot.surM.length;
+      if (M && surucu.length) { const k = new Array(m).fill(0); let kalan = M;
+        // sırayla: her turda en az yarısı olan (eşitse adedi çok olan) sürücüye bir yarı; kişi adedinin iki katını aşmaz
+        while (kalan > 0) { const ad = surucu.filter(i => k[i] < 2 * u24[i]).sort((x, y) => k[x] - k[y] || u24[y] - u24[x])[0]; if (ad === undefined) break; k[ad]++; kalan--; }
+        surucu.forEach(i => { uh[i] = k[i]; u24[i] = Math.max(0, u24[i] - Math.ceil(k[i] / 2)); }); } }
     P.forEach((p, i) => {
       cap[SRC][2 + i] = u24[i]; cap[SRC][2 + m + i] = uh[i];
       tipler.forEach((t, k) => { if (!elig(i, t)) return; if (t === 'es' && attMi(p)) return; const dugum = sinif(t) ? 2 + m + i : 2 + i; cap[dugum][2 + 2 * m + k] = 99; });
@@ -1239,7 +1246,7 @@ const NobetCore = (() => {
     for (let d = 1; d <= N; d++) {
       const L = liste[d];
       for (const T of ['surG', 'surA']) {
-        const p = byId.get(L[T]); if (!p || p.isci || hak(p) - saat.get(p.id) < 12) continue;      // ayrılan saati dolmuşsa (boş vardiyaya yazıldıysa) birleşik görev verilmez
+        const p = byId.get(L[T]); if (!p || p.isci || (p.plan != null ? Math.min(hak(p), p.plan * 24) : hak(p)) - saat.get(p.id) < 12) continue;      // Sürüm 13.78.1: yalnız planının en az 12 saat altında kalan sürücüye (fazla saati YSP'den bölerek doldurmaz)      // ayrılan saati dolmuşsa (boş vardiyaya yazıldıysa) birleşik görev verilmez
         if (['es', 'ysp', 'sur', T === 'surG' ? 'surA' : 'surG'].some(t => L[t] === p.id) || Object.values(L.bol || {}).some(b => b && b.id === p.id)) continue;
         const ad = ['ysp', 'es'].filter(B => p.yet.includes(B) && !(B === 'es' && attMi(p)) && L[B] != null && !(L.bol && L.bol[B]) && !(byId.get(L[B]) || {}).isci);      // Sürüm 13.78.1: ATT sürücüye ekip şefi yarısı verilmez
         if (!ad.length) continue;
