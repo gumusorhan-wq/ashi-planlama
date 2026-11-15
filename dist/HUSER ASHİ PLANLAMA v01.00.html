@@ -1300,6 +1300,7 @@ const NobetCore = (() => {
       const esnek = A => { const t = tuttugu(A); return eksik.filter(B => B.id !== A.id && [...t].some(y => B.yet.includes(y))).length; };
       const fazla = P.filter(p => fark(p) >= 3.9).map(p => ({p, e: esnek(p)})).sort((a, b) => a.e - b.e || fark(b.p) - fark(a.p)).map(x => x.p);
       // A'nın bir nöbetinin sa1 saatini B'ye verir (B o gün boşsa, yuvayı tutabiliyorsa ve sert ihlal artmıyorsa)
+      const parca = x => x >= 16 ? 16 : x >= 8 ? 8 : Math.max(4, Math.round(x));
       const tas = (A, B, sa1, attEs) => {
         for (let d = 1; d <= N; d++) {
           const L = liste[d]; if (B.izin.has(d)) continue;
@@ -1317,13 +1318,13 @@ const NobetCore = (() => {
       };
       let yapildi = false;
       for (const A of fazla) { for (const B of eksik) {
-        const sa1 = Math.max(4, Math.min(20, Math.round(Math.min(-fark(B), fark(A)))));      // Sürüm 13.78: saat saat (5 + 19, 7 + 17); 13.78.1: parça en az 4 saat (1 + 23 gibi bölme yok, 4 saatten küçük sapma bölünmez)
+        const sa1 = parca(Math.min(-fark(B), fark(A)));      // Sürüm 13.78.1 (kullanıcı kararı): nöbet 8 / 16 / 24 saat yazılır; ancak 8 saatten küçük fark kalınca saat saat (en az 4 saat)
         const x = tas(A, B, sa1); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
         if (yapildi) break; }
       // Sürüm 13.78: doğrudan olmuyorsa (ör. fazlası olan yalnız ekip şefi / sürücü, eksik olan yalnız YSP tutuyor) aradaki bir kişi üzerinden:
       // A'nın saati C'ye, sonraki turda C'den B'ye geçer (C'nin toplamı değişmez)
       if (!yapildi) for (const A of fazla) { for (const B of eksik) {
-        const sa1 = Math.max(4, Math.min(20, Math.round(Math.min(-fark(B), fark(A)))));
+        const sa1 = parca(Math.min(-fark(B), fark(A)));
         for (const C of P) { if (C === A || C === B || C.isci || C.plan == null || Math.abs(fark(C)) >= 3.9) continue;
           const tC = tuttugu(C); if (![...tC].some(y => B.yet.includes(y))) continue;
           const x = tas(A, C, sa1); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
