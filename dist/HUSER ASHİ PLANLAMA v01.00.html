@@ -3019,6 +3019,36 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   function n2ListeDurum(b) { const dp = ((S.plan && S.plan.nobet) || {})[b.ad]; if (!dp || !dp.liste) return null;
     const eski = dp.imza ? dp.imza !== n2Imza(b) : n2ListeEski(b) > 0; return !eski ? 'guncel' : dp.elle ? 'elle' : 'eski'; }
   const n2Oto = {kuyruk: [], calis: false};
+  // Sürüm 13.79 (HUSER): kesinleştirme kapısı — plan istasyonlara gönderilmeden önce her istasyonda toplam (açık) ve memurun eksik mesaisi (mesai tamamlanamıyor) denetlenir.
+  // Kullanıcı kararı (15.11.2026): karşılaştırma yalnız toplam üzerinden; kişi başına dağılım istasyonun işi. Sorun ya görevlendirmeyle giderilir ya da gerekçe yazılarak onaylanır.
+  // Onay değere bağlıdır: plan değişip açık / fazla miktarı değişirse onay geçersizleşir, yeniden istenir.
+  const r2k = v => Math.round(v * 100) / 100;
+  function kapiDenetle() {
+    const out = [], K = (S.plan && S.plan.kapi) || {};
+    (S.plan ? S.plan.birimler : []).filter(b => b.tur === 'istasyon' && !b.ekipOf).forEach(b => {
+      const h = hesapla(b), acik = r2k(h.ihtiyac - planlananToplam(h)), fazla = r2k(h.fazlaMemur || 0), on = K[b.ad] || {};
+      if (acik > 0.01) out.push({ad: b.ad, tur: 'acik', deger: acik, yazi: `${fmt(acik)} nöbet açık`, cozum: 'Personel görevlendirin ya da planı artırın', onay: on.acik && on.acik.deger === acik ? on.acik : null});
+      if (fazla > 0.01) out.push({ad: b.ad, tur: 'fazla', deger: fazla, yazi: `Mesai tamamlanamıyor: ${fmt(fazla)} nöbet fazla`, cozum: 'Bir kişiyi başka istasyona görevlendirin', onay: on.fazla && on.fazla.deger === fazla ? on.fazla : null});
+    });
+    return out;
+  }
+  function kapiPencere(L) {
+    return new Promise(coz => {
+      const bekleyen = L.filter(x => !x.onay).length, d = document.createElement('div'); d.className = 'ap-modal ap-onay'; d.setAttribute('data-pop', ''); d.setAttribute('data-kapi', '');
+      const satir = (x, i) => `<tr><td><b>${esc(x.ad)}</b></td><td>${esc(x.yazi)}${x.onay ? `<div class="ap-note">✓ Gerekçeyle onaylandı · ${esc(x.onay.kim || '')} · ${new Date(x.onay.t).toLocaleString('tr-TR')}<br>${esc(x.onay.gerekce)}</div>` : `<div class="ap-note">${esc(x.cozum)}</div>`}</td>
+        <td style="white-space:nowrap">${x.onay ? '<span class="ap-tag ap-t-ok">Onaylı</span>' : `<button class="ap-btn sm" data-k="git" data-i="${i}">Görevlendirme</button> <button class="ap-btn sm" data-k="onay" data-i="${i}">Gerekçeyle onayla</button>`}</td></tr>`;
+      d.innerHTML = `<div role="dialog" aria-modal="true" style="max-width:820px;width:96vw"><h3>Kesinleştirme denetimi</h3>
+        <p>${bekleyen ? `<b>${bekleyen}</b> sorun çözülmeden plan kesinleştirilemez. Her sorun ya görevlendirmeyle giderilir ya da gerekçe yazılarak onaylanır.` : 'Bütün sorunlar gerekçeyle onaylandı.'}</p>
+        <div style="padding:0 18px;max-height:55vh;overflow:auto"><table class="ap-t"><thead><tr><th>İstasyon</th><th>Sorun</th><th></th></tr></thead><tbody>${L.map(satir).join('')}</tbody></table></div>
+        <div class="ap-onay-alt"><button class="ap-btn" data-k="kapat">Vazgeç</button>${bekleyen ? '' : '<button class="ap-btn pri" data-k="kesin">Kesinleştir</button>'}</div></div>`;
+      const tus = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); bit(null); } };
+      const bit = v => { document.removeEventListener('keydown', tus, true); d.remove(); coz(v); };
+      d.addEventListener('click', e => { e.stopPropagation(); const b = e.target.closest('[data-k]'); if (!b) { if (e.target === d) bit(null); return; } const k = b.dataset.k, x = L[+b.dataset.i];
+        bit(k === 'kesin' ? {kesin: true} : k === 'git' ? {git: x} : k === 'onay' ? {onayla: x} : null); });
+      d.addEventListener('mousedown', e => e.stopPropagation());
+      document.addEventListener('keydown', tus, true); root.appendChild(d);
+    });
+  }
   function n2OtoPlanla(b) { if (!n2Duz() || (S.n2 && S.n2.calisiyor) || n2Oto.kuyruk.includes(b.ad)) return; n2Oto.kuyruk.push(b.ad); setTimeout(n2OtoCalis, 60); }
   async function n2OtoCalis() {
     if (n2Oto.calis) return; n2Oto.calis = true;
@@ -3347,6 +3377,21 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
       case 'durum-git': {
         if (!S.plan || !(S.rol === 'yonetici' || S.rol === 'planlayici')) break;
         if (v === 'kilitli' && S.rol !== 'yonetici') { toast('Ayı yalnızca yönetici kapatır.'); break; }
+        if (v === 'kesin') {      // Sürüm 13.79: kesinleştirme kapısı
+          let L = kapiDenetle(), gec = !L.length;
+          while (!gec) {
+            const r = await kapiPencere(L);
+            if (!r) break;
+            if (r.git) { S.modul = 1; S.sayfa = 'gorev'; S.ist = r.git.ad; break; }
+            if (r.kesin) { gec = true; break; }
+            if (r.onayla) { const x = r.onayla, g = await sor(`${x.ad} — ${x.yazi}. Neden bu haliyle kesinleştiriliyor? (en az 10 karakter)`);
+              if (g != null && g.trim().length < 10) toast('Gerekçe en az 10 karakter olmalı.');
+              else if (g != null) mut(() => { const K = S.plan.kapi = {...(S.plan.kapi || {})}; K[x.ad] = {...(K[x.ad] || {}), [x.tur]: {deger: x.deger, gerekce: g.trim(), kim: damgaAd(), t: Date.now()}}; }, 'Kesinleştirme onayı (gerekçeli)', `${x.ad}: ${x.yazi} — ${g.trim()}`); }
+            L = kapiDenetle();
+          }
+          if (!gec) break;
+          if (L.length) { mut(() => { S.plan.durum = 'kesin'; }, 'Plan durumu', `kesin (${L.length} sorun gerekçeyle onaylı)`); break; }
+        }
         const soru = {kesin: `${ayEtiket()} planı kesinleşsin ve istasyonlara açılsın mı?\n\nİstasyon sorumluları kendi planlarını görür ve nöbet listelerini hazırlar.`, taslak: `${ayEtiket()} planı taslağa alınsın mı?\n\nİstasyonlar planı ve nöbet listesi araçlarını görmez.`, kilitli: `${ayEtiket()} kapatılsın (kilitlensin) mı?\n\nKimse değişiklik yapamaz; kilidi yalnız yönetici açar.`}[v];
         if (!soru || !(await onay(soru))) break;
         mut(() => { S.plan.durum = v; }, 'Plan durumu', v); break;
