@@ -118,7 +118,8 @@ console.log('nöbet çekirdek testleri geçti');
   N.adetHazirla(ks, 31); const r = N.uret({y: 2026, m: 12, kisiler: ks, attEs: true}, {sureMs: 2500, deneme: 6, seed: 3});
   assert.strictEqual(r.bos, 0, 'saatlik küsuratta boş yuva kalmamalı');
   const saat = new Map(ks.map(k => [k.id, 0])); r.liste.forEach((L, d) => { if (!d) return; ['es', 'ysp', 'sur'].forEach(t => { if (L[t] != null) saat.set(L[t], saat.get(L[t]) + (L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); Object.values(L.bol || {}).forEach(b => saat.set(b.id, saat.get(b.id) + b.saat)); });
-  ks.forEach(k => assert.ok(Math.abs(saat.get(k.id) - k.planlanan * 24) <= 1.01, `K${k.id}: planı ${(k.planlanan * 24).toFixed(0)} sa, listede ${saat.get(k.id)} sa`));
+  ks.forEach(k => assert.ok(Math.abs(saat.get(k.id) - k.planlanan * 24) <= 3.01, `K${k.id}: planı ${(k.planlanan * 24).toFixed(0)} sa, listede ${saat.get(k.id)} sa`));      // 13.78.1: 4 saatten küçük sapma bölünmez
+  r.liste.forEach((L, d) => Object.values(L.bol || {}).forEach(b => assert.ok(!b || (b.saat >= 4 && b.saat <= 20), `${d}. gün ${b.saat} saatlik parça (en az 4 saat olmalı)`)));
   console.log('saatlik bölme testi geçti');
 }
 // Sürüm 13.78.1 (kullanıcı kararı): sürücü görünmeyen AABT / ATT'nin elle yazılan sürücü nöbeti ihlal değil; doktorunki ihlal
