@@ -402,6 +402,13 @@ const NobetCore = (() => {
         const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));
         const x = tas(A, B, sa1, true); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
         if (yapildi) break; }
+      // eksik ATT o günlerde boş değilse (iki nöbet arası kuralı) parça planı tam olan başka bir ATT'ye, sonraki turda ondan eksik olana geçer
+      if (!yapildi) for (const A of fazla) { if (attMi(A)) continue; for (const B of eksik) { if (!attMi(B)) continue;
+        const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));
+        for (const C of P) { if (C === B || !attMi(C) || C.plan == null || Math.abs(fark(C)) >= 0.9 || !C.yet.includes('es')) continue;
+          const x = tas(A, C, sa1, true); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
+        if (yapildi) break; }
+        if (yapildi) break; }
       if (!yapildi) break;
     }
     return bolunen;
