@@ -3248,7 +3248,12 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   // imzası olmayan eski listeler: bir kişinin listedeki nöbeti planından en az 0,25 farklıysa eski
   function n2ListeEski(b) { try { const D = n2Deneti(b); return D.d.ihlal.filter(i => i.tur === 'adet' && Math.abs(i.fark || 0) >= 0.25).length; } catch (e) { return 0; } }
   // null: liste yok · 'guncel' · 'eski' (kendiliğinden güncellenir) · 'elle' (elle düzenlenmiş, kullanıcı yeniden oluşturmalı)
+  // Sürüm 13.79 (kullanıcı kararı 15.11.2026): Aralık 2026 ve sonrası, yeni kurallardan (liste motoru 2) önce oluşturulmuş bütün listeler —
+  // elle düzenlenmişler dahil — bir kez kendiliğinden yeniden oluşturulur; Kasım ve önceki aylar dokunulmaz
+  const LISTE_MOTOR = 2, MOTOR_AY = 2026 * 12 + 12;
+  const n2MotorEski = dp => (dp.motor || 1) < LISTE_MOTOR && S.y * 12 + S.m >= MOTOR_AY;
   function n2ListeDurum(b) { const dp = ((S.plan && S.plan.nobet) || {})[b.ad]; if (!dp || !dp.liste) return null;
+    if (n2MotorEski(dp)) return 'eski';
     const eski = dp.imza ? dp.imza !== n2Imza(b) : n2ListeEski(b) > 0; return !eski ? 'guncel' : dp.elle ? 'elle' : 'eski'; }
   const n2Oto = {kuyruk: [], calis: false};
   // Sürüm 13.79 (HUSER): kesinleştirme kapısı — plan istasyonlara gönderilmeden önce her istasyonda toplam (açık) ve memurun eksik mesaisi (mesai tamamlanamıyor) denetlenir.
@@ -3298,7 +3303,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
       const imza = n2Imza(b), G = n2Girdi(b);
       const r = await n2Uret(G, {kural: G.kural, sureMs: 1500, deneme: 5, zorlaMs: 4000, seed: (Date.now() % 100000) + 1}, () => {});
       if (!S.plan || !n2Duz() || n2Imza(b) !== imza || n2ListeDurum(b) !== 'eski') continue;      // bu sırada plan yine değiştiyse sonraki çizimde yeniden sıraya girer
-      const dp = n2Depo(ad); dp.liste = r.liste; dp.imza = imza; dp.elle = false; dp.damga = damgaYeni(); S.n2.oneri = null;
+      const dp = n2Depo(ad); dp.liste = r.liste; dp.imza = imza; dp.elle = false; dp.motor = LISTE_MOTOR; dp.damga = damgaYeni(); S.n2.oneri = null;
       logla('Modül 2: liste plana göre kendiliğinden güncellendi', `${ad}${r.bos ? ` · ${r.bos} boş` : ''}`); kaydet(); render();
     } } catch (e) { console.warn('otomatik liste', e); } finally { n2Oto.calis = false; }
   }
@@ -3670,7 +3675,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
         if (!n2Duz()) { toast('Düzenleme yetkiniz yok / ay kilitli.'); break; }
         S.n2.calisiyor = true; render(); await new Promise(r => setTimeout(r, 40));
         const ilerle = x => { const el = root.querySelector('#ap-n2-ilerleme'); if (el) el.innerHTML = `<div class="ap-note">Liste oluşturuluyor… %${Math.round(x.oran * 100)} (${typeof x.deneme === 'number' ? x.deneme + '. deneme' : 'kurallara göre düzeltiliyor'})</div><div style="height:6px;background:var(--ap-line);margin-top:4px"><div style="height:6px;width:${Math.round(x.oran * 100)}%;background:var(--ap-pri, #0055A4);transition:width .2s"></div></div>`; };
-        try { const G = n2Girdi(b), imza = n2Imza(b), r = await n2Uret(G, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 8000, seed: (Date.now() % 100000) + 1}, ilerle); mut2(() => { dp.liste = r.liste; dp.imza = imza; dp.elle = false; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.bos ? ` · ${r.bos} boş` : ''}`);
+        try { const G = n2Girdi(b), imza = n2Imza(b), r = await n2Uret(G, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 8000, seed: (Date.now() % 100000) + 1}, ilerle); mut2(() => { dp.liste = r.liste; dp.imza = imza; dp.elle = false; dp.motor = LISTE_MOTOR; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.bos ? ` · ${r.bos} boş` : ''}`);
           toast([r.bos ? `${r.bos} nöbet boş kaldı (kadro yetmiyor; personel isteyin).` : 'Tüm nöbetler dolu.', r.sert ? `${r.sert} kural ihlali kaldı; Denetim ve öneriler sekmesine bakın.` : 'Kural ihlali yok.'].join(' ')); }
         finally { S.n2.calisiyor = false; }
         break;
