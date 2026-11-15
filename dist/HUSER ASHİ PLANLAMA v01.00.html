@@ -1441,7 +1441,7 @@ const ListeIyilestir = (() => {
   const NC = typeof NobetCore !== 'undefined' ? NobetCore : require('./nobet.js');
   const rng = seed => { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; };
   const C = {bos: 20000, uygun: 60000, cakisma: 60000, izin: 60000, dinlenme: 60000, eksikSaat: 2000, fazlaSaat: 3, bolme: 60, esBolme: 150, surBolme: 3000, garipParca: 800,
-    denge: 18, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 60, yariTek: 900};
+    denge: 60, bolUst: 500, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 60, yariTek: 900};
   const PARCA = [8, 12, 16, 8, 12, 16, 4, 20];      // 4 / 20 yalnız zorda kalınca (ceza)
 
   function* iyilestirAdim(girdi, liste0, secenek) {
@@ -1469,6 +1469,7 @@ const ListeIyilestir = (() => {
       const sabit = (a >= 0 && P[a].gunduz) || (b >= 0 && P[b].gunduz);
       const y = {d, t, a, b: a >= 0 && b >= 0 ? b : -1, h: a >= 0 && b >= 0 ? 24 - bb.saat : 24, sabit}; gunY[d].push(Y.length); Y.push(y);
     }
+    Y.forEach(y => { if (y.b >= 0 && y.h > 12 && !y.sabit) { [y.a, y.b] = [y.b, y.a]; y.h = 24 - y.h; } });
     const S = Y.length;
     // --- kişi görevleri
     const gorev = P.map(() => new Set()); const bagla = (s, i) => { if (i >= 0) gorev[i].add(s); }, coz = (s, i) => { if (i >= 0) gorev[i].delete(s); };
@@ -1478,7 +1479,7 @@ const ListeIyilestir = (() => {
     const bolEkle = (y, k) => { if (y.b < 0 || y.t === 'M') return; bolSay[y.a] += k; bolSay[y.b] += k; const an = ikiliAnahtar(y.a, y.b), v = (ikili.get(an) || 0); const yeni = v + k; ikili.set(an, yeni); ikiliCeza += C.ikili * (Math.max(0, yeni - 1) - Math.max(0, v - 1)); };
     Y.forEach(y => bolEkle(y, 1));
     const memur = P.map((p, i) => i).filter(i => !P[i].isci && !P[i].gunduz && (P[i].plan || 0) > 0.5);
-    const dengeHesap = () => { let s2 = 0; memur.forEach(i => { s2 += bolSay[i] * bolSay[i]; }); return C.denge * s2; };
+    const dengeHesap = () => { let s2 = 0, ust = 0; memur.forEach(i => { s2 += bolSay[i] * bolSay[i]; if (bolSay[i] > 3) ust += bolSay[i] - 3; }); return C.denge * s2 + C.bolUst * ust; };      // kişi başı 3'ü aşan bölünme ağır
     // tek işçili günlerin memur yarısı dengesi (sürücü olabilen memurlar arasında)
     const surucu = memur.filter(i => uygun(i, 'M')); const yariSay = new Int32Array(m); Y.forEach(y => { if (y.t === 'M' && y.a >= 0) yariSay[y.a]++; });
     const yariHesap = () => { if (surucu.length < 2) return 0; let s2 = 0; surucu.forEach(i => { s2 += yariSay[i] * yariSay[i] * C.yariDenge + (yariSay[i] % 2 ? C.yariTek : 0); }); return s2; };      // tek sayıda yarı 4 saatlik artık bırakır (7,67 hedefte)
@@ -1575,6 +1576,9 @@ const ListeIyilestir = (() => {
         if (y.a < 0 && y.b >= 0) { y.a = y.b; y.b = -1; y.h = 24; }
         if (y.b >= 0 && y.b === y.a) { y.b = -1; y.h = 24; }
         if (y.b < 0 && y.t !== 'M') y.h = 24;
+        // 8 / 16 ve 4 / 20'de kısa parça önce (09:00–17:00, sonra 17:00–09:00; kullanıcı 15.11)
+        if (y.b >= 0 && y.h > 12) { [y.a, y.b] = [y.b, y.a]; y.h = 24 - y.h; }
+        if (y2 && y2.b >= 0 && y2.h > 12) { [y2.a, y2.b] = [y2.b, y2.a]; y2.h = 24 - y2.h; }
         // maliyeti yenile
         const eskiY = yuvaMaliyet({...y, ...once}) + (y2 ? yuvaMaliyet({...y2, ...once2}) : 0);
         bolEkle({...y, ...once}, -1); if (y2) bolEkle({...y2, ...once2}, -1);
