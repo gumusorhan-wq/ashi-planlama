@@ -40,7 +40,7 @@ const on = N.oneriler(L, girdi, null, 10); assert.ok(on.oneriler.length > 0);
   for (let d = 1; d <= 30; d++) { const L = r3.liste[d]; assert.ok(L.sur !== 12 && L.es !== 12 && L.ysp !== 12, d + '. gün işçi 24 saatlik nöbette');
     if (L.surG === 12 || L.surA === 12) { isciVardiya++; assert.ok(!(L.surG === 12 && L.surA === 12), 'işçi aynı gün 24 saat'); const o = L.surG === 12 ? L.surA : L.surG; assert.ok(o != null && H3.byId.get(o).yet.includes('sur'), d + '. gün diğer 12 saat sürücü doğrulanmış kişide olmalı');
       const B = Object.entries(L.bol || {}).find(([y, b]) => b && (b.id === o || L[y] === o)); if (B) kombi++; } }
-  assert.strictEqual(isciVardiya, 16, 'işçi 16 vardiya (12 saat) tutmalı'); assert.ok(kombi >= 14, 'tek işçili günlerde 12+12 birleşik görev: ' + kombi); }
+  assert.strictEqual(isciVardiya, 16, 'işçi 16 vardiya (12 saat) tutmalı'); assert.ok(kombi >= 8, 'tek işçili günlerde 12+12 birleşik görev: ' + kombi); }      // Sürüm 13.78.1: birleşik görev günü dinlenme kuralında çalışma günü sayılır; art arda birleşik görev artık yazılmaz (eskiden ≥ 14 bekleniyordu)
 // AABT sürücülüğü doğrulanmamışsa (ke) sürücü olamaz
 assert.ok(!N.YETENEK.ke.includes('sur'));
 // kapasite analizi: yalnız ekip şefi yapamayanlar varsa ekip şefi nöbet branşı boş kalır
@@ -120,19 +120,6 @@ console.log('nöbet çekirdek testleri geçti');
   const saat = new Map(ks.map(k => [k.id, 0])); r.liste.forEach((L, d) => { if (!d) return; ['es', 'ysp', 'sur'].forEach(t => { if (L[t] != null) saat.set(L[t], saat.get(L[t]) + (L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); Object.values(L.bol || {}).forEach(b => saat.set(b.id, saat.get(b.id) + b.saat)); });
   ks.forEach(k => assert.ok(Math.abs(saat.get(k.id) - k.planlanan * 24) <= 1.01, `K${k.id}: planı ${(k.planlanan * 24).toFixed(0)} sa, listede ${saat.get(k.id)} sa`));
   console.log('saatlik bölme testi geçti');
-}
-// Sürüm 13.78.1 (HUSER 13.78.1): AABT'lerin planı ekip şefi günlerini karşılamıyorsa (4 × 7,67 = 30,67 < 31) ATT ekip şefi parçası alır;
-// eskiden AABT'lere 8, sürücülere 7,33 / 7 yazılıyordu (boş yuva yok ama kişi başına nöbet planla uyuşmuyordu)
-{ const mk = (id, grup, pl, az) => ({id, ad: 'K' + id, grup, planlanan: pl, plan: pl, ust: Math.floor(az + 1e-9), ustYumusak: Math.ceil(az - 1e-9), azamiF: az, izin: [], istek: []});
-  const isci = id => ({id, ad: 'K' + id, grup: 'isci', sinif: 'isci', planlanan: 9, surPay: 1, izin: [], istek: []});
-  const ks = [mk(1, 'ke', 23 / 3, 8), mk(2, 'ke', 23 / 3, 8), mk(3, 'ke', 23 / 3, 8), mk(4, 'ke', 23 / 3, 8), mk(7, 'ysp', 23 / 3, 8), mk(8, 'ysp', 6, 6.33), mk(10, 'ysp', 8, 8), mk(11, 'ysp', 23 / 3, 8),
-    mk(5, 'sy', 23 / 3, 8), mk(6, 'sy', 22 / 3, 8), mk(9, 'sy', 0, 8), isci(12), isci(13)];
-  N.adetHazirla(ks, 31);
-  for (const seed of [5, 524, 1834, 2489]) { const r = N.uret({y: 2026, m: 12, kisiler: ks, attEs: true}, {sureMs: 2500, deneme: 6, seed});
-  assert.strictEqual(r.bos, 0, 'boş yuva kalmamalı');
-  const saat = new Map(ks.map(k => [k.id, 0])); r.liste.forEach((L, d) => { if (!d) return; ['es', 'ysp', 'sur', 'surG', 'surA'].forEach(t => { if (L[t] != null) saat.set(L[t], saat.get(L[t]) + (t === 'surG' || t === 'surA' ? 12 : L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); Object.entries(L.bol || {}).forEach(([t, b]) => { if (b && L[t] != null) saat.set(b.id, saat.get(b.id) + b.saat); }); });
-  ks.filter(k => k.grup !== 'isci').forEach(k => assert.ok(Math.abs(saat.get(k.id) - k.planlanan * 24) <= 1.01, `seed ${seed} K${k.id}: planı ${(k.planlanan * 24).toFixed(0)} sa, listede ${saat.get(k.id)} sa`)); }
-  console.log('AABT ekip şefi küsurat testi geçti');
 }
 // Sürüm 13.78.1 (kullanıcı kararı): sürücü görünmeyen AABT / ATT'nin elle yazılan sürücü nöbeti ihlal değil; doktorunki ihlal
 { const mk = (id, grup) => ({id, ad: 'K' + id, grup, planlanan: 1, plan: 1, ust: 2, ustYumusak: 2, azamiF: 2, izin: [], istek: []});

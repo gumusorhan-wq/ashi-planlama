@@ -1009,7 +1009,8 @@ const NobetCore = (() => {
       if (p.gunduz) { const b8 = Math.round(L.reduce((t, x) => t + (x.saat != null ? x.saat : 24), 0) / 24 * 100) / 100; if (Math.abs(b8 - (p.plan || 0)) > 0.34) ekle('adet', 20 * Math.abs(b8 - (p.plan || 0)), 0, p.id, `${p.ad}: gündüz mesaisi ${p.plan || 0} nöbet karşılığı, listede ${b8}`, {fark: b8 - (p.plan || 0)}); return; }
       // 24 saatlik nöbetler: dinlenme (min boşluk gün) ve sürücü gün aşırı 3
       const onc = p.onc || {t24: [], s24: [], A: [], G: []}, oAd = d => d <= 0 ? `önceki ayın ${d === 0 ? 'son' : `sondan ${1 - d}.`} günü` : `${d}. gün`;      // önceki ayın son günleri (0, -1 …)
-      const g24 = [...onc.t24, ...L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).map(x => x.gun)].sort((a, b) => a - b);
+      // Sürüm 13.78.1: memurun 12 saatlik sürücü yarısı (işçili günde sürücü + YSP / ekip şefi birleşik görevi) da çalışma günüdür — art arda günler (12 YSP + 12 sürücü, ertesi gün yine) dinlenme ihlalidir
+      const g24 = [...new Set([...onc.t24, ...L.filter(x => !p.isci || !(x.tip === 'surG' || x.tip === 'surA')).map(x => x.gun)])].sort((a, b) => a - b);
       for (let i = 1; i < g24.length; i++) if (g24[i] >= 1 && g24[i] - g24[i - 1] - 1 < K.minAra) ekle('dinlenme', 700, g24[i], p.id, `${p.ad}: ${oAd(g24[i - 1])} ve ${g24[i]}. gün art arda 24 saatlik nöbet (arada en az ${K.minAra} gün boşluk gerekir)`);
       if (K.surGunAsiri) {
         const s24 = new Set([...onc.s24, ...L.filter(x => x.tip === 'sur').map(x => x.gun)]);
@@ -1035,6 +1036,10 @@ const NobetCore = (() => {
       const birim = Math.round((L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).reduce((t, x) => t + (x.saat != null ? x.saat / 24 : 1), 0) + 0.5 * L.filter(x => x.tip === 'surG' || x.tip === 'surA').length) * 100) / 100, hedef = p.plan != null ? p.plan : p.hedef24 + p.hedefYarim / 2;      // küsuratlı plan (7,67) bölünmüş nöbetle karşılanır
       if (Math.abs(birim - hedef) > 0.05) ekle('adet', 40 * Math.abs(birim - hedef), 0, p.id, `${p.ad}: planlanan ${hedef} nöbet, listede ${birim}`, {fark: birim - hedef});
     });
+    // Sürüm 13.78.1: memurun 12 saatlik sürücü yarıları (işçili gün) sürücü olabilen memurlar arasında dengeli dağılmalı (hep aynı kişi bölünmesin)
+    { const Y = P.filter(p => !p.isci && !p.gunduz && p.yet.includes('sur') && (p.adet || 0) > 0).map(p => ({p, n: gorev.get(p.id).filter(x => x.tip === 'surG' || x.tip === 'surA').length}));
+      if (Y.length >= 2) { const top = Y.reduce((a, y) => a + y.n, 0), ort = top / Y.length;
+        Y.forEach(y => { const fz = Math.abs(y.n - ort) - 1; if (fz > 0) ekle('yarimDenge', 60 * fz, 0, y.p.id, `${y.p.ad}: 12 saatlik sürücü yarısı ${y.n} (ortalama ${Math.round(ort * 10) / 10})`); }); } }
     const toplam = ihlal.reduce((x, i) => x + i.agirlik, 0), say = {};
     ihlal.forEach(i => { say[i.tur] = (say[i.tur] || 0) + 1; });
     return {toplam, ihlal, say, gorev};
@@ -1212,12 +1217,13 @@ const NobetCore = (() => {
   const gundeMi = (L, id) => ['es', 'ysp', 'sur', 'surG', 'surA'].some(t => L[t] === id) || Object.values(L.bol || {}).some(b => b && b.id === id);
   // Boş kalan nöbetler, kendine ayrılan saatin altında kalan kişilerle (yalnızca o saat kadar) doldurulur; kural ihlali artıyorsa yazılmaz.
   // Böylece kimse adedinin üstüne çıkmaz; tek işçili günde 12 saati boşta kalan sürücü önce başka günün boş sürücü vardiyasına yazılır.
-  function bosDoldur(liste, H) {
+  // asim: kaçınılmaz olmayan boşluk kaldıysa (istasyonun toplam planı ihtiyacı karşılıyor) bir vardiyaya kadar planının üstüne yazılır; fark sonra kesirDengele ile planı eksik kalan kişiye aktarılır (Sürüm 13.78.1)
+  function bosDoldur(liste, H, asim) {
     const {N, P} = H, saat = saatleri(liste, H), disi = () => { const r = denetle(liste, H).ihlal; return sertSay(r) - r.filter(i => i.tur === 'eksik').length; };
     let taban = disi(), n = 0; const t0 = Date.now();
     const dene = (L, t, p, sa) => { L[t] = p.id; const x = disi(); if (x <= taban) { taban = x; saat.set(p.id, saat.get(p.id) + sa); n++; return true; } L[t] = null; return false; };
     for (let d = 1; d <= N && Date.now() - t0 < 2000; d++) {
-      const L = liste[d], aday = (f, sa) => P.filter(p => f(p) && !p.izin.has(d) && !gundeMi(L, p.id) && hak(p) - saat.get(p.id) >= sa).sort((a, b) => (hak(b) - saat.get(b.id)) - (hak(a) - saat.get(a.id)));
+      const L = liste[d], aday = (f, sa) => P.filter(p => f(p) && !p.izin.has(d) && !gundeMi(L, p.id) && hak(p) - saat.get(p.id) >= (asim ? 0 : sa)).sort((a, b) => (hak(b) - saat.get(b.id)) - (hak(a) - saat.get(a.id)));
       ['es', 'ysp'].forEach(t => { if (L[t] != null) return; for (const p of aday(q => !q.isci && q.yet.includes(t), 24).sort((a, c) => t === 'es' ? attMi(a) - attMi(c) : 0)) if (dene(L, t, p, 24)) break; });
       if (L.sur != null) continue;
       if (L.surG == null && L.surA == null) for (const p of aday(q => !q.isci && q.yet.includes('sur'), 24)) if (dene(L, 'sur', p, 24)) break;
@@ -1229,18 +1235,23 @@ const NobetCore = (() => {
   function kombiYerlestir(liste, H) {
     const {N, P, byId} = H, saat = saatleri(liste, H);
     const fazla = id => { const p = byId.get(id); return p && p.plan != null ? saat.get(id) - p.plan * 24 : 0; };
-    let n = 0;
+    let n = 0, sert = sertSay(denetle(liste, H).ihlal); const bolSay = new Map();
     for (let d = 1; d <= N; d++) {
       const L = liste[d];
       for (const T of ['surG', 'surA']) {
         const p = byId.get(L[T]); if (!p || p.isci || hak(p) - saat.get(p.id) < 12) continue;      // ayrılan saati dolmuşsa (boş vardiyaya yazıldıysa) birleşik görev verilmez
         if (['es', 'ysp', 'sur', T === 'surG' ? 'surA' : 'surG'].some(t => L[t] === p.id) || Object.values(L.bol || {}).some(b => b && b.id === p.id)) continue;
-        const ad = ['ysp', 'es'].filter(B => p.yet.includes(B) && L[B] != null && !(L.bol && L.bol[B]) && !(byId.get(L[B]) || {}).isci);
+        const ad = ['ysp', 'es'].filter(B => p.yet.includes(B) && !(B === 'es' && attMi(p)) && L[B] != null && !(L.bol && L.bol[B]) && !(byId.get(L[B]) || {}).isci);      // Sürüm 13.78.1: ATT sürücüye ekip şefi yarısı verilmez
         if (!ad.length) continue;
-        const B = ad.sort((x, y) => fazla(L[y]) - fazla(L[x]))[0], X = L[B];
-        L.bol = {...(L.bol || {}), [B]: T === 'surA' ? {id: X, saat: 12} : {id: p.id, saat: 12}};
-        if (T === 'surA') L[B] = p.id;
-        saat.set(X, saat.get(X) - 12); saat.set(p.id, saat.get(p.id) + 12); n++;
+        // Sürüm 13.78.1: önce YSP bölünür (ekip şefi mümkün olduğunca 24 saat kalır), sonra ay içinde en az bölünen kişinin nöbeti; sert kural ihlali artarsa geri alınır
+        const sira = ad.sort((x, y) => (x === 'ysp' ? 0 : 1) - (y === 'ysp' ? 0 : 1) || (bolSay.get(L[x]) || 0) - (bolSay.get(L[y]) || 0) || fazla(L[y]) - fazla(L[x]));
+        for (const B of sira) { const X = L[B], eskiBol = L.bol, eskiB = L[B];
+          L.bol = {...(L.bol || {}), [B]: T === 'surA' ? {id: X, saat: 12} : {id: p.id, saat: 12}};
+          if (T === 'surA') L[B] = p.id;
+          const s2 = sertSay(denetle(liste, H).ihlal);
+          if (s2 > sert) { L.bol = eskiBol; L[B] = eskiB; if (L.bol && !Object.keys(L.bol).length) delete L.bol; continue; }
+          sert = s2; bolSay.set(X, (bolSay.get(X) || 0) + 1);
+          saat.set(X, saat.get(X) - 12); saat.set(p.id, saat.get(p.id) + 12); n++; break; }
       }
     }
     return n;
@@ -1311,22 +1322,37 @@ const NobetCore = (() => {
           const x = tas(A, C, sa1); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
         if (yapildi) break; }
         if (yapildi) break; }
-      // Sürüm 13.78.1: AABT'lerin planı ekip şefi günlerini karşılamıyorsa (ör. 4 × 7,67 = 30,67 < 31) fazlası olan AABT'nin ekip şefi
-      // nöbetinin bir kısmı ATT'ye verilir ("ATT ekip şefine yalnız AABT yetmezse"); önce yukarıdaki iki yol denenir
-      if (!yapildi) for (const A of fazla) { if (attMi(A)) continue; for (const B of eksik) { if (!attMi(B)) continue;
-        const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));
-        const x = tas(A, B, sa1, true); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
-        if (yapildi) break; }
-      // eksik ATT o günlerde boş değilse (iki nöbet arası kuralı) parça planı tam olan başka bir ATT'ye, sonraki turda ondan eksik olana geçer
-      if (!yapildi) for (const A of fazla) { if (attMi(A)) continue; for (const B of eksik) { if (!attMi(B)) continue;
-        const sa1 = Math.max(1, Math.min(23, Math.round(Math.min(-fark(B), fark(A)))));
-        for (const C of P) { if (C === B || !attMi(C) || C.plan == null || Math.abs(fark(C)) >= 0.9 || !C.yet.includes('es')) continue;
-          const x = tas(A, C, sa1, true); if (x === null) return bolunen; if (x) { yapildi = true; break; } }
-        if (yapildi) break; }
-        if (yapildi) break; }
       if (!yapildi) break;
     }
     return bolunen;
+  }
+
+  // Sürüm 13.78.1: gereksiz bölmeleri birleştirir — aynı iki kişi iki ayrı günde aynı nöbeti paylaşıyorsa (A 09–21 / B 21–09, başka gün B / A) ve
+  // ikisinin o iki gündeki saatleri 24 + 24 ediyorsa, bir gün tamamen A'ya, öbür gün tamamen B'ye verilir. Kişilerin saatleri değişmez; sert kural ihlali artarsa yapılmaz.
+  function bolBirlestir(liste, H) {
+    const {N, byId} = H; let sert = sertSay(denetle(liste, H).ihlal), n = 0;
+    for (let tur = 0; tur < 300; tur++) {
+      const B = [];
+      for (let d = 1; d <= N; d++) { const L = liste[d]; if (!L.bol) continue;
+        for (const t of ['es', 'ysp', 'sur']) { const b = L.bol[t]; if (!b || L[t] == null) continue; const a = byId.get(L[t]), c = byId.get(b.id); if (!a || !c || a.isci || c.isci) continue;
+          B.push({d, t, k: [L[t], b.id], h: new Map([[L[t], 24 - b.saat], [b.id, b.saat]])}); } }
+      let yapildi = false;
+      dis: for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+        const x = B[i], y = B[j], ids = x.k; if (ids[0] === ids[1] || !ids.every(id => y.h.has(id))) continue;
+        const [P1, P2] = ids; if (x.h.get(P1) + y.h.get(P1) !== 24) continue;
+        for (const [ax, ay] of [[P1, P2], [P2, P1]]) {
+          if (!byId.get(ax).yet.includes(x.t) || !byId.get(ay).yet.includes(y.t)) continue;
+          const Lx = liste[x.d], Ly = liste[y.d], ex = [Lx[x.t], Lx.bol], ey = [Ly[y.t], Ly.bol];
+          const sil = (L, t) => { const o = {...L.bol}; delete o[t]; L.bol = Object.keys(o).length ? o : undefined; if (!L.bol) delete L.bol; };
+          Lx[x.t] = ax; sil(Lx, x.t); Ly[y.t] = ay; sil(Ly, y.t);
+          const s2 = sertSay(denetle(liste, H).ihlal);
+          if (s2 <= sert) { sert = s2; n++; yapildi = true; break dis; }
+          Lx[x.t] = ex[0]; if (ex[1]) Lx.bol = ex[1]; else delete Lx.bol; Ly[y.t] = ey[0]; if (ey[1]) Ly.bol = ey[1]; else delete Ly.bol;
+        }
+      }
+      if (!yapildi) break;
+    }
+    return n;
   }
 
   // Otomatik nöbet listesi. girdi: {y, m, kisiler:[...], tatil:[gün/iso]}. seçenekler: {kural, sureMs, deneme, seed, zorlaMs}
@@ -1347,7 +1373,7 @@ const NobetCore = (() => {
       while (kal >= 1e7 && Date.now() - t1 < o.zorlaMs && durgun < 4) { const ms = Math.min(1500, Math.max(300, o.zorlaMs - (Date.now() - t1))), once = kal; n++; dene(o.seed + 5000 + 131 * n, ms, n % 2 === 0 ? null : eniyi); durgun = kal < once ? 0 : durgun + 1; yield {oran: Math.min(0.95, (Date.now() - t0) / topSure), deneme: denendi}; }      // dönüşümlü: sıfırdan yeni deneme / en iyiden düşük sıcaklıkla iyileştirme; art arda 4 denemede iyileşme yoksa durur
     }
     eniyi = eniyi.map(x => ({...x, ...(x.bol ? {bol: {...x.bol}} : {})}));
-    const doldu = bosDoldur(eniyi, H), kombi = kombiYerlestir(eniyi, H), muaf = muafYerlestir(eniyi, H), dy = donusYerlestir(eniyi, H), kesir = kesirDengele(eniyi, H);
+    const doldu = bosDoldur(eniyi, H) + (denetle(eniyi, H).ihlal.filter(i => i.tur === 'eksik').length > kacinilmaz ? bosDoldur(eniyi, H, true) : 0), kombi = kombiYerlestir(eniyi, H), muaf = muafYerlestir(eniyi, H), dy = donusYerlestir(eniyi, H), kesir = kesirDengele(eniyi, H), birles = bolBirlestir(eniyi, H);
     const son = denetle(eniyi, H), bos = son.ihlal.filter(i => i.tur === 'eksik').length;
     return {liste: eniyi, ihlal: son.ihlal, ceza: son.toplam, say: son.say, deneme: denendi, sureMs: Date.now() - t0, zorlandi, sert: sertSay(son.ihlal) - bos, bos, bosYuva: kap.bos, kombi, doldu, muaf, donus: dy, kesir};
   }
@@ -2959,7 +2985,7 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
   const N2_SEKME = [['plan', 'Nöbet hedefleri'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
-  const IHLAL_AD = {donus: 'İzin / rapor dönüşü nöbetsiz', eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği', gunGece: 'İşçi gündüz / gece dengesizliği'};
+  const IHLAL_AD = {yarimDenge: '12 saatlik sürücü yarısı dengesiz', donus: 'İzin / rapor dönüşü nöbetsiz', eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği', gunGece: 'İşçi gündüz / gece dengesizliği'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
   // İstasyon sorumlusu, plan kesinleşmeden (İstasyonlara gönder) kendi istasyonunun hiçbir sayısını ve nöbet listesi araçlarını göremez
   const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
