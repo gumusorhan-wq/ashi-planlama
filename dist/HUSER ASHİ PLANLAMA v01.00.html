@@ -1090,7 +1090,7 @@ const NobetCore = (() => {
       if (M && surucu.length) { const k = new Array(m).fill(0); let kalan = M;
         // sırayla: her turda en az yarısı olan (eşitse adedi çok olan) sürücüye bir yarı; kişi adedinin iki katını aşmaz
         while (kalan > 0) { const ad = surucu.filter(i => k[i] < 2 * u24[i]).sort((x, y) => k[x] - k[y] || u24[y] - u24[x])[0]; if (ad === undefined) break; k[ad]++; kalan--; }
-        surucu.forEach(i => { uh[i] = k[i]; u24[i] = Math.max(0, u24[i] - Math.ceil(k[i] / 2)); }); } }
+        surucu.forEach(i => { uh[i] = k[i]; u24[i] = Math.max(0, u24[i] - Math.floor(k[i] / 2)); }); } }      // tek sayıda yarıda 12 saat fazla kalır (azami aşılabilir, en az nöbetin altına inilmez; birleşik görev gerekmez)
     P.forEach((p, i) => {
       cap[SRC][2 + i] = u24[i]; cap[SRC][2 + m + i] = uh[i];
       tipler.forEach((t, k) => { if (!elig(i, t)) return; if (t === 'es' && attMi(p)) return; const dugum = sinif(t) ? 2 + m + i : 2 + i; cap[dugum][2 + 2 * m + k] = 99; });
