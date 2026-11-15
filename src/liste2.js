@@ -14,11 +14,11 @@
 const ListeIyilestir = (() => {
   const NC = typeof NobetCore !== 'undefined' ? NobetCore : require('./nobet.js');
   const rng = seed => { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; };
-  const C = {bos: 20000, uygun: 60000, cakisma: 60000, izin: 60000, dinlenme: 60000, eksikSaat: 300, fazlaSaat: 3, bolme: 40, esBolme: 40, surBolme: 600, garipParca: 800,
-    denge: 18, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 60};
-  const PARCA = [8, 12, 16];
+  const C = {bos: 20000, uygun: 60000, cakisma: 60000, izin: 60000, dinlenme: 60000, eksikSaat: 2000, fazlaSaat: 3, bolme: 60, esBolme: 150, surBolme: 3000, garipParca: 800,
+    denge: 18, ikili: 120, gunduz24: 250, gunduz3: 90, istek: 80, izinOnce: 300, donus: 600, maxAra: 60, surGunAsiri: 300, yariDenge: 60, yariTek: 900};
+  const PARCA = [8, 12, 16, 8, 12, 16, 4, 20];      // 4 / 20 yalnız zorda kalınca (ceza)
 
-  function iyilestir(girdi, liste0, secenek) {
+  function* iyilestirAdim(girdi, liste0, secenek) {
     const o = {sureMs: 2500, seed: 1, ...(secenek || {})}, H = NC.hazirla(girdi, o.kural), {N, K, P} = H, R = rng(o.seed), t0 = Date.now();
     const ix = new Map(P.map((p, i) => [p.id, i])), m = P.length;
     const surAtt = i => P[i].grup === 'sy';
@@ -55,7 +55,7 @@ const ListeIyilestir = (() => {
     const dengeHesap = () => { let s2 = 0; memur.forEach(i => { s2 += bolSay[i] * bolSay[i]; }); return C.denge * s2; };
     // tek işçili günlerin memur yarısı dengesi (sürücü olabilen memurlar arasında)
     const surucu = memur.filter(i => uygun(i, 'M')); const yariSay = new Int32Array(m); Y.forEach(y => { if (y.t === 'M' && y.a >= 0) yariSay[y.a]++; });
-    const yariHesap = () => { if (surucu.length < 2) return 0; let s2 = 0; surucu.forEach(i => { s2 += yariSay[i] * yariSay[i]; }); return C.yariDenge * s2; };
+    const yariHesap = () => { if (surucu.length < 2) return 0; let s2 = 0; surucu.forEach(i => { s2 += yariSay[i] * yariSay[i] * C.yariDenge + (yariSay[i] % 2 ? C.yariTek : 0); }); return s2; };      // tek sayıda yarı 4 saatlik artık bırakır (7,67 hedefte)
     // --- kişi maliyeti
     const hedefSaat = P.map(p => p.plan != null ? Math.round(p.plan * 24) : null);
     function kisiMaliyet(i) {
@@ -101,6 +101,17 @@ const ListeIyilestir = (() => {
     const dc = new Array(N + 2).fill(0); for (let d = 1; d <= N; d++) dc[d] = gunMaliyet(d); let dct = dc.reduce((a, v) => a + v, 0);
     const pc = P.map((_, i) => kisiMaliyet(i)); let yc = Y.reduce((a, y) => a + yuvaMaliyet(y), 0);
     const toplam = () => pc.reduce((a, v) => a + v, 0) + yc + dct + ikiliCeza + dengeHesap() + yariHesap();
+    // ön adım: tek işçili günlerin memur yarıları sürücülere çift sayıda ve dengeli (7,67 gibi hedeflerde 4 saatlik artık kalmasın);
+    // tavlama tek adımda bu dengeye geçemiyor (arada saat açığı büyür), bu yüzden önce kişiler yer değiştirir, saatler sonra tavlamayla dengelenir
+    if (surucu.length >= 2) for (let tur = 0; tur < 40; tur++) {
+      const tek = surucu.filter(i => yariSay[i] % 2); if (tek.length < 2) break;
+      const [p1, p2] = tek.sort((x, y) => yariSay[y] - yariSay[x]); let oldu = false;
+      for (let s = 0; s < S && !oldu; s++) { const y = Y[s]; if (y.t !== 'M' || y.a !== p1 || P[p2].izin.has(y.d)) continue;
+        const once = pc[p1] + pc[p2]; coz(s, p1); bagla(s, p2); y.a = p2; yariSay[p1]--; yariSay[p2]++; const n1 = kisiMaliyet(p1), n2 = kisiMaliyet(p2);
+        if (n1 + n2 - once < C.dinlenme / 2 && n1 < C.cakisma && n2 < C.cakisma) { pc[p1] = n1; pc[p2] = n2; oldu = true; }
+        else { coz(s, p2); bagla(s, p1); y.a = p1; yariSay[p1]++; yariSay[p2]--; } }
+      if (!oldu) break;
+    }
     let cur = toplam(), en = cur, enY = Y.map(y => ({...y}));
     // --- hareketler
     const adaylar = (t, d) => { const r = []; for (let i = 0; i < m; i++) if (uygun(i, t) && !P[i].izin.has(d)) r.push(i); return r; };
@@ -118,12 +129,17 @@ const ListeIyilestir = (() => {
           const A = ADAY[y.t]; if (!A.length) continue; const yeni = sec(A);
           if (y.b >= 0 && R() < 0.5) { if (yeni === y.a) continue; y.b = yeni; } else { if (yeni === y.b) continue; y.a = yeni; }
           etk.add(yeni);
+        } else if (r < 0.45) {   // aynı iki kişinin iki bölmesini birleştir: biri bir günü, öbürü öbür günü tam tutar
+          if (y.b < 0 || y.t === 'M') continue; const es2 = []; for (let k = 0; k < S; k++) { const z = Y[k]; if (k !== s && !z.sabit && z.b >= 0 && z.t !== 'M' && ((z.a === y.a && z.b === y.b) || (z.a === y.b && z.b === y.a))) es2.push(k); }
+          if (!es2.length) continue; s2 = sec(es2); y2 = Y[s2]; once2 = {a: y2.a, b: y2.b, h: y2.h};
+          const [p1, p2] = R() < 0.5 ? [y.a, y.b] : [y.b, y.a]; y.a = p1; y.b = -1; y.h = 24; y2.a = p2; y2.b = -1; y2.h = 24;
         } else if (r < 0.6) {    // aynı türden iki yuvanın içeriğini takas
           s2 = Math.floor(R() * S); y2 = Y[s2]; if (s2 === s || y2.sabit || y2.t !== y.t || (y.t === 'M' && y2.yari !== y.yari && false)) continue;
           once2 = {a: y2.a, b: y2.b, h: y2.h}; [y.a, y2.a] = [y2.a, y.a]; [y.b, y2.b] = [y2.b, y.b]; [y.h, y2.h] = [y2.h, y.h];
           etk.add(once2.a); etk.add(once2.b);
         } else if (r < 0.8) {    // böl / birleştir
           if (y.t === 'M' || y.a < 0) continue;
+          if (y.b < 0 && y.t === 'sur' && R() < 0.8) continue;      // sürücü 24 saat tek kişide; yalnız gerçekten gerekirse bölünür (kural 2, yüksek ceza)
           if (y.b < 0) { const A = ADAY[y.t]; const yeni = sec(A); if (yeni === y.a) continue; y.b = yeni; y.h = PARCA[Math.floor(R() * PARCA.length)]; etk.add(yeni); }
           else { if (R() < 0.5) y.a = y.b; y.b = -1; y.h = 24; }
         } else {                 // parça saatini değiştir ya da sırayı çevir
@@ -159,6 +175,7 @@ const ListeIyilestir = (() => {
         if (y.t === 'M') { if (y.a >= 0) yariSay[y.a]++; if (y2 && y2.a >= 0) yariSay[y2.a]++; }
         eskiP.forEach((v, i) => { pc[i] = v; }); yc -= yeniY - eskiY; eskiD.forEach((v, d) => { dct += v - dc[d]; dc[d] = v; });
       }
+      yield Math.min(0.99, (Date.now() - t0) / sure);
     }
     // --- listeye çevir
     const liste = NC.bos(N);
@@ -168,6 +185,10 @@ const ListeIyilestir = (() => {
       if (y.a < 0) return; L[y.t] = P[y.a].id; if (y.b >= 0) L.bol = {...(L.bol || {}), [y.t]: {id: P[y.b].id, saat: 24 - y.h}}; });
     return {liste, maliyet: en, adim: it};
   }
-  return {iyilestir, MALIYET: C};
+  const iyilestir = (g, l, o) => { const it = iyilestirAdim(g, l, o); let r; while (!(r = it.next()).done); return r.value; };
+  // tarayıcıda arayüzü kilitlemeden: her ~40 ms'de bir ara verir; ilerle(oran)
+  const iyilestirAsync = (g, l, o, ilerle) => new Promise((coz, red) => { const it = iyilestirAdim(g, l, o);
+    const adim = () => { try { const t = Date.now(); let r; do { r = it.next(); } while (!r.done && Date.now() - t < 40); if (r.done) coz(r.value); else { if (ilerle) ilerle(r.value); setTimeout(adim, 0); } } catch (e) { red(e); } }; adim(); });
+  return {iyilestir, iyilestirAsync, MALIYET: C};
 })();
 if (typeof module !== 'undefined') module.exports = ListeIyilestir;

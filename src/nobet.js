@@ -95,8 +95,21 @@ const NobetCore = (() => {
       if (p.gunduz) { const b8 = Math.round(L.reduce((t, x) => t + (x.saat != null ? x.saat : 24), 0) / 24 * 100) / 100; if (Math.abs(b8 - (p.plan || 0)) > 0.34) ekle('adet', 20 * Math.abs(b8 - (p.plan || 0)), 0, p.id, `${p.ad}: gündüz mesaisi ${p.plan || 0} nöbet karşılığı, listede ${b8}`, {fark: b8 - (p.plan || 0)}); return; }
       // 24 saatlik nöbetler: dinlenme (min boşluk gün) ve sürücü gün aşırı 3
       const onc = p.onc || {t24: [], s24: [], A: [], G: []}, oAd = d => d <= 0 ? `önceki ayın ${d === 0 ? 'son' : `sondan ${1 - d}.`} günü` : `${d}. gün`;      // önceki ayın son günleri (0, -1 …)
-      const g24 = [...onc.t24, ...L.filter(x => !(x.tip === 'surG' || x.tip === 'surA')).map(x => x.gun)].sort((a, b) => a - b);
-      for (let i = 1; i < g24.length; i++) if (g24[i] >= 1 && g24[i] - g24[i - 1] - 1 < K.minAra) ekle('dinlenme', 700, g24[i], p.id, `${p.ad}: ${oAd(g24[i - 1])} ve ${g24[i]}. gün art arda 24 saatlik nöbet (arada en az ${K.minAra} gün boşluk gerekir)`);
+      if (p.isci) { const g24 = [...onc.t24].sort((a, b) => a - b); for (let i = 1; i < g24.length; i++) if (g24[i] >= 1 && g24[i] - g24[i - 1] - 1 < K.minAra) ekle('dinlenme', 700, g24[i], p.id, `${p.ad}: ${oAd(g24[i - 1])} ve ${g24[i]}. gün art arda 24 saatlik nöbet`); }
+      else {
+        // Sürüm 13.79 (kullanıcı kuralı 15.11.2026): sabah 09:00'da biten görevden (24 saat, gece parçası) sonra en az 24 saat dinlenme;
+        // gece yarısı (21–09) en çok 2 art arda; gündüz biten görevden sonra ertesi gün 24 saat ve 3+ art arda gündüz yalnız zorda kalınca (uyarı)
+        const gun = new Map(), ek = (d, bas, bit) => { const g = gun.get(d); if (g) { g.bas = Math.min(g.bas, bas); g.bit = Math.max(g.bit, bit); } else gun.set(d, {bas, bit}); };
+        onc.t24.forEach(d => ek(d, 0, 24)); (onc.A || []).forEach(d => ek(d, 12, 24)); (onc.G || []).forEach(d => ek(d, 0, 12));
+        L.forEach(x => { if (x.tip === 'surG') ek(x.gun, 0, 12); else if (x.tip === 'surA') ek(x.gun, 12, 24); else if (x.tip === 'bol') ek(x.gun, 24 - x.saat, 24); else ek(x.gun, 0, x.saat != null ? x.saat : 24); });
+        const gece = g => g && g.bas === 12 && g.bit === 24, gunduzBiter = g => g && g.bit < 24;
+        [...gun.keys()].sort((a, b) => a - b).forEach(d => { const g = gun.get(d), n = gun.get(d + 1); if (!n || d + 1 < 1) return;
+          if (g.bit === 24) { if (gece(g) && gece(n)) { if (gece(gun.get(d - 1))) ekle('dinlenme', 700, d + 1, p.id, `${p.ad}: ${d - 1}., ${d}. ve ${d + 1}. gün art arda gece (en çok 2)`); }
+            else ekle('dinlenme', 700, d + 1, p.id, `${p.ad}: ${oAd(d)} sabah biten görevden sonra ${d + 1}. gün yine görev (en az 24 saat dinlenme gerekir)`); }
+          else { if (n.bas === 0 && n.bit >= 16) ekle('gunduz24', 250, d + 1, p.id, `${p.ad}: ${oAd(d)} gündüz görevinden sonra ${d + 1}. gün 24 saat (zorda kalınca)`);
+            if (gunduzBiter(gun.get(d - 1)) && gunduzBiter(n)) ekle('gunduz3', 90, d + 1, p.id, `${p.ad}: ${d - 1}.–${d + 1}. gün art arda gündüz (zorda kalınca)`); } });
+        if (K.minAra > 1) gun.forEach((g, d) => { if (g.bit < 24 || d < 0) return; for (let k = 2; k <= K.minAra; k++) if (gun.has(d + k)) ekle('dinlenme', 700, d + k, p.id, `${p.ad}: ${d}. gün görevinden sonra en az ${K.minAra} gün boşluk gerekir`); });
+      }
       if (K.surGunAsiri) {
         const s24 = new Set([...onc.s24, ...L.filter(x => x.tip === 'sur').map(x => x.gun)]);
         s24.forEach(d => { if (d + 4 >= 1 && s24.has(d + 2) && s24.has(d + 4)) ekle('surGunAsiri', 300, d + 4, p.id, `${p.ad}: ${d}., ${d + 2}., ${d + 4}. gün sürücü olarak gün aşırı üst üste 3 nöbet (24 saat)`); });

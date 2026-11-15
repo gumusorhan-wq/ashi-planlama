@@ -2,7 +2,7 @@
   // ================= MODÜL 2 — İSTASYON NÖBET LİSTESİ =================
   const NC = NobetCore;
   const N2_SEKME = [['plan', 'Nöbet hedefleri'], ['istek', 'İstek takvimi'], ['liste', 'Nöbet listesi'], ['denetim', 'Denetim ve öneriler'], ['paket', 'Çıktı']];
-  const IHLAL_AD = {yarimDenge: '12 saatlik sürücü yarısı dengesiz', donus: 'İzin / rapor dönüşü nöbetsiz', eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği', gunGece: 'İşçi gündüz / gece dengesizliği'};
+  const IHLAL_AD = {gunduz24: 'Gündüz görevinden sonra 24 saat (zorda kalınca)', gunduz3: '3+ gün art arda gündüz (zorda kalınca)', yarimDenge: '12 saatlik sürücü yarısı dengesiz', donus: 'İzin / rapor dönüşü nöbetsiz', eksik: 'Boş nöbet branşı', yetenek: 'Nöbet branşına uygun değil', izin: 'İzinli günde nöbet', cakisma: 'Aynı gün çift görev', dinlenme: 'Dinlenme ihlali', izinOnce: 'Yıllık izin öncesi boşluk', surGunAsiri: 'Sürücü gün aşırı 3 nöbet', isciGece: 'İşçi art arda 3 gece', aralik: 'İki nöbet arası çok uzun', istek: 'İstenmeyen güne nöbet', adet: 'Nöbet sayısı farkı', ozelGun: 'Hafta sonu / tatil dengesizliği', gunGece: 'İşçi gündüz / gece dengesizliği'};
   const GUN_AD = ['Pz', 'Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct'];
   // İstasyon sorumlusu, plan kesinleşmeden (İstasyonlara gönder) kendi istasyonunun hiçbir sayısını ve nöbet listesi araçlarını göremez
   const n2Onayli = () => !!S.plan && (S.plan.durum === 'kesin' || S.plan.durum === 'kilitli');
@@ -92,6 +92,14 @@
       document.addEventListener('keydown', tus, true); root.appendChild(d);
     });
   }
+  // Sürüm 13.79: liste önce eski üreticiyle kurulur, sonra kullanıcı kurallarına göre iyileştirilir (liste2.js: dinlenme, 8 / 16 bölme, sürücü 24 saat, dengeli bölünme, en az nöbet)
+  async function n2Uret(G, sec, ilerle) {
+    const r = await NC.uretAsync(G.girdi, sec, x => ilerle && ilerle({oran: x.oran * 0.55, deneme: x.deneme}));
+    if (typeof ListeIyilestir === 'undefined') return r;
+    const y = await ListeIyilestir.iyilestirAsync(G.girdi, r.liste, {kural: G.kural, sureMs: 2500, seed: sec.seed}, o => ilerle && ilerle({oran: 0.55 + o * 0.45, deneme: 'iyileştirme'}));
+    const H = NC.hazirla(G.girdi, G.kural), d = NC.denetle(y.liste, H);
+    return {...r, liste: y.liste, ihlal: d.ihlal, ceza: d.toplam, bos: d.ihlal.filter(i => i.tur === 'eksik').length};
+  }
   function n2OtoPlanla(b) { if (!n2Duz() || (S.n2 && S.n2.calisiyor) || n2Oto.kuyruk.includes(b.ad)) return; n2Oto.kuyruk.push(b.ad); setTimeout(n2OtoCalis, 60); }
   async function n2OtoCalis() {
     if (n2Oto.calis) return; n2Oto.calis = true;
@@ -99,7 +107,7 @@
       const ad = n2Oto.kuyruk.shift(), b = S.plan && S.plan.birimler.find(x => x.ad === ad);
       if (!b || b.ekipOf || !n2Duz() || n2ListeDurum(b) !== 'eski') continue;
       const imza = n2Imza(b), G = n2Girdi(b);
-      const r = await NC.uretAsync(G.girdi, {kural: G.kural, sureMs: 1500, deneme: 5, zorlaMs: 4000, seed: (Date.now() % 100000) + 1}, () => {});
+      const r = await n2Uret(G, {kural: G.kural, sureMs: 1500, deneme: 5, zorlaMs: 4000, seed: (Date.now() % 100000) + 1}, () => {});
       if (!S.plan || !n2Duz() || n2Imza(b) !== imza || n2ListeDurum(b) !== 'eski') continue;      // bu sırada plan yine değiştiyse sonraki çizimde yeniden sıraya girer
       const dp = n2Depo(ad); dp.liste = r.liste; dp.imza = imza; dp.elle = false; dp.damga = damgaYeni(); S.n2.oneri = null;
       logla('Modül 2: liste plana göre kendiliğinden güncellendi', `${ad}${r.bos ? ` · ${r.bos} boş` : ''}`); kaydet(); render();
@@ -472,8 +480,8 @@
         const dp = n2Depo(b.ad); if (dp.liste && !(await onay('Mevcut liste yeni oluşturulan listeyle değiştirilecek. Devam edilsin mi?'))) break;
         if (!n2Duz()) { toast('Düzenleme yetkiniz yok / ay kilitli.'); break; }
         S.n2.calisiyor = true; render(); await new Promise(r => setTimeout(r, 40));
-        const ilerle = x => { const el = root.querySelector('#ap-n2-ilerleme'); if (el) el.innerHTML = `<div class="ap-note">Liste oluşturuluyor… %${Math.round(x.oran * 100)} (${x.deneme}. deneme)</div><div style="height:6px;background:var(--ap-line);margin-top:4px"><div style="height:6px;width:${Math.round(x.oran * 100)}%;background:var(--ap-pri, #0055A4);transition:width .2s"></div></div>`; };
-        try { const G = n2Girdi(b), imza = n2Imza(b), r = await NC.uretAsync(G.girdi, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 8000, seed: (Date.now() % 100000) + 1}, ilerle); mut2(() => { dp.liste = r.liste; dp.imza = imza; dp.elle = false; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.bos ? ` · ${r.bos} boş` : ''}`);
+        const ilerle = x => { const el = root.querySelector('#ap-n2-ilerleme'); if (el) el.innerHTML = `<div class="ap-note">Liste oluşturuluyor… %${Math.round(x.oran * 100)} (${typeof x.deneme === 'number' ? x.deneme + '. deneme' : 'kurallara göre düzeltiliyor'})</div><div style="height:6px;background:var(--ap-line);margin-top:4px"><div style="height:6px;width:${Math.round(x.oran * 100)}%;background:var(--ap-pri, #0055A4);transition:width .2s"></div></div>`; };
+        try { const G = n2Girdi(b), imza = n2Imza(b), r = await n2Uret(G, {kural: G.kural, sureMs: 3000, deneme: 10, zorlaMs: 8000, seed: (Date.now() % 100000) + 1}, ilerle); mut2(() => { dp.liste = r.liste; dp.imza = imza; dp.elle = false; }, 'Modül 2: otomatik liste', `${b.ad} ceza ${fmt(r.ceza)}${r.bos ? ` · ${r.bos} boş` : ''}`);
           toast([r.bos ? `${r.bos} nöbet boş kaldı (kadro yetmiyor; personel isteyin).` : 'Tüm nöbetler dolu.', r.sert ? `${r.sert} kural ihlali kaldı; Denetim ve öneriler sekmesine bakın.` : 'Kural ihlali yok.'].join(' ')); }
         finally { S.n2.calisiyor = false; }
         break;
