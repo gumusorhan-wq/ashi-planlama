@@ -997,7 +997,8 @@ const NobetCore = (() => {
       // yetenek, izin, istek, aynı gün çakışma
       L.forEach(x => {
         const yuva = x.tip === 'bol' ? x.yuva : x.tip === 'surG' || x.tip === 'surA' ? 'sur' : x.tip;
-        if (!p.yet.includes(yuva)) ekle('yetenek', 900, x.gun, p.id, `${p.ad}: ${YUVA_AD[yuva]} nöbet branşında görevlendirilemez`);
+        // Sürüm 13.78.1 (kullanıcı kararı): sürücü olarak görünmeyen AABT / ATT bazen sürücü olabilir — istasyonun elle yazdığı sürücü nöbeti ihlal sayılmaz (ASOS listelerinden izlenir); otomatik üretim yine yalnız sürücüleri yazar
+        if (!p.yet.includes(yuva) && !(yuva === 'sur' && (p.grup === 'ke' || p.grup === 'ysp'))) ekle('yetenek', 900, x.gun, p.id, `${p.ad}: ${YUVA_AD[yuva]} nöbet branşında görevlendirilemez`);
         if (p.izin.has(x.gun)) ekle('izin', 900, x.gun, p.id, `${p.ad}: ${x.gun}. gün izinli`);
         else if (p.istek.has(x.gun)) ekle('istek', 80, x.gun, p.id, `${p.ad}: ${x.gun}. gün nöbet istemiyor`);
         if (p.once.has(x.gun) && !p.izin.has(x.gun)) ekle('izinOnce', 300, x.gun, p.id, `${p.ad}: yıllık izin öncesi ${K.izinOnce} gün boşluk kuralı (${x.gun}. gün)`);
@@ -3201,7 +3202,11 @@ const AP_AMB = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' widt
     const {G, H, L, d} = n2Deneti(b), dp = n2Depo(b.ad), N = H.N, duz = n2Duz(), ks = G.girdi.kisiler, K = G.kural, kap = NC.kapasiteAnalizi(G.girdi, G.kural);
     const hata = new Map(); d.ihlal.forEach(i => { const a = `${i.gun}|${i.kisi == null ? '' : i.kisi}`; hata.set(a, (hata.get(a) || '') + i.mesaj + '\n'); if (i.yuva) hata.set(`${i.gun}||${i.yuva}`, i.mesaj); });
     // seçenekler: 12 saatlik sürücü vardiyasına işçi ve sürücülüğü doğrulanmış AABT / ATT; 24 saatlik branşlara işçi dışındakiler (yeteneğine göre). Yazılı kişi her durumda görünür.
-    const secenek = (yuva, tip, sec, bosYazi) => `<option value="">${bosYazi || ''}</option>` + ks.filter(k => k.id === sec || (((H.byId.get(k.id) || {}).yet || NC.YETENEK[k.grup] || []).includes(yuva) && (tip === 'surG' || tip === 'surA' || k.grup !== 'isci'))).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
+    // Sürüm 13.78.1: sürücü sütununda önce sürücüler, ardından sürücü görünmeyen AABT / ATT (bazen sürücü olabilir; ihlal sayılmaz)
+    const uygun = (k, yuva, tip) => (((H.byId.get(k.id) || {}).yet || NC.YETENEK[k.grup] || []).includes(yuva) && (tip === 'surG' || tip === 'surA' || k.grup !== 'isci'));
+    const secenek = (yuva, tip, sec, bosYazi) => { const asil = ks.filter(k => k.id === sec || uygun(k, yuva, tip)), ek = yuva === 'sur' ? ks.filter(k => !asil.includes(k) && (k.grup === 'ke' || k.grup === 'ysp')) : [];
+      const op = k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`;
+      return `<option value="">${bosYazi || ''}</option>` + asil.map(op).join('') + (ek.length ? `<optgroup label="Sürücü olarak görünmeyen">${ek.map(op).join('')}</optgroup>` : ''); };
     const saatYaz = h => C.pad((9 + h) % 24) + ':00';
     const hucre = (gun, tip) => { const yuva = tip === 'surG' || tip === 'surA' ? 'sur' : tip, id = L[gun][tip]; let e = (id != null && hata.get(`${gun}|${id}`)) || (id == null && hata.get(`${gun}||${yuva}`) && (tip === 'sur' || tip === 'es' || tip === 'ysp') ? 'Boş' : '');
       const bl = L[gun].bol && L[gun].bol[tip], ilk = bl ? 24 - bl.saat : 24;

@@ -134,3 +134,11 @@ console.log('nöbet çekirdek testleri geçti');
   ks.filter(k => k.grup !== 'isci').forEach(k => assert.ok(Math.abs(saat.get(k.id) - k.planlanan * 24) <= 1.01, `seed ${seed} K${k.id}: planı ${(k.planlanan * 24).toFixed(0)} sa, listede ${saat.get(k.id)} sa`)); }
   console.log('AABT ekip şefi küsurat testi geçti');
 }
+// Sürüm 13.78.1 (kullanıcı kararı): sürücü görünmeyen AABT / ATT'nin elle yazılan sürücü nöbeti ihlal değil; doktorunki ihlal
+{ const mk = (id, grup) => ({id, ad: 'K' + id, grup, planlanan: 1, plan: 1, ust: 2, ustYumusak: 2, azamiF: 2, izin: [], istek: []});
+  const ks = [mk(1, 'ke'), mk(2, 'ysp'), mk(3, 'dok'), mk(4, 'sy')];
+  const H = N.hazirla({y: 2026, m: 12, kisiler: ks, attEs: true}), L = N.bos(31);
+  L[2].sur = 1; L[6].sur = 2; L[10].sur = 3; L[14].sur = 4;
+  assert.strictEqual(N.denetle(L, H).ihlal.filter(i => i.tur === 'yetenek').length, 1, 'yalnız doktorun sürücü nöbeti ihlal olmalı');
+  console.log('sürücü serbest testi geçti');
+}

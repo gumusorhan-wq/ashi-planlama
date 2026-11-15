@@ -245,7 +245,11 @@
     const {G, H, L, d} = n2Deneti(b), dp = n2Depo(b.ad), N = H.N, duz = n2Duz(), ks = G.girdi.kisiler, K = G.kural, kap = NC.kapasiteAnalizi(G.girdi, G.kural);
     const hata = new Map(); d.ihlal.forEach(i => { const a = `${i.gun}|${i.kisi == null ? '' : i.kisi}`; hata.set(a, (hata.get(a) || '') + i.mesaj + '\n'); if (i.yuva) hata.set(`${i.gun}||${i.yuva}`, i.mesaj); });
     // seçenekler: 12 saatlik sürücü vardiyasına işçi ve sürücülüğü doğrulanmış AABT / ATT; 24 saatlik branşlara işçi dışındakiler (yeteneğine göre). Yazılı kişi her durumda görünür.
-    const secenek = (yuva, tip, sec, bosYazi) => `<option value="">${bosYazi || ''}</option>` + ks.filter(k => k.id === sec || (((H.byId.get(k.id) || {}).yet || NC.YETENEK[k.grup] || []).includes(yuva) && (tip === 'surG' || tip === 'surA' || k.grup !== 'isci'))).map(k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`).join('');
+    // Sürüm 13.78.1: sürücü sütununda önce sürücüler, ardından sürücü görünmeyen AABT / ATT (bazen sürücü olabilir; ihlal sayılmaz)
+    const uygun = (k, yuva, tip) => (((H.byId.get(k.id) || {}).yet || NC.YETENEK[k.grup] || []).includes(yuva) && (tip === 'surG' || tip === 'surA' || k.grup !== 'isci'));
+    const secenek = (yuva, tip, sec, bosYazi) => { const asil = ks.filter(k => k.id === sec || uygun(k, yuva, tip)), ek = yuva === 'sur' ? ks.filter(k => !asil.includes(k) && (k.grup === 'ke' || k.grup === 'ysp')) : [];
+      const op = k => `<option value="${k.id}" ${k.id === sec ? 'selected' : ''}>${esc(k.ad)}</option>`;
+      return `<option value="">${bosYazi || ''}</option>` + asil.map(op).join('') + (ek.length ? `<optgroup label="Sürücü olarak görünmeyen">${ek.map(op).join('')}</optgroup>` : ''); };
     const saatYaz = h => C.pad((9 + h) % 24) + ':00';
     const hucre = (gun, tip) => { const yuva = tip === 'surG' || tip === 'surA' ? 'sur' : tip, id = L[gun][tip]; let e = (id != null && hata.get(`${gun}|${id}`)) || (id == null && hata.get(`${gun}||${yuva}`) && (tip === 'sur' || tip === 'es' || tip === 'ysp') ? 'Boş' : '');
       const bl = L[gun].bol && L[gun].bol[tip], ilk = bl ? 24 - bl.saat : 24;

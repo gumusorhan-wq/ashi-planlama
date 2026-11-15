@@ -83,7 +83,8 @@ const NobetCore = (() => {
       // yetenek, izin, istek, aynı gün çakışma
       L.forEach(x => {
         const yuva = x.tip === 'bol' ? x.yuva : x.tip === 'surG' || x.tip === 'surA' ? 'sur' : x.tip;
-        if (!p.yet.includes(yuva)) ekle('yetenek', 900, x.gun, p.id, `${p.ad}: ${YUVA_AD[yuva]} nöbet branşında görevlendirilemez`);
+        // Sürüm 13.78.1 (kullanıcı kararı): sürücü olarak görünmeyen AABT / ATT bazen sürücü olabilir — istasyonun elle yazdığı sürücü nöbeti ihlal sayılmaz (ASOS listelerinden izlenir); otomatik üretim yine yalnız sürücüleri yazar
+        if (!p.yet.includes(yuva) && !(yuva === 'sur' && (p.grup === 'ke' || p.grup === 'ysp'))) ekle('yetenek', 900, x.gun, p.id, `${p.ad}: ${YUVA_AD[yuva]} nöbet branşında görevlendirilemez`);
         if (p.izin.has(x.gun)) ekle('izin', 900, x.gun, p.id, `${p.ad}: ${x.gun}. gün izinli`);
         else if (p.istek.has(x.gun)) ekle('istek', 80, x.gun, p.id, `${p.ad}: ${x.gun}. gün nöbet istemiyor`);
         if (p.once.has(x.gun) && !p.izin.has(x.gun)) ekle('izinOnce', 300, x.gun, p.id, `${p.ad}: yıllık izin öncesi ${K.izinOnce} gün boşluk kuralı (${x.gun}. gün)`);
