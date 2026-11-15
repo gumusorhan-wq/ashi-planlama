@@ -40,7 +40,7 @@ const on = N.oneriler(L, girdi, null, 10); assert.ok(on.oneriler.length > 0);
   for (let d = 1; d <= 30; d++) { const L = r3.liste[d]; assert.ok(L.sur !== 12 && L.es !== 12 && L.ysp !== 12, d + '. gün işçi 24 saatlik nöbette');
     if (L.surG === 12 || L.surA === 12) { isciVardiya++; assert.ok(!(L.surG === 12 && L.surA === 12), 'işçi aynı gün 24 saat'); const o = L.surG === 12 ? L.surA : L.surG; assert.ok(o != null && H3.byId.get(o).yet.includes('sur'), d + '. gün diğer 12 saat sürücü doğrulanmış kişide olmalı');
       const B = Object.entries(L.bol || {}).find(([y, b]) => b && (b.id === o || L[y] === o)); if (B) kombi++; } }
-  assert.strictEqual(isciVardiya, 16, 'işçi 16 vardiya (12 saat) tutmalı'); }      // Sürüm 13.78.1 (sıralı dağıtım, kullanıcı kararı): tek işçili günün memur yarısı 12 saat; sürücünün kalan saati tam günlerle dolar, 12+12 birleşik görev yalnız planının altında kalan sürücüye (eskiden ≥ 14 birleşik görev bekleniyordu)
+  assert.strictEqual(isciVardiya, 16, 'işçi 16 vardiya (12 saat) tutmalı'); assert.ok(kombi >= 14, 'tek işçili günlerde 12+12 birleşik görev: ' + kombi); }
 // AABT sürücülüğü doğrulanmamışsa (ke) sürücü olamaz
 assert.ok(!N.YETENEK.ke.includes('sur'));
 // kapasite analizi: yalnız ekip şefi yapamayanlar varsa ekip şefi nöbet branşı boş kalır
@@ -118,8 +118,7 @@ console.log('nöbet çekirdek testleri geçti');
   N.adetHazirla(ks, 31); const r = N.uret({y: 2026, m: 12, kisiler: ks, attEs: true}, {sureMs: 2500, deneme: 6, seed: 3});
   assert.strictEqual(r.bos, 0, 'saatlik küsuratta boş yuva kalmamalı');
   const saat = new Map(ks.map(k => [k.id, 0])); r.liste.forEach((L, d) => { if (!d) return; ['es', 'ysp', 'sur'].forEach(t => { if (L[t] != null) saat.set(L[t], saat.get(L[t]) + (L.bol && L.bol[t] ? 24 - L.bol[t].saat : 24)); }); Object.values(L.bol || {}).forEach(b => saat.set(b.id, saat.get(b.id) + b.saat)); });
-  ks.forEach(k => assert.ok(Math.abs(saat.get(k.id) - k.planlanan * 24) <= 3.01, `K${k.id}: planı ${(k.planlanan * 24).toFixed(0)} sa, listede ${saat.get(k.id)} sa`));      // 13.78.1: 4 saatten küçük sapma bölünmez
-  r.liste.forEach((L, d) => Object.values(L.bol || {}).forEach(b => assert.ok(!b || (b.saat >= 4 && b.saat <= 20), `${d}. gün ${b.saat} saatlik parça (en az 4 saat olmalı)`)));
+  ks.forEach(k => assert.ok(Math.abs(saat.get(k.id) - k.planlanan * 24) <= 1.01, `K${k.id}: planı ${(k.planlanan * 24).toFixed(0)} sa, listede ${saat.get(k.id)} sa`));
   console.log('saatlik bölme testi geçti');
 }
 // Sürüm 13.78.1 (kullanıcı kararı): sürücü görünmeyen AABT / ATT'nin elle yazılan sürücü nöbeti ihlal değil; doktorunki ihlal
